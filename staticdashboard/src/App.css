@@ -1,16 +1,15 @@
-/* App.css - Enhanced with patterns and animations */
+/* App.css - Compact UI with subtle patterns */
 
-/* Orange Background Pattern */
+/* Subtle Orange Background */
 .pattern-bg {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background-color: #fef3e2;
+  background-color: #fffbf7;
   background-image: 
-    radial-gradient(circle at 25% 25%, rgba(251, 146, 60, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 75% 75%, rgba(249, 115, 22, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(254, 215, 170, 0.2) 0%, transparent 70%);
+    radial-gradient(circle at 25% 25%, rgba(251, 146, 60, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 75% 75%, rgba(249, 115, 22, 0.06) 0%, transparent 40%);
 }
 
 .pattern-bg::before {
@@ -21,24 +20,17 @@
     repeating-linear-gradient(
       45deg,
       transparent,
-      transparent 10px,
-      rgba(251, 146, 60, 0.03) 10px,
-      rgba(251, 146, 60, 0.03) 20px
-    ),
-    repeating-linear-gradient(
-      -45deg,
-      transparent,
-      transparent 10px,
-      rgba(254, 215, 170, 0.02) 10px,
-      rgba(254, 215, 170, 0.02) 20px
+      transparent 8px,
+      rgba(251, 146, 60, 0.02) 8px,
+      rgba(251, 146, 60, 0.02) 16px
     );
 }
 
-/* Cream Texture Overlay */
+/* Cream Texture - More subtle */
 .cream-texture {
   background: 
-    linear-gradient(135deg, rgba(255, 251, 245, 0.95) 0%, rgba(254, 243, 226, 0.9) 50%, rgba(255, 251, 245, 0.95) 100%);
-  backdrop-filter: blur(20px);
+    linear-gradient(135deg, rgba(255, 251, 245, 0.92) 0%, rgba(254, 243, 226, 0.88) 50%, rgba(255, 251, 245, 0.92) 100%);
+  backdrop-filter: blur(12px);
   position: relative;
 }
 
@@ -47,45 +39,45 @@
   position: absolute;
   inset: 0;
   background: 
-    url("data:image/svg+xml,%3Csvg width='40' height='40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg%3E%3Cpolygon fill='%23fb923c' fill-opacity='0.02' points='20 20 15 0 0 0'/%3E%3Cpolygon fill='%23fed7aa' fill-opacity='0.015' points='20 20 20 0 15 0'/%3E%3Cpolygon fill='%23fb923c' fill-opacity='0.01' points='20 20 0 15 0 20'/%3E%3C/g%3E%3C/svg%3E");
+    url("data:image/svg+xml,%3Csvg width='30' height='30' xmlns='http://www.w3.org/2000/svg'%3E%3Cg%3E%3Cpolygon fill='%23fb923c' fill-opacity='0.015' points='15 15 12 0 0 0'/%3E%3Cpolygon fill='%23fed7aa' fill-opacity='0.01' points='15 15 15 0 12 0'/%3E%3C/g%3E%3C/svg%3E");
   pointer-events: none;
 }
 
-/* Soft UI Shadows */
+/* Compact Soft UI Shadows */
 .soft-shadow {
   box-shadow: 
-    8px 8px 24px rgba(249, 115, 22, 0.08),
-    -8px -8px 24px rgba(255, 255, 255, 0.9),
-    inset 1px 1px 2px rgba(255, 255, 255, 0.3);
+    4px 4px 12px rgba(249, 115, 22, 0.06),
+    -4px -4px 12px rgba(255, 255, 255, 0.85),
+    inset 0.5px 0.5px 1px rgba(255, 255, 255, 0.25);
 }
 
 .soft-shadow-hover {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .soft-shadow-hover:hover {
   box-shadow: 
-    12px 12px 32px rgba(249, 115, 22, 0.12),
-    -12px -12px 32px rgba(255, 255, 255, 0.95),
-    inset 1px 1px 3px rgba(255, 255, 255, 0.4);
-  transform: translateY(-2px);
+    6px 6px 16px rgba(249, 115, 22, 0.08),
+    -6px -6px 16px rgba(255, 255, 255, 0.9),
+    inset 0.5px 0.5px 1.5px rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
 }
 
 .soft-shadow-inset {
   box-shadow: 
-    inset 4px 4px 12px rgba(249, 115, 22, 0.08),
-    inset -4px -4px 12px rgba(255, 255, 255, 0.9);
+    inset 2px 2px 6px rgba(249, 115, 22, 0.06),
+    inset -2px -2px 6px rgba(255, 255, 255, 0.85);
 }
 
-/* Enhanced Animations */
+/* Compact Animations */
 @keyframes pulse-glow {
   0%, 100% { 
     opacity: 1; 
-    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7);
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.6);
   }
   50% { 
-    opacity: 0.8; 
-    box-shadow: 0 0 20px 10px rgba(249, 115, 22, 0);
+    opacity: 0.9; 
+    box-shadow: 0 0 12px 6px rgba(249, 115, 22, 0);
   }
 }
 
@@ -94,16 +86,16 @@
     transform: translateY(0) rotate(0deg);
   }
   33% {
-    transform: translateY(-10px) rotate(1deg);
+    transform: translateY(-4px) rotate(0.5deg);
   }
   66% {
-    transform: translateY(-5px) rotate(-1deg);
+    transform: translateY(-2px) rotate(-0.5deg);
   }
 }
 
 @keyframes slide-in-right {
   0% {
-    transform: translateX(100px);
+    transform: translateX(40px);
     opacity: 0;
   }
   100% {
@@ -114,7 +106,7 @@
 
 @keyframes fade-in-up {
   0% {
-    transform: translateY(20px);
+    transform: translateY(10px);
     opacity: 0;
   }
   100% {
@@ -125,58 +117,221 @@
 
 @keyframes shimmer {
   0% {
-    background-position: -1000px 0;
+    background-position: -500px 0;
   }
   100% {
-    background-position: 1000px 0;
+    background-position: 500px 0;
   }
 }
 
-/* Smooth Transitions */
+/* Faster transitions */
 * {
-  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .smooth-transition {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.hover-lift {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.hover-lift {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .hover-lift:hover {
-  transform: translateY(-4px) scale(1.02);
+  transform: translateY(-2px) scale(1.01);
 }
 
-/* Glass Cards with Cream */
+/* Compact Glass Cards */
 .glass-card-cream {
-  background: linear-gradient(135deg, rgba(255, 251, 245, 0.85), rgba(254, 243, 226, 0.75));
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(251, 146, 60, 0.15);
+  background: linear-gradient(135deg, rgba(255, 251, 245, 0.88), rgba(254, 243, 226, 0.8));
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(251, 146, 60, 0.12);
   box-shadow: 
-    0 8px 32px rgba(249, 115, 22, 0.08),
-    inset 0 1px 2px rgba(255, 255, 255, 0.6);
+    0 4px 16px rgba(249, 115, 22, 0.06),
+    inset 0 0.5px 1px rgba(255, 255, 255, 0.5);
 }
 
-/* Loading Animation */
+/* Compact Loading Animation */
 .loading-float {
-  animation: float 3s ease-in-out infinite;
+  animation: float 2.5s ease-in-out infinite;
 }
 
-/* Card Entry Animations */
+/* Compact Card Entry */
 .card-enter {
-  animation: fade-in-up 0.6s ease-out forwards;
+  animation: fade-in-up 0.4s ease-out forwards;
 }
 
-/* Shimmer Effect */
+/* Subtle Shimmer */
 .shimmer-effect {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0.25) 50%,
     transparent 100%
   );
-  background-size: 1000px 100%;
-  animation: shimmer 2s infinite;
+  background-size: 500px 100%;
+  animation: shimmer 1.8s infinite;
+}
+
+/* Compact spacing overrides */
+.compact-header {
+  padding: 0.5rem 0.75rem;
+}
+
+.compact-card {
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.compact-button {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.6875rem;
+  line-height: 1.25rem;
+}
+
+.compact-input {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+}
+
+.compact-table td,
+.compact-table th {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.625rem;
+}
+
+.compact-modal {
+  padding: 1rem;
+}
+
+.compact-tooltip {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.625rem;
+}
+
+/* Compact chart container */
+.compact-chart {
+  height: 200px;
+  margin: 0.5rem 0;
+}
+
+/* Reduce icon sizes */
+.icon-xs {
+  width: 12px;
+  height: 12px;
+}
+
+.icon-sm {
+  width: 14px;
+  height: 14px;
+}
+
+.icon-base {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-lg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Compact grid gaps */
+.gap-compact {
+  gap: 0.375rem;
+}
+
+.gap-compact-x {
+  column-gap: 0.375rem;
+}
+
+.gap-compact-y {
+  row-gap: 0.375rem;
+}
+
+/* Compact rounded corners */
+.rounded-compact {
+  border-radius: 0.375rem;
+}
+
+.rounded-compact-lg {
+  border-radius: 0.5rem;
+}
+
+/* Optimized for high-density displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .soft-shadow {
+    box-shadow: 
+      3px 3px 10px rgba(249, 115, 22, 0.05),
+      -3px -3px 10px rgba(255, 255, 255, 0.8);
+  }
+}
+
+/* Print styles for compact output */
+@media print {
+  body {
+    font-size: 9pt;
+  }
+  
+  .compact-card {
+    page-break-inside: avoid;
+    padding: 0.25rem;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Smooth range slider styles */
+.slider-thumb::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, #f97316, #fb923c);
+  border: 3px solid white;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  pointer-events: all;
+}
+
+.slider-thumb::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 8px rgba(249, 115, 22, 0.4);
+}
+
+.slider-thumb::-webkit-slider-thumb:active {
+  transform: scale(0.95);
+}
+
+.slider-thumb::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, #f97316, #fb923c);
+  border: 3px solid white;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.slider-thumb::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 8px rgba(249, 115, 22, 0.4);
+}
+
+.slider-thumb::-moz-range-thumb:active {
+  transform: scale(0.95);
+}
+
+/* Multi-select checkbox styles */
+input[type="checkbox"] {
+  accent-color: #f97316;
+}
+
+input[type="checkbox"]:checked {
+  background-color: #f97316;
+  border-color: #f97316;
 }

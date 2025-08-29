@@ -1,4 +1,4 @@
-/* src/index.css - Neumorphism Theme with Modern Styles */
+/* src/index.css - Compact Neumorphism Theme */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
@@ -13,7 +13,7 @@
   }
 
   :root {
-    /* Neumorphism color variables - Light/White theme */
+    /* Neumorphism color variables */
     --neu-base: #ffffff;
     --neu-white: #ffffff;
     --neu-shadow-dark: #d1d5db;
@@ -23,6 +23,19 @@
     --neu-text: #2d3748;
     --neu-text-light: #718096;
     --neu-border: rgba(209, 213, 219, 0.3);
+    
+    /* Compact sizing */
+    --text-xs: 0.625rem;    /* 10px */
+    --text-sm: 0.6875rem;   /* 11px */
+    --text-base: 0.75rem;   /* 12px */
+    --text-lg: 0.8125rem;   /* 13px */
+    --text-xl: 0.875rem;    /* 14px */
+    --text-2xl: 1rem;       /* 16px */
+    --text-3xl: 1.125rem;   /* 18px */
+  }
+
+  html {
+    font-size: 14px; /* Base font size reduced */
   }
 
   body {
@@ -31,11 +44,13 @@
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-size: var(--text-base);
+    line-height: 1.4;
     overflow-x: hidden;
     min-height: 100vh;
   }
 
-  /* Neumorphism Background Pattern */
+  /* Subtle Background Pattern */
   body::before {
     content: '';
     position: fixed;
@@ -44,30 +59,25 @@
     width: 100%;
     height: 100%;
     background-image: 
-      radial-gradient(circle at 20% 80%, rgba(249, 115, 22, 0.02) 0%, transparent 50%),
-      radial-gradient(circle at 80% 20%, rgba(251, 146, 60, 0.02) 0%, transparent 50%),
-      radial-gradient(circle at 40% 40%, rgba(254, 215, 170, 0.01) 0%, transparent 50%);
+      radial-gradient(circle at 20% 80%, rgba(249, 115, 22, 0.015) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(251, 146, 60, 0.015) 0%, transparent 50%);
     pointer-events: none;
     z-index: 0;
   }
 
-  /* Modern Scrollbar */
+  /* Compact Scrollbar */
   ::-webkit-scrollbar {
-    @apply w-2.5 h-2.5;
+    @apply w-1.5 h-1.5;
   }
 
   ::-webkit-scrollbar-track {
     background: #f9f9f9;
-    border-radius: 10px;
-    box-shadow: inset 2px 2px 4px rgba(209, 213, 219, 0.3),
-                inset -2px -2px 4px rgba(255, 255, 255, 0.9);
+    border-radius: 6px;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: linear-gradient(145deg, #f0f0f0, #e0e0e0);
-    border-radius: 10px;
-    box-shadow: 2px 2px 4px rgba(209, 213, 219, 0.3),
-                -2px -2px 4px rgba(255, 255, 255, 0.9);
+    background: linear-gradient(145deg, #e0e0e0, #d0d0d0);
+    border-radius: 6px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
@@ -78,315 +88,267 @@
   ::selection {
     @apply bg-orange-200 text-orange-900;
   }
+
+  /* Typography scales */
+  h1 { font-size: var(--text-3xl); }
+  h2 { font-size: var(--text-2xl); }
+  h3 { font-size: var(--text-xl); }
+  h4 { font-size: var(--text-lg); }
+  p { font-size: var(--text-base); }
+  small { font-size: var(--text-xs); }
 }
 
 @layer components {
-  /* Neumorphism Components */
-  .bg-neu-base {
-    background: #ffffff;
-  }
-
-  .text-neu-text {
-    color: #2d3748;
-  }
-
-  .text-neu-text-light {
-    color: #718096;
-  }
-
-  .text-neu-primary {
-    color: #f97316;
-  }
-
-  .border-neu-border {
-    border-color: rgba(209, 213, 219, 0.3);
-  }
-
-  /* Neumorphism Shadow Effects - Lighter for white background */
+  /* Compact Neumorphism Components */
   .neu-raised {
     background: #ffffff;
-    box-shadow: 6px 6px 12px rgba(209, 213, 219, 0.5),
-                -6px -6px 12px rgba(255, 255, 255, 0.9);
+    box-shadow: 4px 4px 8px rgba(209, 213, 219, 0.4),
+                -4px -4px 8px rgba(255, 255, 255, 0.9);
   }
 
   .neu-inset {
     background: #ffffff;
-    box-shadow: inset 4px 4px 8px rgba(209, 213, 219, 0.4),
-                inset -4px -4px 8px rgba(255, 255, 255, 0.9);
+    box-shadow: inset 2px 2px 4px rgba(209, 213, 219, 0.35),
+                inset -2px -2px 4px rgba(255, 255, 255, 0.9);
   }
 
   .neu-flat {
     background: #ffffff;
-    box-shadow: 3px 3px 6px rgba(209, 213, 219, 0.4),
-                -3px -3px 6px rgba(255, 255, 255, 0.9);
-  }
-
-  .neu-flat-hover {
-    background: #ffffff;
-    box-shadow: 4px 4px 8px rgba(209, 213, 219, 0.4),
-                -4px -4px 8px rgba(255, 255, 255, 0.9);
+    box-shadow: 2px 2px 4px rgba(209, 213, 219, 0.35),
+                -2px -2px 4px rgba(255, 255, 255, 0.9);
   }
 
   .neu-button {
+    @apply px-2 py-1 text-xs font-medium rounded-lg;
     background: linear-gradient(145deg, #ffffff, #f9f9f9);
-    box-shadow: 4px 4px 8px rgba(209, 213, 219, 0.4),
-                -4px -4px 8px rgba(255, 255, 255, 0.9);
-    transition: all 0.3s ease;
+    box-shadow: 3px 3px 6px rgba(209, 213, 219, 0.35),
+                -3px -3px 6px rgba(255, 255, 255, 0.9);
+    transition: all 0.2s ease;
   }
 
   .neu-button:hover {
-    box-shadow: 3px 3px 6px rgba(209, 213, 219, 0.4),
-                -3px -3px 6px rgba(255, 255, 255, 0.9);
+    box-shadow: 2px 2px 4px rgba(209, 213, 219, 0.35),
+                -2px -2px 4px rgba(255, 255, 255, 0.9);
   }
 
   .neu-button:active {
-    box-shadow: inset 2px 2px 4px rgba(209, 213, 219, 0.4),
-                inset -2px -2px 4px rgba(255, 255, 255, 0.9);
+    box-shadow: inset 1px 1px 2px rgba(209, 213, 219, 0.35),
+                inset -1px -1px 2px rgba(255, 255, 255, 0.9);
   }
 
-  .neu-sidebar-shadow {
-    box-shadow: 4px 0 12px rgba(209, 213, 219, 0.2),
-                -2px 0 6px rgba(255, 255, 255, 0.8);
-  }
-
-  /* Glass morphism with Neumorphism */
-  .neu-glass {
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
-    box-shadow: 6px 6px 12px rgba(209, 213, 219, 0.3),
-                -6px -6px 12px rgba(255, 255, 255, 0.9);
-  }
-
-  /* Modern Card Styles */
+  /* Compact Cards */
   .card-neu {
-    @apply rounded-2xl p-6;
+    @apply rounded-lg p-3;
     background: #ffffff;
-    box-shadow: 8px 8px 16px rgba(209, 213, 219, 0.4),
-                -8px -8px 16px rgba(255, 255, 255, 0.9);
-    transition: all 0.3s ease;
+    box-shadow: 6px 6px 12px rgba(209, 213, 219, 0.35),
+                -6px -6px 12px rgba(255, 255, 255, 0.9);
+    transition: all 0.2s ease;
   }
 
   .card-neu:hover {
-    box-shadow: 10px 10px 20px rgba(209, 213, 219, 0.4),
-                -10px -10px 20px rgba(255, 255, 255, 0.9);
-    transform: translateY(-2px);
+    box-shadow: 8px 8px 16px rgba(209, 213, 219, 0.35),
+                -8px -8px 16px rgba(255, 255, 255, 0.9);
+    transform: translateY(-1px);
   }
 
-  /* Input Neumorphism */
+  /* Compact Input */
   .input-neu {
-    @apply px-4 py-3 rounded-xl outline-none;
+    @apply px-2 py-1 text-xs rounded-lg outline-none;
     background: #ffffff;
-    box-shadow: inset 3px 3px 6px rgba(209, 213, 219, 0.3),
-                inset -3px -3px 6px rgba(255, 255, 255, 0.9);
-    transition: all 0.3s ease;
+    box-shadow: inset 2px 2px 4px rgba(209, 213, 219, 0.3),
+                inset -2px -2px 4px rgba(255, 255, 255, 0.9);
+    transition: all 0.2s ease;
   }
 
   .input-neu:focus {
-    box-shadow: inset 4px 4px 8px rgba(209, 213, 219, 0.4),
-                inset -4px -4px 8px rgba(255, 255, 255, 0.9);
+    box-shadow: inset 3px 3px 5px rgba(209, 213, 219, 0.35),
+                inset -3px -3px 5px rgba(255, 255, 255, 0.9);
   }
 
-  /* Progress Bar Neumorphism */
+  /* Compact Progress Bar */
   .progress-neu {
-    @apply w-full h-3 rounded-full;
+    @apply w-full h-1.5 rounded-full;
     background: #ffffff;
-    box-shadow: inset 3px 3px 6px rgba(209, 213, 219, 0.3),
-                inset -3px -3px 6px rgba(255, 255, 255, 0.9);
+    box-shadow: inset 2px 2px 3px rgba(209, 213, 219, 0.3),
+                inset -2px -2px 3px rgba(255, 255, 255, 0.9);
   }
 
   .progress-neu-fill {
     @apply h-full rounded-full;
     background: linear-gradient(145deg, #f97316, #ea580c);
-    box-shadow: 2px 2px 4px rgba(209, 213, 219, 0.4);
+    box-shadow: 1px 1px 2px rgba(209, 213, 219, 0.35);
   }
 
-  /* Status Badges Neumorphism */
+  /* Compact Badges */
   .badge-neu-success {
-    @apply px-3 py-1.5 text-xs font-semibold rounded-full;
+    @apply px-1.5 py-0.5 text-xs font-medium rounded-full;
     background: linear-gradient(145deg, #d4f4e4, #a8e6c7);
-    box-shadow: 3px 3px 6px rgba(163, 177, 198, 0.3),
-                -3px -3px 6px rgba(255, 255, 255, 0.7);
+    box-shadow: 2px 2px 4px rgba(163, 177, 198, 0.25),
+                -2px -2px 4px rgba(255, 255, 255, 0.7);
     color: #047857;
   }
 
   .badge-neu-warning {
-    @apply px-3 py-1.5 text-xs font-semibold rounded-full;
+    @apply px-1.5 py-0.5 text-xs font-medium rounded-full;
     background: linear-gradient(145deg, #fef3c7, #fde68a);
-    box-shadow: 3px 3px 6px rgba(163, 177, 198, 0.3),
-                -3px -3px 6px rgba(255, 255, 255, 0.7);
+    box-shadow: 2px 2px 4px rgba(163, 177, 198, 0.25),
+                -2px -2px 4px rgba(255, 255, 255, 0.7);
     color: #d97706;
   }
 
   .badge-neu-danger {
-    @apply px-3 py-1.5 text-xs font-semibold rounded-full;
+    @apply px-1.5 py-0.5 text-xs font-medium rounded-full;
     background: linear-gradient(145deg, #fee2e2, #fca5a5);
-    box-shadow: 3px 3px 6px rgba(163, 177, 198, 0.3),
-                -3px -3px 6px rgba(255, 255, 255, 0.7);
+    box-shadow: 2px 2px 4px rgba(163, 177, 198, 0.25),
+                -2px -2px 4px rgba(255, 255, 255, 0.7);
     color: #dc2626;
+  }
+
+  /* Compact spacing utilities */
+  .space-y-compact > * + * {
+    margin-top: 0.5rem;
+  }
+
+  .gap-compact {
+    gap: 0.5rem;
+  }
+
+  .p-compact {
+    padding: 0.5rem;
+  }
+
+  .px-compact {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .py-compact {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
   }
 }
 
 @layer utilities {
-  /* Animation Utilities */
-  @keyframes blob {
-    0% {
-      transform: translate(0px, 0px) scale(1);
-    }
-    33% {
-      transform: translate(30px, -50px) scale(1.1);
-    }
-    66% {
-      transform: translate(-20px, 20px) scale(0.9);
-    }
-    100% {
-      transform: translate(0px, 0px) scale(1);
-    }
-  }
-
-  .animate-blob {
-    animation: blob 7s infinite;
-  }
-
-  .animation-delay-2000 {
-    animation-delay: 2s;
-  }
-
-  .animation-delay-4000 {
-    animation-delay: 4s;
-  }
-
+  /* Compact animations */
   @keyframes float {
-    0%, 100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-10px);
-    }
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
   }
 
   .animate-float {
-    animation: float 3s ease-in-out infinite;
+    animation: float 2.5s ease-in-out infinite;
   }
 
   @keyframes pulse-glow {
     0%, 100% {
       opacity: 1;
-      box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7);
+      box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.6);
     }
     50% {
-      opacity: 0.8;
-      box-shadow: 0 0 0 10px rgba(249, 115, 22, 0);
+      opacity: 0.9;
+      box-shadow: 0 0 0 6px rgba(249, 115, 22, 0);
     }
   }
 
   .animate-pulse-glow {
-    animation: pulse-glow 2s infinite;
+    animation: pulse-glow 1.8s infinite;
   }
 
   /* Smooth transitions */
   .transition-neu {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Text Gradients */
-  .text-gradient-orange {
-    @apply bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent;
-  }
-
-  /* Hover Effects */
+  /* Compact hover effects */
   .hover-lift {
-    @apply transition-transform duration-300;
+    @apply transition-transform duration-200;
   }
 
   .hover-lift:hover {
-    transform: translateY(-4px);
+    transform: translateY(-2px);
   }
 
-  /* Pattern overlays */
+  /* Subtle patterns */
   .pattern-dots {
-    background-image: radial-gradient(circle, rgba(163, 177, 198, 0.1) 1px, transparent 1px);
-    background-size: 20px 20px;
+    background-image: radial-gradient(circle, rgba(163, 177, 198, 0.08) 0.5px, transparent 0.5px);
+    background-size: 12px 12px;
   }
 
   .pattern-grid {
     background-image: 
-      linear-gradient(rgba(163, 177, 198, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(163, 177, 198, 0.05) 1px, transparent 1px);
-    background-size: 20px 20px;
+      linear-gradient(rgba(163, 177, 198, 0.04) 0.5px, transparent 0.5px),
+      linear-gradient(90deg, rgba(163, 177, 198, 0.04) 0.5px, transparent 0.5px);
+    background-size: 12px 12px;
   }
 
-  /* Loading Spinner */
+  /* Compact spinner */
   .spinner-neu {
-    @apply w-10 h-10 rounded-full;
+    @apply w-6 h-6 rounded-full;
     background: var(--neu-base);
-    box-shadow: inset 3px 3px 6px var(--neu-shadow-dark),
-                inset -3px -3px 6px var(--neu-shadow-light);
-    position: relative;
-    animation: spin 1.5s linear infinite;
-  }
-
-  .spinner-neu::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    right: 2px;
-    bottom: 2px;
-    border-radius: 50%;
-    border: 3px solid transparent;
-    border-top-color: var(--neu-primary);
-    animation: spin 0.7s linear infinite;
+    box-shadow: inset 2px 2px 4px var(--neu-shadow-dark),
+                inset -2px -2px 4px var(--neu-shadow-light);
+    animation: spin 1.2s linear infinite;
   }
 
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
+
+  /* Text size utilities */
+  .text-2xs { font-size: var(--text-xs); }
+  .text-xs { font-size: var(--text-sm); }
+  .text-sm { font-size: var(--text-base); }
+  .text-base { font-size: var(--text-lg); }
+  .text-lg { font-size: var(--text-xl); }
+  .text-xl { font-size: var(--text-2xl); }
+  .text-2xl { font-size: var(--text-3xl); }
 }
 
-/* Custom Chart Styles for Neumorphism */
+/* Compact Chart Styles */
 .recharts-wrapper {
   font-family: 'Inter', sans-serif !important;
 }
 
 .recharts-cartesian-axis-tick-value {
   fill: var(--neu-text-light) !important;
-  font-size: 12px !important;
+  font-size: 9px !important;
 }
 
 .recharts-legend-wrapper {
-  font-size: 13px !important;
+  font-size: 10px !important;
   color: var(--neu-text) !important;
-}
-
-.recharts-tooltip-wrapper {
-  outline: none !important;
 }
 
 .recharts-default-tooltip {
   background: var(--neu-base) !important;
   border: none !important;
-  border-radius: 12px !important;
-  box-shadow: 8px 8px 16px var(--neu-shadow-dark),
-              -8px -8px 16px var(--neu-shadow-light) !important;
-  padding: 12px !important;
+  border-radius: 8px !important;
+  box-shadow: 6px 6px 12px var(--neu-shadow-dark),
+              -6px -6px 12px var(--neu-shadow-light) !important;
+  padding: 6px 8px !important;
+  font-size: 10px !important;
 }
 
-/* Responsive Design */
+/* Responsive adjustments */
 @media (max-width: 768px) {
   :root {
-    font-size: 14px;
+    --text-xs: 0.5625rem;    /* 9px */
+    --text-sm: 0.625rem;     /* 10px */
+    --text-base: 0.6875rem;  /* 11px */
+    --text-lg: 0.75rem;      /* 12px */
+    --text-xl: 0.8125rem;    /* 13px */
+    --text-2xl: 0.875rem;    /* 14px */
+    --text-3xl: 1rem;        /* 16px */
   }
   
   .card-neu {
-    @apply p-4;
-    box-shadow: 8px 8px 16px var(--neu-shadow-dark),
-                -8px -8px 16px var(--neu-shadow-light);
+    @apply p-2;
   }
 }
 
 @media (max-width: 640px) {
-  :root {
-    font-size: 13px;
+  html {
+    font-size: 12px;
   }
 }
