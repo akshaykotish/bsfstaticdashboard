@@ -19,16 +19,19 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
 
   // Debug logging
   useEffect(() => {
-    if (project) {
-      console.log('Modal: Received project data', {
-        project,
-        hasRequiredFields: !!(project?.serial_no && project?.scheme_name),
-        fields: Object.keys(project || {})
-      });
-    }
-  }, [project]);
+    console.log('Modal: Component mounted/updated', {
+      isOpen,
+      project,
+      hasProject: !!project,
+      projectKeys: project ? Object.keys(project) : []
+    });
+  }, [isOpen, project]);
 
-  if (!isOpen || !project) return null;
+  // Don't render if not open or no project
+  if (!isOpen || !project) {
+    console.log('Modal: Not rendering', { isOpen, hasProject: !!project });
+    return null;
+  }
 
   // Ensure all fields have default values to prevent empty display
   const safeProject = {
@@ -761,18 +764,20 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
     }
   };
 
+  console.log('Modal: Rendering modal');
+
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100000] overflow-hidden flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm z-[100001]"
         onClick={onClose}
       />
       
       {/* Modal */}
-      <div className={`relative w-full max-w-7xl h-[85vh] ${
+      <div className={`relative w-full max-w-6xl h-[85vh] min-h-[600px] ${
         darkMode ? 'bg-gray-900' : 'bg-white'
-      } rounded-2xl shadow-2xl flex flex-col overflow-hidden mx-auto`}>
+      } rounded-2xl shadow-2xl flex flex-col overflow-hidden mx-auto z-[100002]`}>
         
         {/* Header */}
         <div className={`px-6 py-4 border-b ${
@@ -850,7 +855,7 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 min-h-0">
           {renderTabContent()}
         </div>
       </div>

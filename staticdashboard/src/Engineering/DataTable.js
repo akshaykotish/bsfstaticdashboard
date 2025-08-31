@@ -291,7 +291,7 @@ const DataTable = ({
   // Handle empty data
   if (!data || data.length === 0) {
     return (
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} ${!isEmbedded ? 'rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700' : ''} p-8`}>
+      <div  className={`${darkMode ? 'bg-gray-800' : 'bg-white'} ${!isEmbedded ? 'rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700' : ''} overflow-hidden flex flex-col h-full relative z-0`}   style={{ maxWidth: isEmbedded ? '100%' : maxWidth }}>
         <div className="text-center">
           <AlertTriangle size={48} className="mx-auto text-gray-400 mb-4" />
           <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">No Data Available</p>

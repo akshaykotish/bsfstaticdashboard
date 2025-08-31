@@ -49,6 +49,7 @@ const Engineering = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalAnimating, setModalAnimating] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [compareMode, setCompareMode] = useState(false);
   const [selectedProjects, setSelectedProjects] = useState([]);
@@ -59,6 +60,7 @@ const Engineering = () => {
   const [notifications, setNotifications] = useState([]);
   const [drillDownData, setDrillDownData] = useState(null);
   const [showDrillDownModal, setShowDrillDownModal] = useState(false);
+  const [drillDownAnimating, setDrillDownAnimating] = useState(false);
   const [layoutMode, setLayoutMode] = useState('default');
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -361,9 +363,10 @@ const Engineering = () => {
         remaining_amount: project.remaining_amount || 0
       };
       
-      console.log('Engineering: Setting selected project', projectWithDefaults);
+      console.log('Engineering: Setting selected project and opening modal', projectWithDefaults);
       setSelectedProject(projectWithDefaults);
-      setModalOpen(true);
+      setModalOpen(true);  // Open modal immediately
+      setModalAnimating(true);  // Set animation state after
     }
   }, [compareMode]);
 
@@ -404,8 +407,27 @@ const Engineering = () => {
         drillData = filteredData;
     }
     setDrillDownData({ type, data: drillData, filter: data });
-    setShowDrillDownModal(true);
+    setDrillDownAnimating(true);
+    setTimeout(() => {
+      setShowDrillDownModal(true);
+    }, 10);
   }, [filteredData]);
+
+  const closeDrillDownModal = useCallback(() => {
+    setShowDrillDownModal(false);
+    setTimeout(() => {
+      setDrillDownAnimating(false);
+      setDrillDownData(null);
+    }, 300);
+  }, []);
+
+  const closeProjectModal = useCallback(() => {
+    setModalOpen(false);
+    setTimeout(() => {
+      setModalAnimating(false);
+      setSelectedProject(null);
+    }, 300);
+  }, []);
 
   const handleExport = useCallback((format = 'csv') => {
     exportData(filteredData, format, metrics);
@@ -691,18 +713,24 @@ const Engineering = () => {
 
   // Component Functions
   const DrillDownModal = () => {
-    if (!showDrillDownModal || !drillDownData) return null;
+    if (!drillDownAnimating || !drillDownData) return null;
 
     return (
-      <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center">
+      <div className={`fixed inset-0 z-[9999] overflow-hidden flex items-center justify-center transition-all duration-300 ${
+        showDrillDownModal ? 'opacity-100' : 'opacity-0'
+      }`}>
         <div 
-          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-          onClick={() => setShowDrillDownModal(false)}
+          className={`absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
+            showDrillDownModal ? 'opacity-100' : 'opacity-0'
+          }`}
+          onClick={closeDrillDownModal}
         />
         
         <div className={`relative w-[90vw] max-h-[85vh] ${
           darkMode ? 'bg-gray-900' : 'bg-white'
-        } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
+        } rounded-2xl shadow-2xl flex flex-col overflow-hidden transform transition-all duration-300 ${
+          showDrillDownModal ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
+        }`}>
           
           <div className={`px-6 py-4 border-b ${
             darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
@@ -732,7 +760,7 @@ const Engineering = () => {
                   <Download size={16} />
                 </button>
                 <button
-                  onClick={() => setShowDrillDownModal(false)}
+                  onClick={closeDrillDownModal}
                   className={`p-2 rounded-lg ${
                     darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
                   } transition-colors`}
@@ -771,7 +799,7 @@ const Engineering = () => {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto p-6">
+          <div className="z-[9998] flex-1 overflow-auto p-6">
             <DataTable
               data={drillDownData.data}
               darkMode={darkMode}
@@ -865,14 +893,14 @@ const Engineering = () => {
     );
   }
 
-  // Main Render
+  // Main Render with proper z-index layering
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${
+    <div className={`min-h-screen transition-colors duration-300 relative z-0 ${
       darkMode 
         ? 'bg-gray-900 text-gray-100' 
         : 'bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100'
     }`}>
-      <div className={`p-4 lg:p-6 ${layoutMode === 'compact' ? 'max-w-[1600px]' : 'max-w-[1920px]'} mx-auto`}>
+      <div className={`p-4 lg:p-6 ${layoutMode === 'compact' ? 'max-w-[1600px]' : 'max-w-[1920px]'} mx-auto relative z-10`}>
         <div className="space-y-6">
           {/* Header */}
           <div className={`${
@@ -1006,7 +1034,7 @@ const Engineering = () => {
           )}
 
           {viewMode === 'table' && (
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center relative z-20">
               <div className="w-full">
                 <DataTable
                   data={filteredData}
@@ -1094,28 +1122,32 @@ const Engineering = () => {
             </div>
           )}
 
-          {/* Project Detail Modal - Centered with 90vw width */}
-          {selectedProject && modalOpen && (
-            <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center">
+          {/* Project Detail Modal - With Animation */}
+          {modalOpen && selectedProject && (
+            <>
               <div 
-                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                className="fixed inset-0 z-[100000] bg-black/50 backdrop-blur-sm animate-fadeIn"
                 onClick={() => {
                   setModalOpen(false);
                   setSelectedProject(null);
                 }}
               />
-              <div className="relative w-[90vw] max-h-[90vh] overflow-auto">
-                <Modal
-                  isOpen={modalOpen}
-                  onClose={() => {
-                    setModalOpen(false);
-                    setSelectedProject(null);
-                  }}
-                  project={selectedProject}
-                  darkMode={darkMode}
-                />
+              <div className="fixed inset-0 z-[100001] overflow-y-auto animate-fadeIn">
+                <div className="flex min-h-full items-center justify-center p-4">
+                  <div className="animate-modalZoomIn">
+                    <Modal
+                      isOpen={modalOpen}
+                      onClose={() => {
+                        setModalOpen(false);
+                        setSelectedProject(null);
+                      }}
+                      project={selectedProject}
+                      darkMode={darkMode}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* Drill-down Modal */}
@@ -1130,7 +1162,7 @@ const Engineering = () => {
               darkMode ? 'bg-gray-800' : 'bg-white'
             } rounded-xl shadow-lg p-4 border ${
               darkMode ? 'border-gray-700' : 'border-gray-100'
-            }`}>
+            } transform transition-all duration-300 animate-slide-up`}>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-sm">Comparing {selectedProjects.length} Projects</h3>
                 <button
@@ -1183,6 +1215,80 @@ const Engineering = () => {
           )}
         </div>
       </div>
+
+      {/* Custom CSS for animations */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        
+        @keyframes fadeOut {
+          from {
+            opacity: 1;
+          }
+          to {
+            opacity: 0;
+          }
+        }
+        
+        @keyframes modalSlideIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95) translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        
+        @keyframes modalSlideOut {
+          from {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+          to {
+            opacity: 0;
+            transform: scale(0.95) translateY(20px);
+          }
+        }
+        
+        @keyframes slide-up {
+          from {
+            transform: translateY(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out forwards;
+        }
+        
+        .animate-fadeOut {
+          animation: fadeOut 0.3s ease-out forwards;
+        }
+        
+        .animate-modalSlideIn {
+          animation: modalSlideIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+        
+        .animate-modalSlideOut {
+          animation: modalSlideOut 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+        
+        .animate-slide-up {
+          animation: slide-up 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
