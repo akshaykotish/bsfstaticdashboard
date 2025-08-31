@@ -80,7 +80,7 @@ const ChartTabs = ({
     { id: 'predictive', label: 'Predictive Insights', icon: Activity, component: PredictiveInsightsTab }
   ];
 
-  // Handle chart element clicks
+  // Handle chart element clicks - UPDATED to use multi-select filter methods
   const handleChartClick = useCallback((data, type) => {
     setChartHistory(prev => [...prev, { data, type, timestamp: new Date() }]);
 
@@ -92,31 +92,100 @@ const ChartTabs = ({
     } else if (type === 'filter' && data && filters) {
       switch(data.filterType) {
         case 'agency':
-          filters.setSelectedAgency(data.value);
+          // Use multi-select method - set as array with single value
+          if (filters.setSelectedAgencies) {
+            filters.setSelectedAgencies([data.value]);
+          }
           break;
         case 'risk':
-          filters.setSelectedRiskLevel(data.value);
+          // Use multi-select method for risk levels
+          if (filters.setSelectedRiskLevels) {
+            filters.setSelectedRiskLevels([data.value]);
+          }
           break;
         case 'status':
-          filters.setSelectedStatus(data.value);
+          // Use multi-select method for statuses
+          if (filters.setSelectedStatuses) {
+            filters.setSelectedStatuses([data.value]);
+          }
           break;
         case 'budget':
-          filters.setSelectedBudgetHead(data.value);
+          // Use multi-select method for budget heads
+          if (filters.setSelectedBudgetHeads) {
+            filters.setSelectedBudgetHeads([data.value]);
+          }
           break;
         case 'contractor':
-          filters.setSelectedContractor(data.value);
+          // Use multi-select method for contractors
+          if (filters.setSelectedContractors) {
+            filters.setSelectedContractors([data.value]);
+          }
+          break;
+        case 'location':
+          // Use multi-select method for locations
+          if (filters.setSelectedLocations) {
+            filters.setSelectedLocations([data.value]);
+          }
+          break;
+        case 'frontier':
+          // Use multi-select method for frontiers
+          if (filters.setSelectedFrontiers) {
+            filters.setSelectedFrontiers([data.value]);
+          }
           break;
         case 'progress':
-          if (data.range) {
+          if (data.range && filters.setProgressRange) {
             filters.setProgressRange(data.range);
           }
           break;
         case 'delay':
-          if (data.range) {
+          if (data.range && filters.setDelayRange) {
             filters.setDelayRange(data.range);
           }
           break;
+        case 'amount':
+          if (data.range && filters.setAmountRange) {
+            filters.setAmountRange(data.range);
+          }
+          break;
+        case 'efficiency':
+          if (data.range && filters.setEfficiencyRange) {
+            filters.setEfficiencyRange(data.range);
+          }
+          break;
+        case 'health':
+          if (data.range && filters.setHealthRange) {
+            filters.setHealthRange(data.range);
+          }
+          break;
+        // Quick filter shortcuts
+        case 'critical':
+          if (filters.setSelectedRiskLevels) {
+            filters.setSelectedRiskLevels(['CRITICAL']);
+          }
+          break;
+        case 'delayed':
+          if (filters.setDelayRange) {
+            filters.setDelayRange([1, 365]);
+          }
+          break;
+        case 'completed':
+          if (filters.setSelectedStatuses) {
+            filters.setSelectedStatuses(['COMPLETED']);
+          }
+          break;
+        case 'notStarted':
+          if (filters.setSelectedStatuses) {
+            filters.setSelectedStatuses(['NOT_STARTED']);
+          }
+          break;
+        case 'onTrack':
+          if (filters.setDelayRange) {
+            filters.setDelayRange([0, 0]);
+          }
+          break;
         default:
+          console.warn('Unknown filter type:', data.filterType);
           break;
       }
     } else if (type === 'drill' && onDrillDown) {
@@ -128,6 +197,7 @@ const ChartTabs = ({
   const exportChartAsImage = useCallback(() => {
     if (chartRef.current) {
       console.log('Exporting chart as image...');
+      // Implement actual image export logic here if needed
     }
   }, []);
 

@@ -395,15 +395,15 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className={`p-3 rounded-lg shadow-xl backdrop-blur-sm border ${
-          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-orange-200'
+        <div className={`p-2 rounded-lg shadow-lg backdrop-blur-sm border ${
+          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-200'
         }`}>
-          <p className="text-sm font-bold mb-2">{label}</p>
+          <p className="text-xs font-semibold mb-1">{label}</p>
           {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></span>
-              <span className="font-semibold">{entry.name}:</span>
-              <span className="font-medium">{entry.value}</span>
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
+              <span className="font-medium">{entry.name}:</span>
+              <span className="font-semibold">{entry.value}</span>
             </div>
           ))}
         </div>
@@ -423,7 +423,7 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
           onClick={() => setShowRiskModal(false)}
         />
         
-        <div className={`relative w-[70vw] max-w-[1400px] h-[70vh] ${
+        <div className={`relative w-[90vw] max-w-[1600px] h-[85vh] ${
           darkMode ? 'bg-gray-900' : 'bg-white'
         } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
           
@@ -433,10 +433,10 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
           }`}>
             <div className="flex justify-between items-center">
               <div>
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                <h2 className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
                   {selectedRiskData.title}
                 </h2>
-                <div className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-red-100'}`}>
+                <div className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-red-100'}`}>
                   Total Projects: <strong>{selectedRiskData.projects.length}</strong>
                 </div>
               </div>
@@ -446,7 +446,7 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
                   darkMode ? 'hover:bg-gray-700' : 'hover:bg-red-700'
                 } transition-colors`}
               >
-                <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
+                <X size={18} className={darkMode ? 'text-gray-300' : 'text-white'} />
               </button>
             </div>
           </div>
@@ -454,29 +454,29 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
           {/* Stats Summary if available */}
           {selectedRiskData.stats && (
             <div className={`px-6 py-3 border-b ${darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'}`}>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {selectedRiskData.stats.critical !== undefined && (
                   <div className="text-center">
                     <p className="text-xs text-gray-500 uppercase">Critical</p>
-                    <p className="text-lg font-bold text-red-600">{selectedRiskData.stats.critical}</p>
+                    <p className="text-base font-bold text-red-600">{selectedRiskData.stats.critical}</p>
                   </div>
                 )}
                 {selectedRiskData.stats.high !== undefined && (
                   <div className="text-center">
                     <p className="text-xs text-gray-500 uppercase">High Risk</p>
-                    <p className="text-lg font-bold text-orange-600">{selectedRiskData.stats.high}</p>
+                    <p className="text-base font-bold text-orange-600">{selectedRiskData.stats.high}</p>
                   </div>
                 )}
                 {selectedRiskData.stats.avgDelay !== undefined && (
                   <div className="text-center">
                     <p className="text-xs text-gray-500 uppercase">Avg Delay</p>
-                    <p className="text-lg font-bold">{selectedRiskData.stats.avgDelay} days</p>
+                    <p className="text-base font-bold">{selectedRiskData.stats.avgDelay} days</p>
                   </div>
                 )}
                 {selectedRiskData.stats.totalBudget !== undefined && (
                   <div className="text-center">
                     <p className="text-xs text-gray-500 uppercase">Total Budget</p>
-                    <p className="text-lg font-bold">{formatAmount(selectedRiskData.stats.totalBudget)}</p>
+                    <p className="text-base font-bold">{formatAmount(selectedRiskData.stats.totalBudget)}</p>
                   </div>
                 )}
               </div>
@@ -503,9 +503,11 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
   return (
     <div className="space-y-6">
       {/* Risk Overview Cards */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <Shield size={20} className="text-red-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Shield size={18} className="text-red-500" />
           Risk Assessment Overview
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -524,12 +526,12 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
               )}
             >
               <div className="flex justify-between items-start mb-2">
-                <span className="text-sm font-bold" style={{ color: risk.fill }}>
+                <span className="text-sm font-semibold" style={{ color: risk.fill }}>
                   {risk.level}
                 </span>
                 <AlertTriangle size={16} style={{ color: risk.fill }} />
               </div>
-              <div className="text-2xl font-bold">{risk.count}</div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{risk.count}</div>
               <div className="text-xs text-gray-500 mt-1">{risk.percentage}% of total</div>
               <div className="text-xs text-gray-500">₹{risk.budget.toFixed(2)} Cr</div>
             </div>
@@ -538,18 +540,20 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Risk Matrix Scatter Plot */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Activity size={18} className="text-purple-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Activity size={16} className="text-purple-500" />
           Risk Matrix: Progress vs Delay
         </h3>
-        <div className="w-full h-[400px]">
+        <div className="w-full h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart>
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="x" name="Progress %" domain={[0, 100]} tick={{ fontSize: 11 }} />
-              <YAxis dataKey="y" name="Delay (days)" domain={[0, 'dataMax']} tick={{ fontSize: 11 }} />
-              <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+              <XAxis dataKey="x" name="Progress %" domain={[0, 100]} tick={{ fontSize: 10 }} />
+              <YAxis dataKey="y" name="Delay (days)" domain={[0, 'dataMax']} tick={{ fontSize: 10 }} />
+              <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
               <Scatter 
                 name="Projects" 
                 data={riskMetrics.riskMatrix}
@@ -567,9 +571,11 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Risk Factors */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <AlertCircle size={18} className="text-yellow-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <AlertCircle size={16} className="text-yellow-500" />
             Key Risk Factors
           </h3>
           <div className="space-y-3">
@@ -586,7 +592,7 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
                 )}
               >
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold">{factor.factor}</span>
+                  <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">{factor.factor}</span>
                   <span className="text-xs px-2 py-1 rounded-full" style={{ 
                     backgroundColor: factor.color + '20',
                     color: factor.color
@@ -604,12 +610,14 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
 
         {/* Risk by Location */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <MapPin size={18} className="text-orange-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <MapPin size={16} className="text-orange-500" />
             Risk by Frontier HQ
           </h3>
-          <div className="space-y-2 max-h-[350px] overflow-y-auto">
+          <div className="space-y-2 max-h-[320px] overflow-y-auto">
             {riskMetrics.riskByLocation.map((loc, index) => (
               <div 
                 key={index}
@@ -623,13 +631,13 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-sm font-semibold">{loc.location}</p>
+                    <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">{loc.location}</p>
                     <p className="text-xs text-gray-500">{loc.total} projects</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-bold text-red-600">{loc.critical} Critical</div>
+                    <div className="text-xs font-bold text-red-600">{loc.critical} Critical</div>
                     <div className="text-xs text-orange-600">{loc.high} High Risk</div>
-                    <div className="text-xs font-medium">Risk Rate: {loc.riskRate}%</div>
+                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300">Risk Rate: {loc.riskRate}%</div>
                   </div>
                 </div>
               </div>
@@ -639,12 +647,14 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Risk by Budget Head */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <BarChart3 size={18} className="text-blue-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <BarChart3 size={16} className="text-blue-500" />
           Risk Distribution by Budget Head
         </h3>
-        <div className="w-full h-[350px]">
+        <div className="w-full h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart 
               data={riskMetrics.riskByBudgetHead.slice(0, 8)}
@@ -666,10 +676,10 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
               }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="head" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Legend />
+              <XAxis dataKey="head" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 9 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Bar dataKey="critical" stackId="a" fill={COLORS.risk.CRITICAL} name="Critical" />
               <Bar dataKey="high" stackId="a" fill={COLORS.risk.HIGH} name="High" />
               <Bar dataKey="medium" stackId="a" fill={COLORS.risk.MEDIUM} name="Medium" />
@@ -678,16 +688,18 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
           </ResponsiveContainer>
         </div>
         <p className="text-xs text-gray-500 mt-2 flex items-center gap-2">
-          <Eye size={14} />
+          <Eye size={12} />
           Click on bars to view projects by budget head
         </p>
       </div>
 
       {/* Critical Projects Section */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-bold flex items-center gap-2">
-            <AlertOctagon size={18} className="text-red-500" />
+          <h3 className="text-sm font-semibold flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <AlertOctagon size={16} className="text-red-500" />
             Critical Risk Projects - Immediate Action Required
           </h3>
           <button
@@ -697,7 +709,7 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
             )}
             className="px-3 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-2"
           >
-            <Eye size={14} />
+            <Eye size={12} />
             View All {riskMetrics.criticalProjects.length} Critical Projects
           </button>
         </div>
@@ -707,43 +719,43 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
           {riskMetrics.criticalProjects.slice(0, 6).map((project, index) => (
             <div
               key={index}
-              className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:scale-[1.02] 
+              className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:scale-[1.02] 
                 border-red-500 bg-red-50 dark:bg-red-900/20`}
               onClick={() => onChartClick(project, 'project')}
             >
               <div className="flex justify-between items-start mb-2">
-                <h4 className="font-semibold text-sm truncate flex-1" title={project.scheme_name}>
+                <h4 className="font-semibold text-xs truncate flex-1 text-gray-900 dark:text-gray-100" title={project.scheme_name}>
                   {project.scheme_name}
                 </h4>
-                <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">
                   CRITICAL
                 </span>
               </div>
               
               <div className="space-y-1 text-xs">
                 <div className="flex items-center gap-2">
-                  <MapPin size={12} className="text-gray-500" />
-                  <span className="truncate">{project.work_site || 'N/A'}</span>
+                  <MapPin size={10} className="text-gray-500" />
+                  <span className="truncate text-gray-700 dark:text-gray-300">{project.work_site || 'N/A'}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Building2 size={12} className="text-gray-500" />
-                  <span>FHQ: {project.ftr_hq || 'N/A'} | SHQ: {project.shq || 'N/A'}</span>
+                  <Building2 size={10} className="text-gray-500" />
+                  <span className="text-gray-700 dark:text-gray-300">FHQ: {project.ftr_hq || 'N/A'} | SHQ: {project.shq || 'N/A'}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Users size={12} className="text-gray-500" />
-                  <span className="truncate">{project.firm_name || 'N/A'}</span>
+                  <Users size={10} className="text-gray-500" />
+                  <span className="truncate text-gray-700 dark:text-gray-300">{project.firm_name || 'N/A'}</span>
                 </div>
               </div>
 
-              <div className="mt-3 pt-3 border-t border-red-300 dark:border-red-800">
+              <div className="mt-2 pt-2 border-t border-red-300 dark:border-red-800">
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
                     <span className="text-gray-500">Budget:</span>
-                    <p className="font-semibold">₹{(project.sanctioned_amount / 100).toFixed(2)}Cr</p>
+                    <p className="font-semibold text-gray-900 dark:text-gray-100">₹{(project.sanctioned_amount / 100).toFixed(2)}Cr</p>
                   </div>
                   <div>
                     <span className="text-gray-500">Progress:</span>
-                    <p className="font-semibold">{project.physical_progress || 0}%</p>
+                    <p className="font-semibold text-gray-900 dark:text-gray-100">{project.physical_progress || 0}%</p>
                   </div>
                   <div>
                     <span className="text-gray-500">Delay:</span>
@@ -758,19 +770,21 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
 
       {/* Risk Trend */}
       {riskMetrics.riskTrend.length > 0 && (
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <TrendingUp size={18} className="text-green-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <TrendingUp size={16} className="text-green-500" />
             Risk Trend Analysis
           </h3>
-          <div className="w-full h-[300px]">
+          <div className="w-full h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={riskMetrics.riskTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <Area type="monotone" dataKey="critical" stackId="1" stroke={COLORS.risk.CRITICAL} fill={COLORS.risk.CRITICAL} name="Critical" />
                 <Area type="monotone" dataKey="high" stackId="1" stroke={COLORS.risk.HIGH} fill={COLORS.risk.HIGH} name="High" />
                 <Area type="monotone" dataKey="medium" stackId="1" stroke={COLORS.risk.MEDIUM} fill={COLORS.risk.MEDIUM} name="Medium" />
@@ -782,25 +796,27 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
       )}
 
       {/* Risk Heatmap */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Gauge size={18} className="text-purple-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Gauge size={16} className="text-purple-500" />
           Risk Heatmap: Efficiency vs Budget
         </h3>
-        <div className="overflow-x-auto" style={{ maxHeight: '300px' }}>
+        <div className="overflow-x-auto">
           <table className="w-full text-xs">
-            <thead className="sticky top-0 z-10">
+            <thead>
               <tr className={darkMode ? 'bg-gray-900' : 'bg-gray-50'}>
-                <th className="px-2 py-2 text-left">Efficiency / Budget</th>
+                <th className="px-2 py-2 text-left text-gray-700 dark:text-gray-300">Efficiency / Budget</th>
                 {['<50L', '50-100L', '1-5Cr', '5-10Cr', '>10Cr'].map(range => (
-                  <th key={range} className="px-2 py-2 text-center">{range}</th>
+                  <th key={range} className="px-2 py-2 text-center text-gray-700 dark:text-gray-300">{range}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'].map(effRange => (
                 <tr key={effRange}>
-                  <td className="px-2 py-2 font-medium">{effRange}</td>
+                  <td className="px-2 py-2 font-medium text-gray-900 dark:text-gray-100">{effRange}</td>
                   {['<50L', '50-100L', '1-5Cr', '5-10Cr', '>10Cr'].map(budgetRange => {
                     const cell = riskMetrics.riskHeatmap.find(
                       h => h.efficiency === effRange && h.budget === budgetRange
@@ -841,10 +857,12 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Mitigation Priority */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-bold flex items-center gap-2">
-            <Target size={18} className="text-orange-500" />
+          <h3 className="text-sm font-semibold flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Target size={16} className="text-orange-500" />
             Priority Mitigation Actions
           </h3>
           <button
@@ -854,15 +872,15 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
             )}
             className="px-3 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 transition-colors flex items-center gap-2"
           >
-            <Eye size={14} />
+            <Eye size={12} />
             View All Priority Projects
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4" style={{ maxHeight: '600px', overflowY: 'auto' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {riskMetrics.mitigationPriority.slice(0, 6).map((project, index) => (
             <div
               key={index}
-              className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:scale-[1.02] ${
+              className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:scale-[1.02] ${
                 project.risk === 'CRITICAL' 
                   ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
                   : 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
@@ -870,10 +888,10 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
               onClick={() => onChartClick(project, 'project')}
             >
               <div className="flex justify-between items-start mb-2">
-                <h4 className="font-semibold text-sm truncate flex-1" title={project.project}>
+                <h4 className="font-semibold text-xs truncate flex-1 text-gray-900 dark:text-gray-100" title={project.project}>
                   {project.project}
                 </h4>
-                <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                   project.risk === 'CRITICAL' 
                     ? 'bg-red-100 text-red-700' 
                     : 'bg-orange-100 text-orange-700'
@@ -884,28 +902,28 @@ const RiskDashboard = ({ data, darkMode, onChartClick, formatAmount }) => {
               
               <div className="space-y-1 text-xs">
                 <div className="flex items-center gap-2">
-                  <MapPin size={12} className="text-gray-500" />
-                  <span className="truncate">{project.location}</span>
+                  <MapPin size={10} className="text-gray-500" />
+                  <span className="truncate text-gray-700 dark:text-gray-300">{project.location}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Building2 size={12} className="text-gray-500" />
-                  <span>FHQ: {project.ftr_hq} | SHQ: {project.shq}</span>
+                  <Building2 size={10} className="text-gray-500" />
+                  <span className="text-gray-700 dark:text-gray-300">FHQ: {project.ftr_hq} | SHQ: {project.shq}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Users size={12} className="text-gray-500" />
-                  <span className="truncate">{project.contractor}</span>
+                  <Users size={10} className="text-gray-500" />
+                  <span className="truncate text-gray-700 dark:text-gray-300">{project.contractor}</span>
                 </div>
               </div>
 
-              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
                     <span className="text-gray-500">Budget:</span>
-                    <p className="font-semibold">₹{project.budget}Cr</p>
+                    <p className="font-semibold text-gray-900 dark:text-gray-100">₹{project.budget.toFixed(2)}Cr</p>
                   </div>
                   <div>
                     <span className="text-gray-500">Progress:</span>
-                    <p className="font-semibold">{project.progress}%</p>
+                    <p className="font-semibold text-gray-900 dark:text-gray-100">{project.progress}%</p>
                   </div>
                   <div>
                     <span className="text-gray-500">Delay:</span>

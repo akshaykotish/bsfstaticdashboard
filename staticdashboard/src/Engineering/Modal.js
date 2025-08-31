@@ -114,12 +114,12 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
 
   const getRiskColor = (level) => {
     const colors = {
-      CRITICAL: 'text-red-600 bg-red-100',
-      HIGH: 'text-orange-600 bg-orange-100',
-      MEDIUM: 'text-yellow-600 bg-yellow-100',
-      LOW: 'text-green-600 bg-green-100'
+      CRITICAL: 'text-red-600 bg-red-100 dark:bg-red-900/20',
+      HIGH: 'text-orange-600 bg-orange-100 dark:bg-orange-900/20',
+      MEDIUM: 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/20',
+      LOW: 'text-green-600 bg-green-100 dark:bg-green-900/20'
     };
-    return colors[level] || 'text-gray-600 bg-gray-100';
+    return colors[level] || 'text-gray-600 bg-gray-100 dark:bg-gray-900/20';
   };
 
   const getStatusColor = (status) => {
@@ -202,57 +202,57 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
           <div className="space-y-6">
             {/* Key Metrics */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 rounded-lg bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-800">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Progress</span>
-                  <TrendingUp size={16} className="text-orange-500" />
+                  <TrendingUp size={16} className="text-blue-500" />
                 </div>
-                <div className="text-2xl font-bold">{safeProject.physical_progress.toFixed(0)}%</div>
-                <div className="w-full bg-gray-200 rounded-full h-1 mt-2">
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{safeProject.physical_progress.toFixed(0)}%</div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-2">
                   <div 
-                    className="h-1 rounded-full bg-orange-500"
+                    className="h-1.5 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
                     style={{ width: `${Math.min(100, Math.max(0, safeProject.physical_progress))}%` }}
                   />
                 </div>
               </div>
 
-              <div className="p-4 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border border-green-200 dark:border-green-800">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Efficiency</span>
-                  <Target size={16} className="text-blue-500" />
+                  <Target size={16} className="text-green-500" />
                 </div>
-                <div className="text-2xl font-bold">{safeProject.efficiency_score.toFixed(1)}%</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{safeProject.efficiency_score.toFixed(1)}%</div>
               </div>
 
-              <div className="p-4 rounded-lg bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border border-purple-200 dark:border-purple-800">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Health</span>
-                  <Activity size={16} className="text-green-500" />
+                  <Activity size={16} className="text-purple-500" />
                 </div>
-                <div className="text-2xl font-bold">{safeProject.health_score.toFixed(0)}</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{safeProject.health_score.toFixed(0)}</div>
               </div>
 
-              <div className="p-4 rounded-lg bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-800">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Delay</span>
                   <Clock size={16} className="text-red-500" />
                 </div>
-                <div className="text-2xl font-bold">{safeProject.delay_days} days</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{safeProject.delay_days} days</div>
               </div>
             </div>
 
             {/* Project Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h3 className="font-semibold mb-3 text-orange-600">Basic Information</h3>
+                <h3 className="font-semibold mb-3 text-blue-600 dark:text-blue-400">Basic Information</h3>
                 <dl className="space-y-2">
                   <div className="flex justify-between py-1 border-b border-gray-200 dark:border-gray-700">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Serial No</dt>
-                    <dd className="text-sm font-medium">{safeProject.serial_no}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{safeProject.serial_no}</dd>
                   </div>
                   <div className="flex justify-between py-1 border-b border-gray-200 dark:border-gray-700">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Budget Head</dt>
-                    <dd className="text-sm font-medium">{safeProject.budget_head}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{safeProject.budget_head}</dd>
                   </div>
                   <div className="flex justify-between py-1 border-b border-gray-200 dark:border-gray-700">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Status</dt>
@@ -270,33 +270,33 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
                   </div>
                   <div className="flex justify-between py-1 border-b border-gray-200 dark:border-gray-700">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Priority</dt>
-                    <dd className="text-sm font-medium">{safeProject.priority}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{safeProject.priority}</dd>
                   </div>
                 </dl>
               </div>
 
               <div>
-                <h3 className="font-semibold mb-3 text-blue-600">Location & Parties</h3>
+                <h3 className="font-semibold mb-3 text-green-600 dark:text-green-400">Location & Parties</h3>
                 <dl className="space-y-2">
                   <div className="flex justify-between py-1 border-b border-gray-200 dark:border-gray-700">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Work Site</dt>
-                    <dd className="text-sm font-medium text-right">{safeProject.work_site}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100 text-right">{safeProject.work_site}</dd>
                   </div>
                   <div className="flex justify-between py-1 border-b border-gray-200 dark:border-gray-700">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Executive Agency</dt>
-                    <dd className="text-sm font-medium text-right">{safeProject.executive_agency}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100 text-right">{safeProject.executive_agency}</dd>
                   </div>
                   <div className="flex justify-between py-1 border-b border-gray-200 dark:border-gray-700">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Contractor</dt>
-                    <dd className="text-sm font-medium text-right">{safeProject.firm_name}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100 text-right">{safeProject.firm_name}</dd>
                   </div>
                   <div className="flex justify-between py-1 border-b border-gray-200 dark:border-gray-700">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Frontier HQ</dt>
-                    <dd className="text-sm font-medium">{safeProject.ftr_hq}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{safeProject.ftr_hq}</dd>
                   </div>
                   <div className="flex justify-between py-1 border-b border-gray-200 dark:border-gray-700">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">SHQ</dt>
-                    <dd className="text-sm font-medium">{safeProject.shq}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{safeProject.shq}</dd>
                   </div>
                 </dl>
               </div>
@@ -305,8 +305,8 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
             {/* Remarks */}
             {safeProject.remarks && safeProject.remarks !== 'N/A' && (
               <div>
-                <h3 className="font-semibold mb-2 text-purple-600">Remarks</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <h3 className="font-semibold mb-2 text-purple-600 dark:text-purple-400">Remarks</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
                   {safeProject.remarks}
                 </p>
               </div>
@@ -319,24 +319,24 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
           <div className="space-y-6">
             {/* Financial Summary */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg">
+              <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-2xl border border-green-200 dark:border-green-800">
                 <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Sanctioned Amount</div>
                 <div className="text-2xl font-bold text-green-600">{formatAmount(safeProject.sanctioned_amount)}</div>
               </div>
-              <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg">
+              <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-2xl border border-blue-200 dark:border-blue-800">
                 <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Total Expenditure</div>
                 <div className="text-2xl font-bold text-blue-600">{formatAmount(safeProject.total_expdr)}</div>
                 <div className="text-xs text-gray-500 mt-1">{safeProject.percent_expdr.toFixed(1)}% utilized</div>
               </div>
-              <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-lg">
+              <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-2xl border border-orange-200 dark:border-orange-800">
                 <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Remaining</div>
                 <div className="text-2xl font-bold text-orange-600">{formatAmount(safeProject.remaining_amount)}</div>
               </div>
             </div>
 
             {/* Budget Utilization Chart */}
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-              <h3 className="font-semibold mb-4">Budget Distribution</h3>
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Budget Distribution</h3>
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
                   <Pie
@@ -360,28 +360,28 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
 
             {/* Detailed Financial Info */}
             <div>
-              <h3 className="font-semibold mb-3">Financial Details</h3>
+              <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Financial Details</h3>
               <dl className="space-y-2">
                 <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                   <dt className="text-sm text-gray-600 dark:text-gray-400">Expenditure upto 31 Mar 25</dt>
-                  <dd className="text-sm font-medium">{formatAmount(safeProject.expdr_upto_31mar25)}</dd>
+                  <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatAmount(safeProject.expdr_upto_31mar25)}</dd>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                   <dt className="text-sm text-gray-600 dark:text-gray-400">Current FY Expenditure</dt>
-                  <dd className="text-sm font-medium">{formatAmount(safeProject.expdr_cfy)}</dd>
+                  <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatAmount(safeProject.expdr_cfy)}</dd>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                   <dt className="text-sm text-gray-600 dark:text-gray-400">Utilization %</dt>
-                  <dd className="text-sm font-bold">{safeProject.percent_expdr.toFixed(2)}%</dd>
+                  <dd className="text-sm font-bold text-gray-900 dark:text-gray-100">{safeProject.percent_expdr.toFixed(2)}%</dd>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                   <dt className="text-sm text-gray-600 dark:text-gray-400">AA/ES Reference</dt>
-                  <dd className="text-sm font-medium">{safeProject.aa_es_ref || 'N/A'}</dd>
+                  <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{safeProject.aa_es_ref || 'N/A'}</dd>
                 </div>
                 {safeProject.aa_es_pending_with && (
                   <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">AA/ES Pending With</dt>
-                    <dd className="text-sm font-medium">{safeProject.aa_es_pending_with}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{safeProject.aa_es_pending_with}</dd>
                   </div>
                 )}
               </dl>
@@ -394,54 +394,54 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
           <div className="space-y-6">
             {/* Key Dates */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
+                <h3 className="font-semibold mb-3 flex items-center gap-2 text-gray-900 dark:text-gray-100">
                   <Calendar size={18} className="text-blue-500" />
                   Project Dates
                 </h3>
                 <dl className="space-y-2">
                   <div className="flex justify-between py-1">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Date of Award</dt>
-                    <dd className="text-sm font-medium">{formatDate(safeProject.date_award)}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatDate(safeProject.date_award)}</dd>
                   </div>
                   <div className="flex justify-between py-1">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Date of Tender</dt>
-                    <dd className="text-sm font-medium">{formatDate(safeProject.date_tender)}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatDate(safeProject.date_tender)}</dd>
                   </div>
                   <div className="flex justify-between py-1">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">PDC (Agreement)</dt>
-                    <dd className="text-sm font-medium">{formatDate(safeProject.pdc_agreement)}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatDate(safeProject.pdc_agreement)}</dd>
                   </div>
                   <div className="flex justify-between py-1">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Revised PDC</dt>
-                    <dd className="text-sm font-medium">{formatDate(safeProject.revised_pdc)}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatDate(safeProject.revised_pdc)}</dd>
                   </div>
                   <div className="flex justify-between py-1">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Date of Acceptance</dt>
-                    <dd className="text-sm font-medium">{formatDate(safeProject.date_acceptance)}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatDate(safeProject.date_acceptance)}</dd>
                   </div>
                   <div className="flex justify-between py-1">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Actual Completion</dt>
-                    <dd className="text-sm font-medium">
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">
                       {safeProject.actual_completion_date ? formatDate(safeProject.actual_completion_date) : 'In Progress'}
                     </dd>
                   </div>
                 </dl>
               </div>
 
-              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
+                <h3 className="font-semibold mb-3 flex items-center gap-2 text-gray-900 dark:text-gray-100">
                   <Timer size={18} className="text-orange-500" />
                   Time Analysis
                 </h3>
                 <dl className="space-y-2">
                   <div className="flex justify-between py-1">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Time Allowed</dt>
-                    <dd className="text-sm font-medium">{safeProject.time_allowed_days} days</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{safeProject.time_allowed_days} days</dd>
                   </div>
                   <div className="flex justify-between py-1">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Time Elapsed</dt>
-                    <dd className="text-sm font-medium">
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">
                       {safeProject.date_award ? 
                         Math.floor((new Date() - new Date(safeProject.date_award)) / (1000 * 60 * 60 * 24)) : 0
                       } days
@@ -455,11 +455,11 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
                   </div>
                   <div className="flex justify-between py-1">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Progress Status</dt>
-                    <dd className="text-sm font-medium">{safeProject.progress_status}</dd>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">{safeProject.progress_status}</dd>
                   </div>
                   <div className="flex justify-between py-1">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">Expected Completion</dt>
-                    <dd className="text-sm font-medium">
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-100">
                       {safeProject.revised_pdc || safeProject.pdc_agreement || 'TBD'}
                     </dd>
                   </div>
@@ -468,14 +468,20 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
             </div>
 
             {/* Progress Chart */}
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-              <h3 className="font-semibold mb-4">Progress Timeline</h3>
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Progress Timeline</h3>
               <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={timelineData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
+                  <XAxis dataKey="month" stroke={darkMode ? '#9ca3af' : '#6b7280'} />
+                  <YAxis stroke={darkMode ? '#9ca3af' : '#6b7280'} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+                      border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                      borderRadius: '8px'
+                    }}
+                  />
                   <Line type="monotone" dataKey="planned" stroke="#3b82f6" name="Planned" strokeWidth={2} />
                   <Line type="monotone" dataKey="actual" stroke="#10b981" name="Actual" strokeWidth={2} />
                 </LineChart>
@@ -488,32 +494,38 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
         return (
           <div className="space-y-6">
             {/* Performance Radar */}
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-              <h3 className="font-semibold mb-4">Performance Metrics</h3>
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Performance Metrics</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <RadarChart data={performanceData}>
-                  <PolarGrid strokeDasharray="3 3" />
-                  <PolarAngleAxis dataKey="metric" />
-                  <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                  <Radar name="Score" dataKey="value" stroke="#f97316" fill="#fb923c" fillOpacity={0.6} />
-                  <Tooltip />
+                  <PolarGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
+                  <PolarAngleAxis dataKey="metric" stroke={darkMode ? '#9ca3af' : '#6b7280'} />
+                  <PolarRadiusAxis angle={90} domain={[0, 100]} stroke={darkMode ? '#9ca3af' : '#6b7280'} />
+                  <Radar name="Score" dataKey="value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.6} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+                      border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                      borderRadius: '8px'
+                    }}
+                  />
                 </RadarChart>
               </ResponsiveContainer>
             </div>
 
             {/* Performance Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <h3 className="font-semibold mb-3">Efficiency Analysis</h3>
+              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
+                <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Efficiency Analysis</h3>
                 <div className="space-y-3">
                   <div>
                     <div className="flex justify-between mb-1">
                       <span className="text-sm text-gray-600 dark:text-gray-400">Progress vs Budget</span>
-                      <span className="text-sm font-medium">{safeProject.efficiency_score.toFixed(1)}%</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{safeProject.efficiency_score.toFixed(1)}%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div 
-                        className="h-2 rounded-full bg-gradient-to-r from-orange-400 to-orange-600"
+                        className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
                         style={{ width: `${Math.min(100, Math.max(0, safeProject.efficiency_score))}%` }}
                       />
                     </div>
@@ -521,13 +533,13 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
                   <div>
                     <div className="flex justify-between mb-1">
                       <span className="text-sm text-gray-600 dark:text-gray-400">Time Efficiency</span>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                         {Math.max(0, 100 - (safeProject.delay_days / 3.65)).toFixed(1)}%
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div 
-                        className="h-2 rounded-full bg-gradient-to-r from-blue-400 to-blue-600"
+                        className="h-2 rounded-full bg-gradient-to-r from-green-500 to-green-600"
                         style={{ width: `${Math.max(0, 100 - (safeProject.delay_days / 3.65))}%` }}
                       />
                     </div>
@@ -535,11 +547,11 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
                   <div>
                     <div className="flex justify-between mb-1">
                       <span className="text-sm text-gray-600 dark:text-gray-400">Physical Progress</span>
-                      <span className="text-sm font-medium">{safeProject.physical_progress.toFixed(1)}%</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{safeProject.physical_progress.toFixed(1)}%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div 
-                        className="h-2 rounded-full bg-gradient-to-r from-green-400 to-green-600"
+                        className="h-2 rounded-full bg-gradient-to-r from-purple-500 to-purple-600"
                         style={{ width: `${Math.min(100, Math.max(0, safeProject.physical_progress))}%` }}
                       />
                     </div>
@@ -547,8 +559,8 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
                 </div>
               </div>
 
-              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <h3 className="font-semibold mb-3">Health Indicators</h3>
+              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
+                <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Health Indicators</h3>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Overall Health</span>
@@ -568,7 +580,7 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Priority</span>
-                    <span className="text-sm font-medium">{safeProject.priority}</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{safeProject.priority}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Status</span>
@@ -586,8 +598,8 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
         return (
           <div className="space-y-6">
             {/* Risk Assessment */}
-            <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-200 dark:border-red-800">
+              <h3 className="font-semibold mb-3 flex items-center gap-2 text-gray-900 dark:text-gray-100">
                 <AlertTriangle size={18} className="text-red-500" />
                 Current Risk Level: {safeProject.risk_level}
               </h3>
@@ -601,7 +613,7 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
                   <div className="flex items-start gap-2">
                     <Clock size={16} className="text-red-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Schedule Delay</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Schedule Delay</p>
                       <p className="text-xs text-gray-600 dark:text-gray-400">
                         Project is delayed by {safeProject.delay_days} days
                       </p>
@@ -613,7 +625,7 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
                   <div className="flex items-start gap-2">
                     <Target size={16} className="text-orange-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Low Efficiency</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Low Efficiency</p>
                       <p className="text-xs text-gray-600 dark:text-gray-400">
                         Efficiency score is {safeProject.efficiency_score.toFixed(1)}%
                       </p>
@@ -625,7 +637,7 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
                   <div className="flex items-start gap-2">
                     <IndianRupee size={16} className="text-yellow-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Budget Overrun Risk</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Budget Overrun Risk</p>
                       <p className="text-xs text-gray-600 dark:text-gray-400">
                         {safeProject.percent_expdr.toFixed(1)}% budget used for {safeProject.physical_progress.toFixed(0)}% progress
                       </p>
@@ -637,7 +649,7 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
                   <div className="flex items-start gap-2">
                     <AlertCircle size={16} className="text-red-500 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">No Progress</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">No Progress</p>
                       <p className="text-xs text-gray-600 dark:text-gray-400">
                         Project has not started despite being awarded
                       </p>
@@ -648,41 +660,41 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
             </div>
 
             {/* Mitigation Strategies */}
-            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <h3 className="font-semibold mb-3">Recommended Actions</h3>
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Recommended Actions</h3>
               <ul className="space-y-2">
                 {safeProject.delay_days > 30 && (
                   <li className="flex items-start gap-2">
                     <CheckCircle size={16} className="text-green-500 mt-0.5" />
-                    <span className="text-sm">Review and optimize project timeline with contractor</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Review and optimize project timeline with contractor</span>
                   </li>
                 )}
                 {safeProject.efficiency_score < 70 && (
                   <li className="flex items-start gap-2">
                     <CheckCircle size={16} className="text-green-500 mt-0.5" />
-                    <span className="text-sm">Conduct efficiency audit and implement process improvements</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Conduct efficiency audit and implement process improvements</span>
                   </li>
                 )}
                 {safeProject.risk_level === 'CRITICAL' && (
                   <li className="flex items-start gap-2">
                     <CheckCircle size={16} className="text-green-500 mt-0.5" />
-                    <span className="text-sm">Schedule immediate review meeting with all stakeholders</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Schedule immediate review meeting with all stakeholders</span>
                   </li>
                 )}
                 <li className="flex items-start gap-2">
                   <CheckCircle size={16} className="text-green-500 mt-0.5" />
-                  <span className="text-sm">Monitor progress weekly and update risk assessment</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Monitor progress weekly and update risk assessment</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle size={16} className="text-green-500 mt-0.5" />
-                  <span className="text-sm">Ensure adequate resource allocation and support</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Ensure adequate resource allocation and support</span>
                 </li>
               </ul>
             </div>
 
             {/* Risk History */}
-            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <h3 className="font-semibold mb-3">Risk Assessment History</h3>
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Risk Assessment History</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Risk assessment is calculated based on delay days, efficiency score, budget utilization, and physical progress.
               </p>
@@ -693,8 +705,8 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
       case 'documents':
         return (
           <div className="space-y-6">
-            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <h3 className="font-semibold mb-3">Project Documents</h3>
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Project Documents</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Documents and files related to this project
               </p>
@@ -707,16 +719,16 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
                   { name: 'Progress Report Q1.xlsx', size: '456 KB', date: '2024-04-01' },
                   { name: 'Site Photos.zip', size: '15.2 MB', date: '2024-05-15' }
                 ].map((doc, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-white dark:bg-gray-700 rounded-lg">
+                  <div key={idx} className="flex items-center justify-between p-3 bg-white dark:bg-gray-700 rounded-xl">
                     <div className="flex items-center gap-3">
-                      <FileText size={20} className="text-orange-500" />
+                      <FileText size={20} className="text-blue-500" />
                       <div>
-                        <p className="text-sm font-medium">{doc.name}</p>
-                        <p className="text-xs text-gray-500">{doc.size} • {doc.date}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{doc.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{doc.size} • {doc.date}</p>
                       </div>
                     </div>
-                    <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded">
-                      <Download size={16} />
+                    <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors">
+                      <Download size={16} className="text-gray-600 dark:text-gray-400" />
                     </button>
                   </div>
                 ))}
@@ -724,19 +736,19 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
             </div>
 
             {/* Notes Section */}
-            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <h3 className="font-semibold mb-3">Project Notes</h3>
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Project Notes</h3>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Add notes about this project..."
-                className={`w-full h-32 p-3 rounded-lg border ${
+                className={`w-full h-32 p-3 rounded-xl border ${
                   darkMode 
-                    ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                    : 'bg-white border-gray-300'
-                } focus:ring-2 focus:ring-orange-400`}
+                    ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400' 
+                    : 'bg-white border-gray-300 placeholder-gray-500'
+                } focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:outline-none`}
               />
-              <button className="mt-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 flex items-center gap-2">
+              <button className="mt-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:opacity-90 transition-all flex items-center gap-2 shadow-sm">
                 <Save size={16} />
                 Save Notes
               </button>
@@ -764,14 +776,14 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
         
         {/* Header */}
         <div className={`px-6 py-4 border-b ${
-          darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-orange-500 to-orange-600'
+          darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
         }`}>
           <div className="flex justify-between items-start">
             <div className="flex-1">
               <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
                 {safeProject.scheme_name}
               </h2>
-              <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-orange-100'}`}>
+              <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
                 {safeProject.work_site} • {safeProject.executive_agency}
               </p>
             </div>
@@ -781,7 +793,7 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
               <button
                 onClick={handleShare}
                 className={`p-2 rounded-lg ${
-                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-700'
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
                 } transition-colors`}
                 title="Share"
               >
@@ -790,7 +802,7 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
               <button
                 onClick={handlePrint}
                 className={`p-2 rounded-lg ${
-                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-700'
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
                 } transition-colors`}
                 title="Print"
               >
@@ -799,7 +811,7 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
               <button
                 onClick={handleExport}
                 className={`p-2 rounded-lg ${
-                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-700'
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
                 } transition-colors`}
                 title="Export"
               >
@@ -808,7 +820,7 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
               <button
                 onClick={onClose}
                 className={`p-2 rounded-lg ${
-                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-700'
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
                 } transition-colors`}
               >
                 <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
@@ -826,7 +838,7 @@ const Modal = ({ isOpen, onClose, project, darkMode }) => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
                   activeTab === tab.id 
-                    ? 'bg-orange-500 text-white shadow-md' 
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm' 
                     : darkMode ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200'
                 }`}
               >

@@ -17,14 +17,14 @@ const COLORS = {
     spent: '#10b981',
     remaining: '#f59e0b',
     overrun: '#ef4444',
-    underutilized: '#a855f7'
+    underutilized: '#8b5cf6'
   },
   variance: {
     positive: '#10b981',
     negative: '#ef4444',
     neutral: '#6b7280'
   },
-  gradient: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#a855f7', '#ec4899']
+  gradient: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 };
 
 const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
@@ -243,15 +243,15 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className={`p-3 rounded-lg shadow-xl backdrop-blur-sm border ${
-          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-orange-200'
+        <div className={`p-2 rounded-lg shadow-lg backdrop-blur-sm border ${
+          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-200'
         }`}>
-          <p className="text-sm font-bold mb-2">{label}</p>
+          <p className="text-xs font-semibold mb-1">{label}</p>
           {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></span>
-              <span className="font-semibold">{entry.name}:</span>
-              <span className="font-medium">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
+              <span className="font-medium">{entry.name}:</span>
+              <span className="font-semibold">
                 {typeof entry.value === 'number' && (entry.name.includes('Amount') || entry.name.includes('Budget'))
                   ? formatAmount(entry.value * 100)
                   : entry.value}
@@ -267,20 +267,22 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
   return (
     <div className="space-y-6">
       {/* Budget Allocation vs Utilization */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <IndianRupee size={20} className="text-green-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <IndianRupee size={18} className="text-green-500" />
           Budget Allocation vs Utilization by Department
         </h3>
         <div className="w-full h-[400px]">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={budgetMetrics.budgetByHead}>
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 10 }} />
-              <YAxis yAxisId="left" label={{ value: 'Amount (Cr)', angle: -90, position: 'insideLeft' }} />
-              <YAxis yAxisId="right" orientation="right" label={{ value: 'Utilization %', angle: 90, position: 'insideRight' }} />
+              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 9 }} />
+              <YAxis yAxisId="left" label={{ value: 'Amount (Cr)', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="right" orientation="right" label={{ value: 'Utilization %', angle: 90, position: 'insideRight', style: { fontSize: 10 } }} tick={{ fontSize: 10 }} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Bar yAxisId="left" dataKey="allocated" fill={COLORS.budget.allocated} name="Allocated (Cr)" />
               <Bar yAxisId="left" dataKey="spent" fill={COLORS.budget.spent} name="Spent (Cr)" />
               <Bar yAxisId="left" dataKey="remaining" fill={COLORS.budget.remaining} name="Remaining (Cr)" />
@@ -292,17 +294,19 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Efficiency Matrix */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <BarChart3 size={18} className="text-blue-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <BarChart3 size={16} className="text-blue-500" />
             Budget Efficiency Matrix
           </h3>
           <div className="w-full h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="x" name="Budget Spent %" domain={[0, 120]} tick={{ fontSize: 11 }} />
-                <YAxis dataKey="y" name="Progress %" domain={[0, 100]} tick={{ fontSize: 11 }} />
+                <XAxis dataKey="x" name="Budget Spent %" domain={[0, 120]} tick={{ fontSize: 10 }} />
+                <YAxis dataKey="y" name="Progress %" domain={[0, 100]} tick={{ fontSize: 10 }} />
                 <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
                 <Scatter name="Projects" data={budgetMetrics.efficiencyMatrix}>
                   {budgetMetrics.efficiencyMatrix.map((entry, index) => (
@@ -315,9 +319,11 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
 
         {/* Utilization Distribution */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <PieChartIcon size={18} className="text-purple-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <PieChartIcon size={16} className="text-purple-500" />
             Budget Utilization Distribution
           </h3>
           <div className="w-full h-[350px]">
@@ -346,19 +352,21 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
 
       {/* Budget Trend */}
       {budgetMetrics.budgetTrend.length > 0 && (
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <TrendingUp size={18} className="text-green-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <TrendingUp size={16} className="text-green-500" />
             Monthly Budget Trend
           </h3>
           <div className="w-full h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={budgetMetrics.budgetTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <Area type="monotone" dataKey="allocated" stackId="1" stroke={COLORS.budget.allocated} fill={COLORS.budget.allocated} name="Allocated" />
                 <Area type="monotone" dataKey="spent" stackId="2" stroke={COLORS.budget.spent} fill={COLORS.budget.spent} name="Spent" />
               </AreaChart>
@@ -370,30 +378,32 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
       {/* Critical Projects */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Overrun Projects */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <AlertTriangle size={18} className="text-red-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <AlertTriangle size={16} className="text-red-500" />
             Top Budget Overruns
           </h3>
-          <div className="space-y-3 max-h-[400px] overflow-y-auto">
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {budgetMetrics.overrunProjects.map((project, index) => (
               <div 
                 key={index}
-                className={`p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.02] ${
+                className={`p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.01] ${
                   darkMode ? 'border-red-800 bg-red-900/20' : 'border-red-200 bg-red-50'
                 }`}
                 onClick={() => onChartClick(project, 'project')}
               >
-                <p className="text-sm font-semibold truncate">{project.project}</p>
+                <p className="text-xs font-semibold truncate text-gray-900 dark:text-gray-100">{project.project}</p>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-xs text-gray-500">Overrun</span>
-                  <span className="font-bold text-red-600 text-sm">
+                  <span className="font-bold text-red-600 text-xs">
                     ₹{project.overrunAmount} Cr ({project.overrunPercent}%)
                   </span>
                 </div>
                 <div className="flex justify-between items-center mt-1">
                   <span className="text-xs text-gray-500">Progress</span>
-                  <span className="text-xs font-medium">{project.progress}%</span>
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{project.progress}%</span>
                 </div>
               </div>
             ))}
@@ -401,30 +411,32 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
 
         {/* Underutilized Projects */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <AlertCircle size={18} className="text-yellow-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <AlertCircle size={16} className="text-yellow-500" />
             Underutilized Budgets
           </h3>
-          <div className="space-y-3 max-h-[400px] overflow-y-auto">
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {budgetMetrics.underutilizedProjects.map((project, index) => (
               <div 
                 key={index}
-                className={`p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.02] ${
+                className={`p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.01] ${
                   darkMode ? 'border-yellow-800 bg-yellow-900/20' : 'border-yellow-200 bg-yellow-50'
                 }`}
                 onClick={() => onChartClick(project, 'project')}
               >
-                <p className="text-sm font-semibold truncate">{project.project}</p>
+                <p className="text-xs font-semibold truncate text-gray-900 dark:text-gray-100">{project.project}</p>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-xs text-gray-500">Unutilized</span>
-                  <span className="font-bold text-yellow-600 text-sm">
+                  <span className="font-bold text-yellow-600 text-xs">
                     ₹{project.unutilizedAmount} Cr
                   </span>
                 </div>
                 <div className="flex justify-between items-center mt-1">
                   <span className="text-xs text-gray-500">Utilization</span>
-                  <span className="text-xs font-medium">{project.utilizationPercent}%</span>
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{project.utilizationPercent}%</span>
                 </div>
               </div>
             ))}

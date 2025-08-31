@@ -23,7 +23,7 @@ const COLORS = {
     poor: '#ef4444',
     critical: '#991b1b'
   },
-  metrics: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#a855f7', '#ec4899'],
+  metrics: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'],
   gradient: {
     high: '#10b981',
     medium: '#f59e0b',
@@ -374,15 +374,15 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className={`p-3 rounded-lg shadow-xl backdrop-blur-sm border ${
-          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-orange-200'
+        <div className={`p-2 rounded-lg shadow-lg backdrop-blur-sm border ${
+          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-200'
         }`}>
-          <p className="text-sm font-bold mb-2">{label}</p>
+          <p className="text-xs font-semibold mb-1">{label}</p>
           {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></span>
-              <span className="font-semibold">{entry.name}:</span>
-              <span className="font-medium">{entry.value}</span>
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
+              <span className="font-medium">{entry.name}:</span>
+              <span className="font-semibold">{entry.value}</span>
             </div>
           ))}
         </div>
@@ -402,19 +402,19 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
           onClick={() => setShowEfficiencyModal(false)}
         />
         
-        <div className={`relative w-[70vw] max-w-[1400px] h-[70vh] ${
+        <div className={`relative w-[90vw] max-w-[1600px] h-[85vh] ${
           darkMode ? 'bg-gray-900' : 'bg-white'
         } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
           
           <div className={`px-6 py-4 border-b ${
-            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-purple-500 to-indigo-600'
+            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
           }`}>
             <div className="flex justify-between items-center">
               <div>
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                <h2 className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
                   {selectedEfficiencyData.title}
                 </h2>
-                <div className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-purple-100'}`}>
+                <div className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
                   Total Projects: <strong>{selectedEfficiencyData.projects.length}</strong>
                   {selectedEfficiencyData.stats && (
                     <>
@@ -431,51 +431,51 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
               <button
                 onClick={() => setShowEfficiencyModal(false)}
                 className={`p-2 rounded-lg ${
-                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-purple-700'
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
                 } transition-colors`}
               >
-                <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
+                <X size={18} className={darkMode ? 'text-gray-300' : 'text-white'} />
               </button>
             </div>
           </div>
 
           {selectedEfficiencyData.stats && Object.keys(selectedEfficiencyData.stats).length > 0 && (
             <div className={`px-6 py-3 border-b ${darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'}`}>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 {selectedEfficiencyData.stats.excellent !== undefined && (
                   <div className="text-center">
                     <p className="text-xs text-gray-500 uppercase">Excellent</p>
-                    <p className="text-lg font-bold text-green-600">{selectedEfficiencyData.stats.excellent}</p>
+                    <p className="text-base font-bold text-green-600">{selectedEfficiencyData.stats.excellent}</p>
                   </div>
                 )}
                 {selectedEfficiencyData.stats.good !== undefined && (
                   <div className="text-center">
                     <p className="text-xs text-gray-500 uppercase">Good</p>
-                    <p className="text-lg font-bold text-blue-600">{selectedEfficiencyData.stats.good}</p>
+                    <p className="text-base font-bold text-blue-600">{selectedEfficiencyData.stats.good}</p>
                   </div>
                 )}
                 {selectedEfficiencyData.stats.average !== undefined && (
                   <div className="text-center">
                     <p className="text-xs text-gray-500 uppercase">Average</p>
-                    <p className="text-lg font-bold text-yellow-600">{selectedEfficiencyData.stats.average}</p>
+                    <p className="text-base font-bold text-yellow-600">{selectedEfficiencyData.stats.average}</p>
                   </div>
                 )}
                 {selectedEfficiencyData.stats.poor !== undefined && (
                   <div className="text-center">
                     <p className="text-xs text-gray-500 uppercase">Poor</p>
-                    <p className="text-lg font-bold text-red-600">{selectedEfficiencyData.stats.poor}</p>
+                    <p className="text-base font-bold text-red-600">{selectedEfficiencyData.stats.poor}</p>
                   </div>
                 )}
                 {selectedEfficiencyData.stats.avgProgress !== undefined && (
                   <div className="text-center">
                     <p className="text-xs text-gray-500 uppercase">Avg Progress</p>
-                    <p className="text-lg font-bold">{selectedEfficiencyData.stats.avgProgress}%</p>
+                    <p className="text-base font-bold">{selectedEfficiencyData.stats.avgProgress}%</p>
                   </div>
                 )}
                 {selectedEfficiencyData.stats.avgBudgetUsed !== undefined && (
                   <div className="text-center">
                     <p className="text-xs text-gray-500 uppercase">Budget Used</p>
-                    <p className="text-lg font-bold">{selectedEfficiencyData.stats.avgBudgetUsed}%</p>
+                    <p className="text-base font-bold">{selectedEfficiencyData.stats.avgBudgetUsed}%</p>
                   </div>
                 )}
               </div>
@@ -501,15 +501,17 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
   return (
     <div className="space-y-6">
       {/* Overall Efficiency Dashboard */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <Gauge size={20} className="text-purple-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Gauge size={18} className="text-purple-500" />
           Efficiency Performance Dashboard
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className={`p-4 rounded-lg text-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-            <div className="text-3xl font-bold text-purple-600">{efficiencyData.overallEfficiency.avgScore}%</div>
-            <div className="text-sm text-gray-500 mt-1">Average Score</div>
+          <div className={`p-3 rounded-lg text-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+            <div className="text-2xl font-bold text-purple-600">{efficiencyData.overallEfficiency.avgScore}%</div>
+            <div className="text-xs text-gray-500 mt-1">Average Score</div>
           </div>
           {[
             { label: 'Excellent', count: efficiencyData.overallEfficiency.excellent, rate: efficiencyData.overallEfficiency.excellentRate, color: COLORS.efficiency.excellent, projects: efficiencyData.overallEfficiency.excellentProjects },
@@ -519,7 +521,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
           ].map((item, index) => (
             <div 
               key={index}
-              className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:scale-105`}
+              className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:scale-105`}
               style={{ borderColor: item.color, backgroundColor: item.color + '10' }}
               onClick={() => handleEfficiencyClick(
                 `${item.label} Efficiency Projects (${item.count})`,
@@ -527,7 +529,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
                 { avgEfficiency: efficiencyData.overallEfficiency.avgScore }
               )}
             >
-              <div className="text-2xl font-bold" style={{ color: item.color }}>{item.count}</div>
+              <div className="text-xl font-bold" style={{ color: item.color }}>{item.count}</div>
               <div className="text-xs text-gray-500">{item.label}</div>
               <div className="text-xs font-medium mt-1">{item.rate}%</div>
             </div>
@@ -537,9 +539,11 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Efficiency Distribution */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <BarChart3 size={18} className="text-blue-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <BarChart3 size={16} className="text-blue-500" />
             Efficiency Distribution
           </h3>
           <div className="w-full h-[300px]">
@@ -560,9 +564,9 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="range" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
+                <XAxis dataKey="range" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="count" style={{ cursor: 'pointer' }}>
                   {efficiencyData.efficiencyDistribution.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -572,25 +576,27 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
             </ResponsiveContainer>
           </div>
           <p className="text-xs text-gray-500 mt-2 flex items-center gap-2">
-            <Eye size={14} />
+            <Eye size={12} />
             Click on bars to view projects in each efficiency range
           </p>
         </div>
 
         {/* Efficiency Factors Radar */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <Target size={18} className="text-green-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Target size={16} className="text-green-500" />
             Efficiency Factors Analysis
           </h3>
           <div className="w-full h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={efficiencyData.efficiencyFactors}>
                 <PolarGrid stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <PolarAngleAxis dataKey="factor" tick={{ fontSize: 10 }} />
-                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
+                <PolarAngleAxis dataKey="factor" tick={{ fontSize: 9 }} />
+                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 9 }} />
                 <Radar name="Score" dataKey="score" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.6} />
-                <Tooltip />
+                <Tooltip content={<CustomTooltip />} />
               </RadarChart>
             </ResponsiveContainer>
           </div>
@@ -598,18 +604,20 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Efficiency Correlation Scatter */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Activity size={18} className="text-indigo-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Activity size={16} className="text-indigo-500" />
           Efficiency Correlation: Progress vs Budget Utilization
         </h3>
         <div className="w-full h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart>
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="x" name="Progress %" domain={[0, 100]} tick={{ fontSize: 11 }} />
-              <YAxis dataKey="y" name="Budget Used %" domain={[0, 120]} tick={{ fontSize: 11 }} />
-              <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+              <XAxis dataKey="x" name="Progress %" domain={[0, 100]} tick={{ fontSize: 10 }} />
+              <YAxis dataKey="y" name="Budget Used %" domain={[0, 120]} tick={{ fontSize: 10 }} />
+              <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
               <Scatter 
                 name="Projects" 
                 data={efficiencyData.efficiencyCorrelation}
@@ -626,9 +634,11 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Agency Efficiency Comparison */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Building2 size={18} className="text-orange-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Building2 size={16} className="text-orange-500" />
           Agency Efficiency Performance
         </h3>
         <div className="w-full h-[350px]">
@@ -653,10 +663,10 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
               }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="agency" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Legend />
+              <XAxis dataKey="agency" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 9 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Bar dataKey="avgEfficiency" fill="#8b5cf6" name="Avg Efficiency %" style={{ cursor: 'pointer' }} />
               <Bar dataKey="avgProgress" fill="#3b82f6" name="Avg Progress %" />
               <Line type="monotone" dataKey="avgBudgetUsed" stroke="#f97316" name="Avg Budget Used %" strokeWidth={2} />
@@ -664,15 +674,17 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
           </ResponsiveContainer>
         </div>
         <p className="text-xs text-gray-500 mt-2 flex items-center gap-2">
-          <Eye size={14} />
+          <Eye size={12} />
           Click on bars to view detailed project list for each agency
         </p>
       </div>
 
       {/* Location Efficiency Analysis */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <MapPin size={18} className="text-red-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <MapPin size={16} className="text-red-500" />
           Efficiency by Frontier HQ
         </h3>
         <div className="w-full h-[350px]">
@@ -697,10 +709,10 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
               }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="location" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Legend />
+              <XAxis dataKey="location" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 9 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Bar dataKey="avgEfficiency" fill="#8b5cf6" name="Avg Efficiency %" style={{ cursor: 'pointer' }} />
               <Bar dataKey="excellentRate" fill="#10b981" name="Excellent Rate %" />
               <Bar dataKey="poorRate" fill="#ef4444" name="Poor Rate %" />
@@ -710,9 +722,11 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Contractor Efficiency Performance */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Users size={18} className="text-cyan-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Users size={16} className="text-cyan-500" />
           Top Contractors by Efficiency
         </h3>
         <div className="w-full h-[400px]">
@@ -736,11 +750,11 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
               }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="contractor" angle={-45} textAnchor="end" height={100} tick={{ fontSize: 10 }} />
-              <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Legend />
+              <XAxis dataKey="contractor" angle={-45} textAnchor="end" height={100} tick={{ fontSize: 9 }} />
+              <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Bar yAxisId="left" dataKey="avgEfficiency" fill="#06b6d4" name="Avg Efficiency %" style={{ cursor: 'pointer' }} />
               <Bar yAxisId="left" dataKey="projects" fill="#94a3b8" name="Projects" />
               <Line yAxisId="right" type="monotone" dataKey="totalBudget" stroke="#f97316" name="Budget (Cr)" strokeWidth={2} />
@@ -748,16 +762,18 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
           </ResponsiveContainer>
         </div>
         <p className="text-xs text-gray-500 mt-2 flex items-center gap-2">
-          <Eye size={14} />
+          <Eye size={12} />
           Click on bars to view contractor's project portfolio
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Performers */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <Award size={18} className="text-green-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Award size={16} className="text-green-500" />
             Top Efficiency Performers
           </h3>
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -770,13 +786,13 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
                 onClick={() => onChartClick(project, 'project')}
               >
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold truncate flex-1">{project.project}</span>
-                  <span className="text-green-600 font-bold">{project.efficiency}%</span>
+                  <span className="text-xs font-semibold truncate flex-1 text-gray-900 dark:text-gray-100">{project.project}</span>
+                  <span className="text-green-600 font-bold text-xs">{project.efficiency}%</span>
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                  <div>Progress: {project.progress}%</div>
-                  <div>Budget: {project.budgetUsed}%</div>
-                  <div>₹{project.budget} Cr</div>
+                  <div className="text-gray-700 dark:text-gray-300">Progress: {project.progress}%</div>
+                  <div className="text-gray-700 dark:text-gray-300">Budget: {project.budgetUsed}%</div>
+                  <div className="text-gray-700 dark:text-gray-300">₹{project.budget} Cr</div>
                 </div>
               </div>
             ))}
@@ -789,17 +805,19 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
                 .slice(0, 50);
               handleEfficiencyClick('All Top Performing Projects', allTopPerformers);
             }}
-            className="mt-3 w-full px-3 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+            className="mt-3 w-full px-3 py-2 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
           >
-            <Eye size={16} />
+            <Eye size={14} />
             View All Top Performers
           </button>
         </div>
 
         {/* Bottom Performers */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <AlertTriangle size={18} className="text-red-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <AlertTriangle size={16} className="text-red-500" />
             Low Efficiency Projects
           </h3>
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -812,14 +830,14 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
                 onClick={() => onChartClick(project, 'project')}
               >
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold truncate flex-1">{project.project}</span>
-                  <span className="text-red-600 font-bold">{project.efficiency}%</span>
+                  <span className="text-xs font-semibold truncate flex-1 text-gray-900 dark:text-gray-100">{project.project}</span>
+                  <span className="text-red-600 font-bold text-xs">{project.efficiency}%</span>
                 </div>
                 <div className="mt-2 text-xs">
                   <div className="grid grid-cols-3 gap-2">
-                    <div>Progress: {project.progress}%</div>
-                    <div>Budget: {project.budgetUsed}%</div>
-                    <div>₹{project.budget} Cr</div>
+                    <div className="text-gray-700 dark:text-gray-300">Progress: {project.progress}%</div>
+                    <div className="text-gray-700 dark:text-gray-300">Budget: {project.budgetUsed}%</div>
+                    <div className="text-gray-700 dark:text-gray-300">₹{project.budget} Cr</div>
                   </div>
                   {project.issues && (
                     <div className="mt-1 text-red-600">Issues: {project.issues}</div>
@@ -836,9 +854,9 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
                 .slice(0, 50);
               handleEfficiencyClick('All Low Efficiency Projects', allBottomPerformers);
             }}
-            className="mt-3 w-full px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+            className="mt-3 w-full px-3 py-2 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
           >
-            <Eye size={16} />
+            <Eye size={14} />
             View All Low Performers
           </button>
         </div>
@@ -846,9 +864,11 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
 
       {/* Efficiency Trend */}
       {efficiencyData.efficiencyTrend.length > 0 && (
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <TrendingUp size={18} className="text-purple-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <TrendingUp size={16} className="text-purple-500" />
             Efficiency Trend Analysis
           </h3>
           <div className="w-full h-[300px]">
@@ -873,10 +893,10 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <Line type="monotone" dataKey="avgEfficiency" stroke="#8b5cf6" name="Avg Efficiency %" strokeWidth={2} />
                 <Line type="monotone" dataKey="excellentRate" stroke="#10b981" name="Excellent Rate %" strokeWidth={2} />
                 <Line type="monotone" dataKey="poorRate" stroke="#ef4444" name="Poor Rate %" strokeWidth={2} />
@@ -884,16 +904,18 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
             </ResponsiveContainer>
           </div>
           <p className="text-xs text-gray-500 mt-2 flex items-center gap-2">
-            <Eye size={14} />
+            <Eye size={12} />
             Click on data points to view projects from specific months
           </p>
         </div>
       )}
 
       {/* Budget Head Efficiency Treemap */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Package size={18} className="text-indigo-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Package size={16} className="text-indigo-500" />
           Efficiency by Budget Head
         </h3>
         <div className="w-full h-[400px]">
@@ -912,7 +934,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
               stroke="#fff"
               fill="#8884d8"
               content={({ root, depth, x, y, width, height, index, name, value, excellent, poor, projectList }) => {
-                const fontSize = width > 50 && height > 30 ? 12 : 10;
+                const fontSize = width > 50 && height > 30 ? 11 : 9;
                 const color = value > 80 ? COLORS.efficiency.excellent :
                             value > 60 ? COLORS.efficiency.good :
                             value > 40 ? COLORS.efficiency.average : COLORS.efficiency.poor;
@@ -989,18 +1011,20 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Quick Stats */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Zap size={18} className="text-yellow-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Zap size={16} className="text-yellow-500" />
           Efficiency Quick Stats
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+          <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">High Efficiency</span>
-              <CheckCircle size={16} className="text-green-500" />
+              <CheckCircle size={14} className="text-green-500" />
             </div>
-            <p className="text-2xl font-bold text-green-500">
+            <p className="text-xl font-bold text-green-500">
               {data.filter(d => d.efficiency_score >= 80).length}
             </p>
             <p className="text-xs text-gray-500 mt-1">
@@ -1008,12 +1032,12 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
             </p>
           </div>
 
-          <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+          <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Low Efficiency</span>
-              <AlertCircle size={16} className="text-red-500" />
+              <AlertCircle size={14} className="text-red-500" />
             </div>
-            <p className="text-2xl font-bold text-red-500">
+            <p className="text-xl font-bold text-red-500">
               {data.filter(d => d.efficiency_score < 40).length}
             </p>
             <p className="text-xs text-gray-500 mt-1">
@@ -1021,12 +1045,12 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
             </p>
           </div>
 
-          <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+          <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Optimal Projects</span>
-              <Target size={16} className="text-purple-500" />
+              <Target size={14} className="text-purple-500" />
             </div>
-            <p className="text-2xl font-bold text-purple-500">
+            <p className="text-xl font-bold text-purple-500">
               {data.filter(d => d.efficiency_score >= 60 && d.efficiency_score <= 100 && d.delay_days === 0).length}
             </p>
             <p className="text-xs text-gray-500 mt-1">
@@ -1034,12 +1058,12 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
             </p>
           </div>
 
-          <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+          <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Budget Impact</span>
-              <IndianRupee size={16} className="text-orange-500" />
+              <IndianRupee size={14} className="text-orange-500" />
             </div>
-            <p className="text-2xl font-bold text-orange-500">
+            <p className="text-xl font-bold text-orange-500">
               ₹{(data.filter(d => d.efficiency_score < 60)
                 .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100).toFixed(2)} Cr
             </p>

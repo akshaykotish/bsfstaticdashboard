@@ -442,7 +442,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
       : metric.value;
 
     const cardSizes = {
-      compact: 'p-2',
+      compact: 'p-3',
       normal: 'p-4',
       large: 'p-6'
     };
@@ -453,27 +453,27 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
         onMouseEnter={() => setHoveredCard(metric.id)}
         onMouseLeave={() => setHoveredCard(null)}
         className={`
-          relative rounded-xl shadow-lg border transition-all duration-300 cursor-pointer
+          relative rounded-2xl shadow-sm border transition-all duration-300 cursor-pointer
           ${darkMode 
             ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' 
-            : 'bg-white border-gray-200 hover:bg-gray-50'
+            : 'bg-white border-gray-100 hover:bg-gray-50'
           }
           ${cardSizes[size]}
-          hover:shadow-xl hover:scale-105 hover:-translate-y-1
+          hover:shadow-lg hover:scale-102 hover:-translate-y-0.5
           ${metric.alert ? 'ring-2 ring-red-400 ring-opacity-50' : ''}
           ${metric.pulse ? 'animate-pulse' : ''}
         `}
         style={{ position: 'relative', zIndex: isHovered ? 20 : 1 }}
       >
-        {/* Gradient Background Effect */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${metric.gradient} opacity-5 rounded-xl pointer-events-none`} />
+        {/* Gradient Background Effect - Subtle */}
+        <div className={`absolute inset-0 bg-gradient-to-br ${metric.gradient} opacity-[0.03] rounded-2xl pointer-events-none`} />
         
         {/* Alert Badge */}
         {metric.alert && (
-          <div className="absolute -top-2 -right-2 z-10">
-            <span className="relative flex h-3 w-3">
+          <div className="absolute -top-1 -right-1 z-10">
+            <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
             </span>
           </div>
         )}
@@ -483,14 +483,14 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
           <div className="flex justify-between items-start mb-3">
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <span className={`text-xs font-bold uppercase tracking-wider ${
+                <span className={`text-xs font-semibold ${
                   darkMode ? 'text-gray-400' : 'text-gray-600'
                 }`}>
                   {metric.title}
                 </span>
                 {metric.group && size !== 'compact' && (
-                  <span className={`px-1.5 py-0.5 rounded text-xs ${
-                    darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
+                  <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${
+                    darkMode ? 'bg-gray-700/50 text-gray-400' : 'bg-gray-100 text-gray-600'
                   }`}>
                     {metric.group}
                   </span>
@@ -505,24 +505,24 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
                     : (metric.alert ? 'text-green-500' : 'text-red-500')
                 }`}>
                   {metric.trendDirection === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                  <span>{Math.abs(metric.trend)}%</span>
+                  <span className="text-[10px]">{Math.abs(metric.trend)}%</span>
                 </div>
               )}
             </div>
             
             {/* Icon */}
-            <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.gradient} shadow-md ${
-              size === 'compact' ? 'p-1.5' : 'p-2'
+            <div className={`rounded-xl bg-gradient-to-br ${metric.gradient} shadow-sm ${
+              size === 'compact' ? 'p-2' : 'p-2.5'
             }`}>
-              <metric.icon size={size === 'compact' ? 14 : isMain ? 20 : 16} className="text-white" />
+              <metric.icon size={size === 'compact' ? 14 : isMain ? 18 : 16} className="text-white" />
             </div>
           </div>
           
           {/* Value Display */}
           <div className={`${
-            size === 'compact' ? 'text-lg' : isMain ? 'text-2xl' : 'text-xl'
-          } font-black ${
-            darkMode ? 'text-gray-100' : 'text-gray-800'
+            size === 'compact' ? 'text-base' : isMain ? 'text-xl' : 'text-lg'
+          } font-bold ${
+            darkMode ? 'text-gray-100' : 'text-gray-900'
           } mb-1 transition-all duration-500 ${
             animateValues ? 'scale-100' : 'scale-95'
           }`}>
@@ -531,7 +531,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
           
           {/* Subtitle */}
           {metric.subtitle && size !== 'compact' && (
-            <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
               {metric.subtitle}
             </div>
           )}
@@ -548,7 +548,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
           
           {/* Mini Sparkline Chart */}
           {metric.sparkline && showTrends && size === 'normal' && (
-            <div className="mt-2 h-8 pointer-events-none">
+            <div className="mt-3 h-8 pointer-events-none opacity-50">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={metric.sparkline}>
                   <defs>
@@ -571,12 +571,11 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
           {/* Hover Details Popup */}
           {showDetails && (
             <div 
-              className={`absolute left-0 right-0 mt-2 p-3 rounded-lg shadow-xl ${
+              className={`absolute left-0 right-0 mt-2 p-3 rounded-xl shadow-xl ${
                 darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
-              } border`}
+              } border z-50`}
               style={{ 
                 top: '100%',
-                zIndex: 1000,
                 minWidth: '200px'
               }}
             >
@@ -610,11 +609,11 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
               e.stopPropagation();
               // Handle more options
             }}
-            className={`absolute top-2 right-2 p-1 rounded opacity-0 hover:opacity-100 transition-opacity ${
-              darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+            className={`absolute top-3 right-3 p-1 rounded-lg opacity-0 hover:opacity-100 transition-opacity ${
+              darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
             }`}
           >
-            <MoreVertical size={14} />
+            <MoreVertical size={14} className="text-gray-400" />
           </button>
         )}
       </div>
@@ -624,21 +623,23 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
   return (
     <div className="space-y-4" style={{ position: 'relative', zIndex: 1 }}>
       {/* Controls Bar */}
-      <div className={`flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg ${
-        darkMode ? 'bg-gray-800' : 'bg-white'
-      } shadow-md`}>
+      <div className={`flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl ${
+        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'
+      } shadow-sm border`}>
         {/* Group Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">View:</span>
+          <span className={`text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+            View:
+          </span>
           <div className="flex gap-1">
             {Object.keys(metricGroups).map(group => (
               <button
                 key={group}
                 onClick={() => setSelectedMetricGroup(group)}
-                className={`px-3 py-1 rounded-lg text-xs font-medium capitalize transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${
                   selectedMetricGroup === group
-                    ? 'bg-orange-500 text-white'
-                    : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm'
+                    : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 {group}
@@ -651,13 +652,13 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
         <div className="flex items-center gap-3">
           {/* Size Toggle */}
           <div className="flex items-center gap-2">
-            <span className="text-xs">Size:</span>
+            <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Size:</span>
             <select
               value={cardSize}
               onChange={(e) => setCardSize(e.target.value)}
-              className={`px-2 py-1 rounded text-xs ${
-                darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
-              }`}
+              className={`px-2 py-1 rounded-lg text-xs ${
+                darkMode ? 'bg-gray-700 text-gray-300 border-gray-600' : 'bg-gray-100 text-gray-700 border-gray-200'
+              } border focus:outline-none focus:ring-2 focus:ring-blue-400`}
             >
               <option value="compact">Compact</option>
               <option value="normal">Normal</option>
@@ -668,10 +669,10 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
           {/* Trends Toggle */}
           <button
             onClick={() => setShowTrends(!showTrends)}
-            className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${
               showTrends
-                ? 'bg-green-500 text-white'
-                : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+                ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-sm'
+                : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             <Activity size={12} />
@@ -681,8 +682,8 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
           {/* Expand Toggle */}
           <button
             onClick={() => setExpandedView(!expandedView)}
-            className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1 ${
-              darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${
+              darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             {expandedView ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -742,20 +743,26 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
 
       {/* Summary Stats Bar */}
       {selectedMetricGroup === 'all' && (
-        <div className={`flex flex-wrap items-center justify-center gap-4 p-3 rounded-lg ${
-          darkMode ? 'bg-gray-800/50' : 'bg-gray-50'
-        } text-xs`}>
+        <div className={`flex flex-wrap items-center justify-center gap-4 p-3 rounded-xl ${
+          darkMode ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50 border-gray-100'
+        } text-xs border`}>
           <div className="flex items-center gap-2">
             <Info size={14} className="text-blue-500" />
-            <span>Last Updated: {new Date().toLocaleTimeString()}</span>
+            <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+              Last Updated: {new Date().toLocaleTimeString()}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <Heart size={14} className="text-red-500" />
-            <span>System Health: {safeNumber(enhancedMetrics?.avgHealthScore, 0).toFixed(0)}/100</span>
+            <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+              System Health: {safeNumber(enhancedMetrics?.avgHealthScore, 0).toFixed(0)}/100
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <AlertCircle size={14} className="text-orange-500" />
-            <span>Alerts: {((enhancedMetrics?.critical || 0) + ((enhancedMetrics?.delayed || 0) > 30 ? 1 : 0))}</span>
+            <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+              Alerts: {((enhancedMetrics?.critical || 0) + ((enhancedMetrics?.delayed || 0) > 30 ? 1 : 0))}
+            </span>
           </div>
         </div>
       )}

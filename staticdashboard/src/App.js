@@ -1,178 +1,221 @@
 // src/App.js
 import React, { useState, useEffect } from 'react';
+import HomePage from './Home';
 import Engineering from './Engineering';
 import { 
-  Building, Menu, X, ChevronRight, Bell, Search, Shield, ChevronLeft
+  LayoutGrid, Home
 } from 'lucide-react';
 
 const App = () => {
-  const [activeMenu, setActiveMenu] = useState('engineering');
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentView, setCurrentView] = useState('home');
 
   useEffect(() => {
     // Simulate initial loading
-    setTimeout(() => setIsLoading(false), 1500);
+    setTimeout(() => setIsLoading(false), 1000);
   }, []);
 
-  const menuItems = [
-    { id: 'engineering', label: 'Engineering Operations', icon: Building }
-  ];
-
-  const renderContent = () => {
-    return <Engineering />;
+  const handleNavigate = (view) => {
+    setCurrentView(view);
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-screen flex items-center justify-center neu-bg">
         <div className="text-center">
-          <div className="w-24 h-24 mx-auto mb-6 neu-raised rounded-full flex items-center justify-center">
+          <div className="w-20 h-20 mx-auto mb-4 neu-raised rounded-2xl flex items-center justify-center">
             <img 
               src="/logo.png" 
               alt="BSF Logo" 
-              className="w-16 h-16 object-contain"
+              className="w-14 h-14 object-contain"
             />
           </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Border Security Force</h2>
-          <p className="text-sm text-gray-600">Initializing Dashboard...</p>
+          <h2 className="text-sm font-medium text-gray-600 mb-3">Border Security Force</h2>
+          <div className="flex items-center justify-center gap-1">
+            <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse"></div>
+            <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></div>
+            <div className="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-white relative overflow-hidden">
-      {/* Neumorphism Background Pattern */}
-      <div className="fixed inset-0 opacity-30 pointer-events-none">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-orange-200 rounded-full filter blur-3xl opacity-10 animate-blob"></div>
-        <div className="absolute top-0 right-0 w-96 h-96 bg-orange-300 rounded-full filter blur-3xl opacity-10 animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-orange-100 rounded-full filter blur-3xl opacity-10 animate-blob animation-delay-4000"></div>
-      </div>
-
-      {/* Left Sidebar with Neumorphism - Optimized */}
-      <div 
-        className={`fixed z-50 bg-gray-50 transition-[width] duration-300 ease-out flex flex-col neu-sidebar-shadow overflow-hidden rounded-r-2xl ${
-          sidebarExpanded ? 'w-72' : 'w-20'
-        }`}
-        style={{
-          top: '20px',
-          left: '0',
-          bottom: '20px',
-          height: 'calc(100vh - 40px)'
+    <div className="min-h-screen neu-bg">
+      {/* Fixed Chrome-like Tab Header with Darker Theme */}
+      <header 
+        className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b"
+        style={{ 
+          backgroundColor: 'rgba(31, 41, 55, 0.95)', // Dark gray with transparency
+          borderBottomColor: 'rgba(55, 65, 81, 0.5)',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1)'
         }}
-        onMouseEnter={() => setSidebarExpanded(true)}
-        onMouseLeave={() => setSidebarExpanded(false)}
       >
-        {/* Sidebar Header */}
-        <div className="p-6 flex items-center justify-between border-b border-gray-200">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="p-2 flex-shrink-0">
-              <img 
-                src="/logo.png" 
-                alt="BSF Logo" 
-                className="w-8 h-8 object-contain"
-              />
+        <div className="flex items-center h-12 px-3">
+          {/* Logo and Brand */}
+          <div className="flex items-center gap-2.5 pr-3">
+            <img 
+              src="/logo.png" 
+              alt="BSF Logo" 
+              className="w-5 h-5 object-contain brightness-110"
+            />
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs font-semibold text-gray-100">BSF DASHBOARD</span>
+              <span className="text-[10px] text-gray-400">Command Control Center</span>
             </div>
-            <div 
-              className={`flex flex-col transition-opacity duration-300 ${
-                !sidebarExpanded ? 'opacity-0 invisible' : 'opacity-100 visible'
+          </div>
+
+          {/* Divider */}
+          <div className="h-5 w-px bg-gray-600 mx-3"></div>
+
+          {/* Navigation Tabs */}
+          <div className="flex items-center h-full gap-1.5" style={{ minWidth: '400px' }}>
+            {/* Home Tab */}
+            <button 
+              onClick={() => handleNavigate('home')}
+              className={`px-3 py-1.5 rounded-md transition-all duration-200 flex items-center gap-1.5 ${
+                currentView === 'home' 
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg transform scale-105' 
+                  : 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/70 hover:text-gray-100'
               }`}
+              style={{ 
+                display: 'flex', 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                gap: '6px',
+                minWidth: 'fit-content'
+              }}
             >
-              <span className="text-xl font-extrabold text-neu-primary whitespace-nowrap">
-                BSF
-              </span>
-              <span className="text-xs text-neu-text-light font-medium tracking-wide whitespace-nowrap">
-                Command Center
-              </span>
-            </div>
-            <div className={`transition-opacity duration-300 ${
-              !sidebarExpanded ? 'opacity-0' : 'opacity-100'
-            }`}>
-              <div className="text-gray-400">
-                {sidebarExpanded ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Military Badge */}
-        {sidebarExpanded && (
-          <div className="px-6 py-4 text-center border-b border-gray-200">
-            <div className="text-xs font-semibold text-gray-800 mb-1">Border Security Force</div>
-            <div className="text-xs text-gray-600 italic">सीमा सुरक्षा बल</div>
-          </div>
-        )}
-
-        {/* Navigation */}
-        <nav className="flex-1 py-4 overflow-y-auto overflow-x-hidden">
-          {menuItems.map((item) => (
-            <div
-              key={item.id}
-              className="px-3 mb-2"
-            >
-              <button
-                className={`w-full flex items-center gap-3 py-3.5 px-3 rounded-xl transition-colors duration-200 relative ${
-                  !sidebarExpanded ? 'justify-center' : ''
-                } ${
-                  activeMenu === item.id 
-                    ? 'neu-inset text-neu-primary' 
-                    : 'neu-flat text-gray-600 hover:neu-flat-hover hover:text-gray-700'
-                }`}
-                onClick={() => setActiveMenu(item.id)}
-                title={!sidebarExpanded ? item.label : ''}
+              <Home 
+                style={{ 
+                  width: '14px', 
+                  height: '14px', 
+                  flexShrink: 0,
+                  strokeWidth: currentView === 'home' ? 2.5 : 2
+                }} 
+              />
+              <span 
+                style={{ 
+                  whiteSpace: 'nowrap', 
+                  display: 'inline-block',
+                  fontSize: '11px',
+                  fontWeight: currentView === 'home' ? '600' : '500'
+                }}
               >
-                <item.icon 
-                  size={20} 
-                  className={`flex-shrink-0 ${
-                    activeMenu === item.id ? 'text-neu-primary' : ''
-                  }`} 
-                />
-                {sidebarExpanded && (
-                  <span className="text-sm whitespace-nowrap">
-                    {item.label}
-                  </span>
-                )}
-                {activeMenu === item.id && sidebarExpanded && (
-                  <div className="absolute right-2 w-2 h-2 bg-neu-primary rounded-full"></div>
-                )}
-              </button>
-            </div>
-          ))}
-        </nav>
-
-        {/* Footer */}
-        {sidebarExpanded && (
-          <div className="p-6 border-t border-gray-200">
-            <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="whitespace-nowrap">
-                Secure Connection
+                Home
               </span>
+            </button>
+
+            {/* Engineering Tab */}
+            <button 
+              onClick={() => handleNavigate('engineering')}
+              className={`px-3 py-1.5 rounded-md transition-all duration-200 flex items-center gap-1.5 ${
+                currentView === 'engineering' 
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg transform scale-105' 
+                  : 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/70 hover:text-gray-100'
+              }`}
+              style={{ 
+                display: 'flex', 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                gap: '6px',
+                minWidth: 'fit-content'
+              }}
+            >
+              <LayoutGrid 
+                style={{ 
+                  width: '14px', 
+                  height: '14px', 
+                  flexShrink: 0,
+                  strokeWidth: currentView === 'engineering' ? 2.5 : 2
+                }} 
+              />
+              <span 
+                style={{ 
+                  whiteSpace: 'nowrap', 
+                  display: 'inline-block',
+                  fontSize: '11px',
+                  fontWeight: currentView === 'engineering' ? '600' : '500'
+                }}
+              >
+                Engineering
+              </span>
+            </button>
+          </div>
+
+          {/* Spacer */}
+          <div className="flex-1"></div>
+
+          {/* Status Indicators */}
+          <div className="flex items-center gap-3 mr-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-gray-400">www.akshaykotish.com</span> | <span className="text-[10px] text-gray-400">connect@akshaykotish.com</span>
             </div>
+            <div className="h-4 w-px bg-gray-600"></div>
           </div>
-        )}
 
-        {/* Hover Indicator - shows at the edge when collapsed */}
-        {!sidebarExpanded && (
-          <div className="absolute top-1/2 -translate-y-1/2 right-0">
-            <div className="bg-orange-500 w-1 h-16 rounded-l-full animate-pulse"></div>
+          {/* Version Info */}
+          <div className="px-2 text-[10px] text-gray-500">
+            v2.1.0 | © 2024 BSF
           </div>
-        )}
-      </div>
-
-      {/* Main Content */}
-      <div 
-        className={`flex-1 flex flex-col transition-all duration-300 relative z-10`}
-        style={{
-          marginLeft: sidebarExpanded ? '288px' : '80px'
-        }}
-      >
-        {/* Page Content */}
-        <div className="flex-1 p-8">
-          {renderContent()}
         </div>
-      </div>
+      </header>
+
+      {/* Main Content Area with top padding for fixed header */}
+      <main className="max-w-[1920px] mx-auto px-6 py-6" style={{ paddingTop: '72px' }}>
+        <div className="neu-content-wrapper">
+          {currentView === 'home' && <HomePage onNavigate={handleNavigate} />}
+          {currentView === 'engineering' && <Engineering />}
+        </div>
+      </main>
+
+      {/* Add custom styles for the dark theme */}
+      <style jsx>{`
+        .neu-bg {
+          background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+          min-height: 100vh;
+        }
+        
+        .neu-content-wrapper {
+          animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        /* Smooth scrolling */
+        html {
+          scroll-behavior: smooth;
+        }
+
+        /* Custom scrollbar for dark theme */
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+          background: rgba(31, 41, 55, 0.1);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+          background: rgba(31, 41, 55, 0.5);
+          border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(31, 41, 55, 0.7);
+        }
+      `}</style>
     </div>
   );
 };

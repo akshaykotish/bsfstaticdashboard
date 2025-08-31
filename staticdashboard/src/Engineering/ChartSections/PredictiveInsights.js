@@ -22,7 +22,7 @@ const COLORS = {
     medium: '#f59e0b',
     high: '#ef4444'
   },
-  trend: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#a855f7', '#ec4899']
+  trend: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 };
 
 const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
@@ -399,15 +399,15 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className={`p-3 rounded-lg shadow-xl backdrop-blur-sm border ${
-          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-orange-200'
+        <div className={`p-2 rounded-lg shadow-lg backdrop-blur-sm border ${
+          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-200'
         }`}>
-          <p className="text-sm font-bold mb-2">{label}</p>
+          <p className="text-xs font-semibold mb-1">{label}</p>
           {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></span>
-              <span className="font-semibold">{entry.name}:</span>
-              <span className="font-medium">{
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
+              <span className="font-medium">{entry.name}:</span>
+              <span className="font-semibold">{
                 typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value
               }</span>
             </div>
@@ -422,16 +422,18 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
     <div className="space-y-6">
       {/* AI Recommendations */}
       {predictions.recommendations.length > 0 && (
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <Brain size={20} className="text-purple-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Brain size={18} className="text-purple-500" />
             AI-Powered Recommendations
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {predictions.recommendations.map((rec, index) => (
               <div 
                 key={index}
-                className={`p-4 rounded-lg border-l-4 ${
+                className={`p-3 rounded-lg border-l-4 ${
                   darkMode ? 'bg-gray-900' : 'bg-gray-50'
                 } ${
                   rec.priority === 'critical' ? 'border-red-500' :
@@ -443,15 +445,15 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
                   <div className={`p-2 rounded-lg ${
                     darkMode ? 'bg-gray-800' : 'bg-white'
                   }`}>
-                    <rec.icon size={20} className={
+                    <rec.icon size={16} className={
                       rec.priority === 'critical' ? 'text-red-500' :
                       rec.priority === 'high' ? 'text-orange-500' :
                       'text-blue-500'
                     } />
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-semibold mb-1">{rec.title}</h4>
-                    <p className="text-sm text-gray-500 mb-2">{rec.description}</p>
+                    <h4 className="font-semibold text-sm mb-1 text-gray-900 dark:text-gray-100">{rec.title}</h4>
+                    <p className="text-xs text-gray-500 mb-2">{rec.description}</p>
                     <p className="text-xs font-medium text-green-600">
                       Impact: {rec.impact}
                     </p>
@@ -464,19 +466,21 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
       )}
 
       {/* Completion Forecast - Using LineChart instead of AreaChart */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Target size={18} className="text-blue-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Target size={16} className="text-blue-500" />
           12-Month Completion Forecast
         </h3>
         <div className="w-full h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={predictions.completionForecast}>
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Line 
                 type="monotone" 
                 dataKey="optimistic" 
@@ -505,19 +509,21 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Budget Projection */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <IndianRupee size={18} className="text-green-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <IndianRupee size={16} className="text-green-500" />
             Budget Utilization Projection
           </h3>
           <div className="w-full h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={predictions.budgetProjection}>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 11 }} />
+                <XAxis dataKey="month" tick={{ fontSize: 9 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: '10px' }} />
                 <Line type="monotone" dataKey="allocated" stroke="#6b7280" strokeDasharray="5 5" name="Allocated" />
                 <Line type="monotone" dataKey="optimistic" stroke={COLORS.prediction.optimistic} name="Optimistic" strokeWidth={2} />
                 <Line type="monotone" dataKey="realistic" stroke={COLORS.prediction.realistic} name="Realistic" strokeWidth={2} />
@@ -528,19 +534,21 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
 
         {/* Risk Prediction - Also using LineChart */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <AlertTriangle size={18} className="text-red-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <AlertTriangle size={16} className="text-red-500" />
             Risk Level Prediction
           </h3>
           <div className="w-full h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={predictions.riskPrediction}>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 11 }} />
+                <XAxis dataKey="month" tick={{ fontSize: 9 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: '10px' }} />
                 <Line type="monotone" dataKey="low" stroke={COLORS.risk.low} name="Low Risk" strokeWidth={2} />
                 <Line type="monotone" dataKey="medium" stroke={COLORS.risk.medium} name="Medium Risk" strokeWidth={2} />
                 <Line type="monotone" dataKey="high" stroke={COLORS.risk.high} name="High Risk" strokeWidth={2} />
@@ -551,22 +559,24 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Performance Trends */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <TrendingUp size={18} className="text-purple-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <TrendingUp size={16} className="text-purple-500" />
           Performance Trend Projection
         </h3>
         <div className="w-full h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={predictions.performanceTrends}>
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Line type="monotone" dataKey="avgProgress" stroke="#3b82f6" name="Avg Progress %" strokeWidth={2} />
               <Line type="monotone" dataKey="avgEfficiency" stroke="#10b981" name="Avg Efficiency %" strokeWidth={2} />
-              <Line type="monotone" dataKey="projectedCompletion" stroke="#f97316" name="Completion Rate %" strokeWidth={2} />
+              <Line type="monotone" dataKey="projectedCompletion" stroke="#8b5cf6" name="Completion Rate %" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -574,38 +584,40 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
 
       {/* Critical Path Analysis */}
       {predictions.criticalPathAnalysis.length > 0 && (
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <Activity size={18} className="text-red-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Activity size={16} className="text-red-500" />
             Critical Path Projects
           </h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-xs">
               <thead className={`${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
                 <tr>
-                  <th className="px-4 py-2 text-left">Project</th>
-                  <th className="px-4 py-2 text-center">Progress</th>
-                  <th className="px-4 py-2 text-center">Delay</th>
-                  <th className="px-4 py-2 text-center">Budget (Cr)</th>
-                  <th className="px-4 py-2 text-center">Risk Score</th>
-                  <th className="px-4 py-2 text-center">Months to Complete</th>
-                  <th className="px-4 py-2 text-center">Action</th>
+                  <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Project</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Progress</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Delay</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Budget (Cr)</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Risk Score</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Months to Complete</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Action</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
                 {predictions.criticalPathAnalysis.map((project, index) => (
                   <tr 
                     key={index}
-                    className={`hover:${darkMode ? 'bg-gray-700' : 'bg-orange-50'} cursor-pointer`}
+                    className={`hover:${darkMode ? 'bg-gray-700' : 'bg-blue-50'} cursor-pointer`}
                     onClick={() => onChartClick(project, 'project')}
                   >
-                    <td className="px-4 py-2 truncate max-w-[200px]">{project.project}</td>
-                    <td className="px-4 py-2 text-center">{project.currentProgress}%</td>
-                    <td className="px-4 py-2 text-center">
+                    <td className="px-3 py-2 truncate max-w-[200px] text-gray-900 dark:text-gray-100">{project.project}</td>
+                    <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{project.currentProgress}%</td>
+                    <td className="px-3 py-2 text-center">
                       <span className="text-red-600 font-medium">{project.currentDelay} days</span>
                     </td>
-                    <td className="px-4 py-2 text-center">₹{project.budget.toFixed(2)}</td>
-                    <td className="px-4 py-2 text-center">
+                    <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">₹{project.budget.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-center">
                       <span className={`font-bold ${
                         parseFloat(project.riskScore) > 70 ? 'text-red-600' :
                         parseFloat(project.riskScore) > 50 ? 'text-orange-600' :
@@ -614,9 +626,9 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
                         {project.riskScore}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-center">{project.predictedCompletion}</td>
-                    <td className="px-4 py-2 text-center">
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                    <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{project.predictedCompletion}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                         project.intervention === 'Immediate' ? 'bg-red-100 text-red-700' :
                         project.intervention === 'Urgent' ? 'bg-orange-100 text-orange-700' :
                         project.intervention === 'Priority' ? 'bg-yellow-100 text-yellow-700' :
@@ -634,23 +646,25 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
       )}
 
       {/* Resource Requirements */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Zap size={18} className="text-yellow-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Zap size={16} className="text-yellow-500" />
           Projected Resource Requirements
         </h3>
         <div className="w-full h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={predictions.resourceRequirements}>
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+              <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
               <Tooltip />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Bar yAxisId="left" dataKey="activeProjects" fill="#3b82f6" name="Active Projects" />
               <Line yAxisId="right" type="monotone" dataKey="fundingNeeded" stroke="#10b981" name="Funding (Cr)" strokeWidth={2} />
-              <Line yAxisId="right" type="monotone" dataKey="manpowerNeeded" stroke="#f97316" name="Teams Required" strokeWidth={2} />
+              <Line yAxisId="right" type="monotone" dataKey="manpowerNeeded" stroke="#8b5cf6" name="Teams Required" strokeWidth={2} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>

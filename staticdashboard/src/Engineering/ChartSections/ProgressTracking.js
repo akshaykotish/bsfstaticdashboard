@@ -79,7 +79,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
       };
     });
 
-    // Velocity Analysis (Progress Rate) - FIXED: Include all original data
+    // Velocity Analysis (Progress Rate) - FIXED
     const velocityData = data
       .filter(d => d.date_award && d.physical_progress > 0)
       .map(d => {
@@ -110,7 +110,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
       .sort((a, b) => b.velocity - a.velocity)
       .slice(0, 20);
 
-    // Progress vs Budget Correlation - FIXED: Include all original data
+    // Progress vs Budget Correlation - FIXED
     const progressBudgetCorrelation = data
       .filter(d => d.sanctioned_amount > 0)
       .slice(0, 100)
@@ -147,7 +147,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
         .reduce((sum, d, _, arr) => sum + (d.sanctioned_amount || 0) / arr.length / 100, 0) || 0
     }));
 
-    // Stagnant Projects - FIXED: Include all original data
+    // Stagnant Projects - FIXED
     const stagnantProjects = data
       .filter(d => d.physical_progress > 0 && d.physical_progress < 100 && d.delay_days > 60)
       .map(d => ({
@@ -167,7 +167,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
       .sort((a, b) => b.stuckDays - a.stuckDays)
       .slice(0, 15);
 
-    // Critical Delayed Projects - NEW: Projects with high delay and critical risk
+    // Critical Delayed Projects
     const criticalDelayedProjects = data
       .filter(d => d.delay_days > 30 && (d.risk_level === 'CRITICAL' || d.risk_level === 'HIGH'))
       .map(d => ({
@@ -220,7 +220,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
       .sort((a, b) => b.avgProgress - a.avgProgress)
       .slice(0, 10);
 
-    // Progress by Frontier HQ - NEW
+    // Progress by Frontier HQ
     const frontierProgress = {};
     data.forEach(d => {
       const frontier = d.ftr_hq || 'Unknown';
@@ -277,7 +277,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
       }))
       .sort((a, b) => b.totalProjects - a.totalProjects);
 
-    // Completion Forecast (Next 6 months)
+    // Completion Forecast (Next 6 months) - FIXED to ensure proper data structure
     const completionForecast = [];
     const today = new Date();
     for (let i = 0; i < 6; i++) {
@@ -299,7 +299,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
       });
     }
 
-    // Progress Trend Analysis
+    // Progress Trend Analysis - FIXED to ensure proper data structure
     const progressTrend = [];
     const monthlyProgress = {};
     
@@ -326,7 +326,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
       .sort((a, b) => a.month.localeCompare(b.month))
       .slice(-12)
       .forEach(item => {
-        item.avgProgress = item.projects ? (item.totalProgress / item.projects).toFixed(1) : 0;
+        item.avgProgress = item.projects ? parseFloat((item.totalProgress / item.projects).toFixed(1)) : 0;
         progressTrend.push(item);
       });
 
@@ -349,15 +349,15 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className={`p-3 rounded-lg shadow-xl backdrop-blur-sm border ${
-          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-orange-200'
+        <div className={`p-2 rounded-lg shadow-lg backdrop-blur-sm border ${
+          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-200'
         }`}>
-          <p className="text-sm font-bold mb-2">{label}</p>
+          <p className="text-xs font-semibold mb-1">{label}</p>
           {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></span>
-              <span className="font-semibold">{entry.name}:</span>
-              <span className="font-medium">{entry.value}</span>
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
+              <span className="font-medium">{entry.name}:</span>
+              <span className="font-semibold">{entry.value}</span>
             </div>
           ))}
         </div>
@@ -369,20 +369,22 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
   return (
     <div className="space-y-6">
       {/* Milestone Progress */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <Target size={20} className="text-blue-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Target size={18} className="text-blue-500" />
           Project Progress Milestones
         </h3>
         <div className="w-full h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={progressMetrics.milestoneData}>
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="milestone" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+              <XAxis dataKey="milestone" tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Bar yAxisId="left" dataKey="projects" name="Projects">
                 {progressMetrics.milestoneData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
@@ -396,18 +398,20 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Progress Distribution */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <PieChartIcon size={18} className="text-purple-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <PieChartIcon size={16} className="text-purple-500" />
             Progress Distribution
           </h3>
           <div className="w-full h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={progressMetrics.progressDistribution}>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="range" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
+                <XAxis dataKey="range" tick={{ fontSize: 9 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="count" fill="#3b82f6" />
               </BarChart>
             </ResponsiveContainer>
@@ -415,18 +419,20 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
 
         {/* Progress vs Budget Efficiency */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <Activity size={18} className="text-green-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Activity size={16} className="text-green-500" />
             Progress vs Budget Efficiency
           </h3>
           <div className="w-full h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="x" name="Progress %" domain={[0, 100]} tick={{ fontSize: 11 }} />
-                <YAxis dataKey="y" name="Budget Used %" domain={[0, 120]} tick={{ fontSize: 11 }} />
-                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                <XAxis dataKey="x" name="Progress %" domain={[0, 100]} tick={{ fontSize: 10 }} />
+                <YAxis dataKey="y" name="Budget Used %" domain={[0, 120]} tick={{ fontSize: 10 }} />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
                 <Scatter name="Projects" data={progressMetrics.progressBudgetCorrelation}>
                   {progressMetrics.progressBudgetCorrelation.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -438,22 +444,24 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
       </div>
 
-      {/* Progress by Frontier HQ - NEW SECTION */}
+      {/* Progress by Frontier HQ */}
       {progressMetrics.progressByFrontier.length > 0 && (
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <MapPin size={18} className="text-orange-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <MapPin size={16} className="text-orange-500" />
             Progress by Frontier HQ
           </h3>
           <div className="w-full h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={progressMetrics.progressByFrontier}>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 10 }} />
-                <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 9 }} />
+                <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <Bar yAxisId="left" dataKey="totalProjects" fill="#3b82f6" name="Total Projects" />
                 <Bar yAxisId="left" dataKey="completed" fill="#10b981" name="Completed" />
                 <Bar yAxisId="left" dataKey="criticalProjects" fill="#ef4444" name="Critical" />
@@ -465,56 +473,58 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
       )}
 
       {/* Project Velocity Analysis */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Zap size={18} className="text-yellow-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Zap size={16} className="text-yellow-500" />
           Project Velocity (Progress Rate)
         </h3>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead className={`${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
               <tr>
-                <th className="px-4 py-2 text-left">Project</th>
-                <th className="px-4 py-2 text-center">Progress</th>
-                <th className="px-4 py-2 text-center">Velocity (%/day)</th>
-                <th className="px-4 py-2 text-center">Frontier HQ</th>
-                <th className="px-4 py-2 text-center">Days to Complete</th>
-                <th className="px-4 py-2 text-center">Status</th>
+                <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Project</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Progress</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Velocity (%/day)</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Frontier HQ</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Days to Complete</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Status</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
               {progressMetrics.velocityData.slice(0, 10).map((item, index) => (
                 <tr 
                   key={index} 
-                  className={`hover:${darkMode ? 'bg-gray-700' : 'bg-orange-50'} cursor-pointer transition-colors`}
+                  className={`hover:${darkMode ? 'bg-gray-700' : 'bg-blue-50'} cursor-pointer transition-colors`}
                   onClick={() => onChartClick(item, 'project')}
                 >
-                  <td className="px-4 py-2 truncate max-w-[200px]">
+                  <td className="px-3 py-2 truncate max-w-[200px]">
                     <div>
-                      <p className="font-medium">{item.project}</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{item.project}</p>
                       <p className="text-xs text-gray-500">{item.work_site}</p>
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-center">
+                  <td className="px-3 py-2 text-center">
                     <div className="flex items-center justify-center gap-2">
-                      <span>{item.progress}%</span>
-                      <div className="w-16 bg-gray-200 rounded-full h-1.5">
+                      <span className="text-gray-700 dark:text-gray-300">{item.progress}%</span>
+                      <div className="w-14 bg-gray-200 rounded-full h-1">
                         <div 
-                          className="h-1.5 rounded-full bg-blue-500"
+                          className="h-1 rounded-full bg-blue-500"
                           style={{ width: `${item.progress}%` }}
                         />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-center font-medium">{item.velocity}</td>
-                  <td className="px-4 py-2 text-center">
-                    <span className="text-xs">{item.ftr_hq}</span>
+                  <td className="px-3 py-2 text-center font-medium text-gray-700 dark:text-gray-300">{item.velocity}</td>
+                  <td className="px-3 py-2 text-center">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">{item.ftr_hq}</span>
                   </td>
-                  <td className="px-4 py-2 text-center">
+                  <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">
                     {item.expectedCompletion < 999 ? item.expectedCompletion : 'N/A'}
                   </td>
-                  <td className="px-4 py-2 text-center">
-                    <span className={`px-2 py-1 rounded-full text-xs font-bold`} style={{ 
+                  <td className="px-3 py-2 text-center">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold`} style={{ 
                       backgroundColor: item.color + '20',
                       color: item.color
                     }}>
@@ -528,18 +538,20 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
       </div>
 
-      {/* Critical Delayed Projects - NEW SECTION */}
+      {/* Critical Delayed Projects */}
       {progressMetrics.criticalDelayedProjects.length > 0 && (
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <AlertTriangle size={18} className="text-red-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <AlertTriangle size={16} className="text-red-500" />
             Critical Delayed Projects
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {progressMetrics.criticalDelayedProjects.slice(0, 6).map((project, index) => (
               <div 
                 key={index}
-                className={`p-4 rounded-lg border cursor-pointer transition-all hover:scale-[1.01] ${
+                className={`p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.01] ${
                   project.risk_level === 'CRITICAL' 
                     ? darkMode ? 'border-red-800 bg-red-900/20' : 'border-red-200 bg-red-50'
                     : darkMode ? 'border-orange-800 bg-orange-900/20' : 'border-orange-200 bg-orange-50'
@@ -547,8 +559,8 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                 onClick={() => onChartClick(project, 'project')}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <p className="text-sm font-bold truncate flex-1">{project.project}</p>
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold ml-2 ${
+                  <p className="text-xs font-semibold truncate flex-1 text-gray-900 dark:text-gray-100">{project.project}</p>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ml-2 ${
                     project.risk_level === 'CRITICAL' 
                       ? 'bg-red-100 text-red-600' 
                       : 'bg-orange-100 text-orange-600'
@@ -558,23 +570,23 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-xs">
-                    <MapPin size={12} className="text-gray-500" />
-                    <span className="truncate">{project.work_site}</span>
+                    <MapPin size={10} className="text-gray-500" />
+                    <span className="truncate text-gray-600 dark:text-gray-400">{project.work_site}</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
-                    <Building2 size={12} className="text-gray-500" />
-                    <span className="truncate">FHQ: {project.ftr_hq} | SHQ: {project.shq}</span>
+                    <Building2 size={10} className="text-gray-500" />
+                    <span className="truncate text-gray-600 dark:text-gray-400">FHQ: {project.ftr_hq} | SHQ: {project.shq}</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
-                    <Users size={12} className="text-gray-500" />
-                    <span className="truncate">{project.contractor}</span>
+                    <Users size={10} className="text-gray-500" />
+                    <span className="truncate text-gray-600 dark:text-gray-400">{project.contractor}</span>
                   </div>
                 </div>
-                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>
                       <span className="text-gray-500">Progress:</span>
-                      <p className="font-semibold">{project.progress}%</p>
+                      <p className="font-semibold text-gray-700 dark:text-gray-300">{project.progress}%</p>
                     </div>
                     <div>
                       <span className="text-gray-500">Delay:</span>
@@ -582,7 +594,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                     </div>
                     <div>
                       <span className="text-gray-500">Budget:</span>
-                      <p className="font-semibold">₹{project.budget}Cr</p>
+                      <p className="font-semibold text-gray-700 dark:text-gray-300">₹{project.budget}Cr</p>
                     </div>
                   </div>
                 </div>
@@ -594,10 +606,12 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
 
       {/* Stagnant Projects Alert */}
       {progressMetrics.stagnantProjects.length > 0 && (
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <Clock size={18} className="text-yellow-500" />
-            Stagnant Projects (Delayed &lt; 60 days)
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Clock size={16} className="text-yellow-500" />
+            Stagnant Projects (Delayed &gt; 60 days)
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {progressMetrics.stagnantProjects.slice(0, 9).map((project, index) => (
@@ -608,23 +622,23 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                 }`}
                 onClick={() => onChartClick(project, 'project')}
               >
-                <p className="text-sm font-semibold truncate">{project.project}</p>
+                <p className="text-xs font-semibold truncate text-gray-900 dark:text-gray-100">{project.project}</p>
                 <p className="text-xs text-gray-500 truncate mt-1">
                   <MapPin size={10} className="inline mr-1" />
                   {project.work_site} | FHQ: {project.ftr_hq}
                 </p>
                 <div className="mt-2 space-y-1">
                   <div className="flex justify-between text-xs">
-                    <span>Progress:</span>
-                    <span className="font-medium">{project.progress}%</span>
+                    <span className="text-gray-600 dark:text-gray-400">Progress:</span>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">{project.progress}%</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span>Stuck for:</span>
+                    <span className="text-gray-600 dark:text-gray-400">Stuck for:</span>
                     <span className="font-medium text-red-600">{project.stuckDays} days</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span>Budget:</span>
-                    <span className="font-medium">₹{project.budget} Cr</span>
+                    <span className="text-gray-600 dark:text-gray-400">Budget:</span>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">₹{project.budget} Cr</span>
                   </div>
                 </div>
               </div>
@@ -633,55 +647,59 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
       )}
 
-      {/* Completion Forecast */}
+      {/* Completion Forecast - FIXED AreaChart */}
       {progressMetrics.completionForecast.length > 0 && (
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <TrendingUp size={18} className="text-green-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <TrendingUp size={16} className="text-green-500" />
             Completion Forecast (Next 6 Months)
           </h3>
           <div className="w-full h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={progressMetrics.completionForecast}>
+              <ComposedChart data={progressMetrics.completionForecast}>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend />
-                <Area type="monotone" dataKey="expected" stackId="1" stroke="#3b82f6" fill="#3b82f6" name="Expected Completions" />
-                <Area type="monotone" dataKey="cumulative" stackId="2" stroke="#10b981" fill="#10b981" name="Cumulative" />
-              </AreaChart>
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
+                <Bar dataKey="expected" fill="#3b82f6" name="Expected Completions" />
+                <Line type="monotone" dataKey="cumulative" stroke="#10b981" strokeWidth={2} name="Cumulative" />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
       )}
 
       {/* Progress by Agency */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Building2 size={18} className="text-blue-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Building2 size={16} className="text-blue-500" />
           Progress by Executive Agency
         </h3>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead className={`${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
               <tr>
-                <th className="px-4 py-2 text-left">Agency</th>
-                <th className="px-4 py-2 text-center">Projects</th>
-                <th className="px-4 py-2 text-center">Avg Progress</th>
-                <th className="px-4 py-2 text-center">Completed</th>
-                <th className="px-4 py-2 text-center">On Track</th>
-                <th className="px-4 py-2 text-center">Delayed</th>
-                <th className="px-4 py-2 text-center">Budget (Cr)</th>
+                <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Agency</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Projects</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Avg Progress</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Completed</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">On Track</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Delayed</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Budget (Cr)</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
               {progressMetrics.progressByAgency.map((agency, index) => (
-                <tr key={index} className={`hover:${darkMode ? 'bg-gray-700' : 'bg-orange-50'}`}>
-                  <td className="px-4 py-2 font-medium">{agency.name}</td>
-                  <td className="px-4 py-2 text-center">{agency.totalProjects}</td>
-                  <td className="px-4 py-2 text-center">
-                    <span className={`font-semibold ${
+                <tr key={index} className={`hover:${darkMode ? 'bg-gray-700' : 'bg-blue-50'} transition-colors`}>
+                  <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{agency.name}</td>
+                  <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{agency.totalProjects}</td>
+                  <td className="px-3 py-2 text-center">
+                    <span className={`font-semibold text-xs ${
                       agency.avgProgress > 75 ? 'text-green-600' :
                       agency.avgProgress > 50 ? 'text-blue-600' :
                       agency.avgProgress > 25 ? 'text-yellow-600' : 'text-red-600'
@@ -689,10 +707,10 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                       {agency.avgProgress}%
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-center">{agency.completed}</td>
-                  <td className="px-4 py-2 text-center text-green-600">{agency.onTrack}</td>
-                  <td className="px-4 py-2 text-center text-red-600">{agency.delayed}</td>
-                  <td className="px-4 py-2 text-center">₹{agency.totalBudget.toFixed(2)}</td>
+                  <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{agency.completed}</td>
+                  <td className="px-3 py-2 text-center text-green-600">{agency.onTrack}</td>
+                  <td className="px-3 py-2 text-center text-red-600">{agency.delayed}</td>
+                  <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">₹{agency.totalBudget.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>

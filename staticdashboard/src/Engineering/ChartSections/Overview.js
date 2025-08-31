@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   PieChart, Pie, Cell, BarChart, Bar, LineChart, Line,
   ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -7,8 +7,10 @@ import {
 import {
   Building, TrendingUp, DollarSign, Clock, CheckCircle,
   AlertTriangle, Activity, Users, IndianRupee, Target,
-  Calendar, AlertCircle, Info, ArrowUp, ArrowDown
+  Calendar, AlertCircle, Info, ArrowUp, ArrowDown,
+  X, Eye
 } from 'lucide-react';
+import DataTable from '../DataTable';
 
 const COLORS = {
   primary: ['#f97316', '#fb923c', '#fed7aa'],
@@ -37,6 +39,9 @@ const COLORS = {
 };
 
 const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) => {
+  const [showAgencyModal, setShowAgencyModal] = useState(false);
+  const [selectedAgency, setSelectedAgency] = useState(null);
+
   // Calculate comprehensive metrics
   const metrics = useMemo(() => {
     if (!data || data.length === 0) {
@@ -54,7 +59,8 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
         monthlyTrend: [],
         riskDistribution: [],
         statusDistribution: [],
-        agencyPerformance: []
+        agencyPerformance: [],
+        agencyProjects: {}
       };
     }
 
@@ -141,8 +147,10 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
       { status: 'Not Started', count: executiveSummary.notStarted, fill: COLORS.status.danger }
     ];
 
-    // Agency Performance Summary
+    // Agency Performance Summary with project lists
     const agencyStats = {};
+    const agencyProjects = {};
+    
     data.forEach(d => {
       const agency = d.executive_agency || 'Unknown';
       if (!agencyStats[agency]) {
@@ -151,18 +159,35 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
           projects: 0,
           budget: 0,
           avgProgress: 0,
-          totalProgress: 0
+          totalProgress: 0,
+          completed: 0,
+          delayed: 0,
+          critical: 0,
+          onTrack: 0
         };
+        agencyProjects[agency] = [];
       }
       agencyStats[agency].projects++;
       agencyStats[agency].budget += (d.sanctioned_amount || 0) / 100;
       agencyStats[agency].totalProgress += d.physical_progress || 0;
+      
+      // Store complete project data for modal
+      agencyProjects[agency].push(d);
+      
+      // Calculate additional stats
+      if (d.physical_progress >= 100) agencyStats[agency].completed++;
+      if (d.delay_days > 0) agencyStats[agency].delayed++;
+      if (d.risk_level === 'CRITICAL') agencyStats[agency].critical++;
+      if ((!d.delay_days || d.delay_days === 0) && d.physical_progress > 0) agencyStats[agency].onTrack++;
     });
 
     const agencyPerformance = Object.values(agencyStats)
       .map(a => ({
         ...a,
-        avgProgress: a.projects ? (a.totalProgress / a.projects).toFixed(1) : 0
+        avgProgress: a.projects ? (a.totalProgress / a.projects).toFixed(1) : 0,
+        completionRate: a.projects ? ((a.completed / a.projects) * 100).toFixed(1) : 0,
+        delayRate: a.projects ? ((a.delayed / a.projects) * 100).toFixed(1) : 0,
+        onTrackRate: a.projects ? ((a.onTrack / a.projects) * 100).toFixed(1) : 0
       }))
       .sort((a, b) => b.projects - a.projects)
       .slice(0, 5);
@@ -173,9 +198,30 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
       monthlyTrend,
       riskDistribution,
       statusDistribution,
-      agencyPerformance
+      agencyPerformance,
+      agencyProjects
     };
   }, [data]);
+
+  // Handle agency click to show modal
+  const handleAgencyClick = (agencyName) => {
+    const projects = metrics.agencyProjects[agencyName] || [];
+    const stats = metrics.agencyPerformance.find(a => a.name === agencyName) || 
+                   Object.values(metrics.agencyProjects).find((_, agency) => agency === agencyName);
+    
+    setSelectedAgency({
+      name: agencyName,
+      projects: projects,
+      stats: stats
+    });
+    setShowAgencyModal(true);
+  };
+
+  // Handle project click from within agency modal
+  const handleProjectClick = (project) => {
+    setShowAgencyModal(false);
+    onChartClick(project, 'project');
+  };
 
   // Custom Tooltip
   const CustomTooltip = ({ active, payload, label }) => {
@@ -200,6 +246,102 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
       );
     }
     return null;
+  };
+
+  // Agency Projects Modal
+  const AgencyProjectsModal = () => {
+    if (!showAgencyModal || !selectedAgency) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4">
+        <div 
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowAgencyModal(false)}
+        />
+        
+        <div className={`relative w-[90vw] max-w-[1600px] h-[85vh] ${
+          darkMode ? 'bg-gray-900' : 'bg-white'
+        } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
+          
+          {/* Header */}
+          <div className={`px-6 py-4 border-b ${
+            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
+          }`}>
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                  {selectedAgency.name} - Project Portfolio
+                </h2>
+                {selectedAgency.stats && (
+                  <div className={`flex flex-wrap gap-4 text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
+                    <span>Total Projects: <strong>{selectedAgency.projects.length}</strong></span>
+                    <span>•</span>
+                    <span>Completed: <strong>{selectedAgency.stats.completed || 0}</strong></span>
+                    <span>•</span>
+                    <span>Avg Progress: <strong>{selectedAgency.stats.avgProgress || 0}%</strong></span>
+                    <span>•</span>
+                    <span>On Track: <strong>{selectedAgency.stats.onTrackRate || 0}%</strong></span>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setShowAgencyModal(false)}
+                className={`p-2 rounded-lg ${
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
+                } transition-colors`}
+              >
+                <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
+              </button>
+            </div>
+          </div>
+
+          {/* Stats Summary */}
+          {selectedAgency.stats && (
+            <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'}`}>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 uppercase">Total Budget</p>
+                  <p className="text-lg font-bold">{formatAmount(selectedAgency.stats.budget * 100)}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 uppercase">Projects</p>
+                  <p className="text-lg font-bold">{selectedAgency.projects.length}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 uppercase">Completed</p>
+                  <p className="text-lg font-bold text-green-600">{selectedAgency.stats.completed || 0}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 uppercase">On Track</p>
+                  <p className="text-lg font-bold text-blue-600">{selectedAgency.stats.onTrack || 0}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 uppercase">Delayed</p>
+                  <p className="text-lg font-bold text-orange-600">{selectedAgency.stats.delayed || 0}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 uppercase">Critical</p>
+                  <p className="text-lg font-bold text-red-600">{selectedAgency.stats.critical || 0}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DataTable */}
+          <div className="flex-1 overflow-hidden">
+            <DataTable
+              data={selectedAgency.projects}
+              darkMode={darkMode}
+              onRowClick={handleProjectClick}
+              compareMode={false}
+              selectedProjects={[]}
+              isEmbedded={true}
+              maxHeight="100%"
+            />
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -343,7 +485,7 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
         </div>
       )}
 
-      {/* Top Agencies Performance */}
+      {/* Top Agencies Performance - Enhanced with click functionality */}
       {metrics.agencyPerformance.length > 0 && (
         <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
           <h3 className="text-base font-bold mb-4 flex items-center gap-2">
@@ -355,15 +497,36 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
               <div 
                 key={index}
                 className={`p-4 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} cursor-pointer hover:scale-[1.02] transition-all`}
-                onClick={() => onChartClick({ filterType: 'agency', value: agency.name }, 'filter')}
+                onClick={() => handleAgencyClick(agency.name)}
               >
                 <div className="flex justify-between items-center mb-2">
                   <span className="font-semibold">{agency.name}</span>
-                  <span className="text-sm text-gray-500">{agency.projects} projects</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">{agency.projects} projects</span>
+                    <Eye size={14} className="text-blue-500" />
+                  </div>
                 </div>
-                <div className="flex justify-between items-center text-sm">
+                <div className="flex justify-between items-center text-sm mb-2">
                   <span>Budget: {formatAmount(agency.budget * 100)}</span>
                   <span>Avg Progress: {agency.avgProgress}%</span>
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-xs mb-2">
+                  <div>
+                    <span className="text-gray-500">Completed:</span>
+                    <span className="ml-1 font-medium text-green-600">{agency.completed}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">On Track:</span>
+                    <span className="ml-1 font-medium text-blue-600">{agency.onTrack}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Delayed:</span>
+                    <span className="ml-1 font-medium text-orange-600">{agency.delayed}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Critical:</span>
+                    <span className="ml-1 font-medium text-red-600">{agency.critical}</span>
+                  </div>
                 </div>
                 <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
                   <div 
@@ -371,11 +534,20 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
                     style={{ width: `${agency.avgProgress}%` }}
                   />
                 </div>
+                <div className="mt-2 pt-2 border-t border-gray-300 dark:border-gray-700">
+                  <p className="text-xs text-gray-500 flex items-center justify-between">
+                    <span>Click to view all {agency.projects} projects with filters & search</span>
+                    <ArrowUp size={12} className="text-blue-500" />
+                  </p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
+
+      {/* Agency Projects Modal */}
+      <AgencyProjectsModal />
     </div>
   );
 };

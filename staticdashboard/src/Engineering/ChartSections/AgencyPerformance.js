@@ -21,12 +21,12 @@ const COLORS = {
     average: '#f59e0b',
     poor: '#ef4444'
   },
-  agencies: ['#f97316', '#3b82f6', '#10b981', '#a855f7', '#ec4899', '#06b6d4', '#f59e0b', '#ef4444'],
+  agencies: ['#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b', '#ef4444', '#6366f1'],
   metrics: {
     progress: '#3b82f6',
     efficiency: '#10b981',
     budget: '#f59e0b',
-    timeline: '#a855f7',
+    timeline: '#8b5cf6',
     quality: '#ec4899'
   }
 };
@@ -251,15 +251,15 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className={`p-3 rounded-lg shadow-xl backdrop-blur-sm border ${
-          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-orange-200'
+        <div className={`p-2 rounded-lg shadow-lg backdrop-blur-sm border ${
+          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-200'
         }`}>
-          <p className="text-sm font-bold mb-2">{label}</p>
+          <p className="text-xs font-semibold mb-1">{label}</p>
           {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></span>
-              <span className="font-semibold">{entry.name}:</span>
-              <span className="font-medium">{entry.value}</span>
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
+              <span className="font-medium">{entry.name}:</span>
+              <span className="font-semibold">{entry.value}</span>
             </div>
           ))}
         </div>
@@ -279,21 +279,21 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
           onClick={() => setShowAgencyModal(false)}
         />
         
-        <div className={`relative w-[70vw] max-w-[1400px] h-[85vh] ${
+        <div className={`relative w-[90vw] max-w-[1600px] h-[85vh] ${
           darkMode ? 'bg-gray-900' : 'bg-white'
         } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
           
           {/* Header */}
           <div className={`px-6 py-4 border-b ${
-            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-orange-500 to-orange-600'
+            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
           }`}>
             <div className="flex justify-between items-center">
               <div>
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                <h2 className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
                   {selectedAgency.name} - Projects Portfolio
                 </h2>
                 {selectedAgency.stats && (
-                  <div className={`flex flex-wrap gap-4 text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-orange-100'}`}>
+                  <div className={`flex flex-wrap gap-4 text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
                     <span>Total Projects: <strong>{selectedAgency.stats.projects}</strong></span>
                     <span>•</span>
                     <span>Completed: <strong>{selectedAgency.stats.completed}</strong></span>
@@ -307,41 +307,41 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
               <button
                 onClick={() => setShowAgencyModal(false)}
                 className={`p-2 rounded-lg ${
-                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-700'
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
                 } transition-colors`}
               >
-                <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
+                <X size={18} className={darkMode ? 'text-gray-300' : 'text-white'} />
               </button>
             </div>
           </div>
 
           {/* Stats Summary */}
           {selectedAgency.stats && (
-            <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'}`}>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className={`px-6 py-3 border-b ${darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'}`}>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div className="text-center">
                   <p className="text-xs text-gray-500 uppercase">Total Budget</p>
-                  <p className="text-lg font-bold">{formatAmount(selectedAgency.stats.allocated * 100)}</p>
+                  <p className="text-base font-bold">{formatAmount(selectedAgency.stats.allocated * 100)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-500 uppercase">Spent</p>
-                  <p className="text-lg font-bold">{formatAmount(selectedAgency.stats.spent * 100)}</p>
+                  <p className="text-base font-bold">{formatAmount(selectedAgency.stats.spent * 100)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-500 uppercase">Utilization</p>
-                  <p className="text-lg font-bold">{selectedAgency.stats.utilization}%</p>
+                  <p className="text-base font-bold">{selectedAgency.stats.utilization}%</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-500 uppercase">On Track</p>
-                  <p className="text-lg font-bold text-green-600">{selectedAgency.stats.onTrackRate}%</p>
+                  <p className="text-base font-bold text-green-600">{selectedAgency.stats.onTrackRate}%</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-500 uppercase">Delayed</p>
-                  <p className="text-lg font-bold text-orange-600">{selectedAgency.stats.delayRate}%</p>
+                  <p className="text-base font-bold text-orange-600">{selectedAgency.stats.delayRate}%</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-500 uppercase">Critical Projects</p>
-                  <p className="text-lg font-bold text-red-600">{selectedAgency.stats.critical}</p>
+                  <p className="text-base font-bold text-red-600">{selectedAgency.stats.critical}</p>
                 </div>
               </div>
             </div>
@@ -365,9 +365,11 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
   return (
     <div className="space-y-6">
       {/* Agency Performance Overview */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <Users size={20} className="text-blue-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Users size={18} className="text-blue-500" />
           Agency Performance Dashboard
         </h3>
         <div className="w-full h-[400px]">
@@ -379,13 +381,13 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
                 angle={-45} 
                 textAnchor="end" 
                 height={80} 
-                tick={{ fontSize: 10, cursor: 'pointer' }}
+                tick={{ fontSize: 9, cursor: 'pointer' }}
                 onClick={(e) => e && e.value && handleAgencyClick(e.value)}
               />
-              <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '12px' }} />
               <Bar 
                 yAxisId="left" 
                 dataKey="projects" 
@@ -395,13 +397,13 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
                 style={{ cursor: 'pointer' }}
               />
               <Bar yAxisId="left" dataKey="completed" fill="#10b981" name="Completed" />
-              <Line yAxisId="right" type="monotone" dataKey="performanceScore" stroke="#f97316" name="Performance Score" strokeWidth={2} />
-              <Line yAxisId="right" type="monotone" dataKey="avgProgress" stroke="#a855f7" name="Avg Progress %" strokeWidth={2} />
+              <Line yAxisId="right" type="monotone" dataKey="performanceScore" stroke="#3b82f6" name="Performance Score" strokeWidth={2} />
+              <Line yAxisId="right" type="monotone" dataKey="avgProgress" stroke="#8b5cf6" name="Avg Progress %" strokeWidth={2} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
         <p className="text-xs text-gray-500 mt-2 flex items-center gap-2">
-          <Eye size={14} />
+          <Eye size={12} />
           Click on agency names or bars to view detailed project list with search and filters
         </p>
       </div>
@@ -409,17 +411,19 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Performance Radar */}
         {agencyMetrics.performanceRadar.length > 0 && (
-          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-            <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-              <Target size={18} className="text-purple-500" />
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+            darkMode ? 'border-gray-700' : 'border-gray-100'
+          }`}>
+            <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+              <Target size={16} className="text-purple-500" />
               Top 5 Agencies Performance Comparison
             </h3>
             <div className="w-full h-[350px]">
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart data={agencyMetrics.performanceRadar}>
                   <PolarGrid stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                  <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
-                  <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
+                  <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10 }} />
+                  <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 9 }} />
                   {agencyMetrics.topPerformers.slice(0, 5).map((agency, index) => {
                     const agencyKey = agency.name.length > 15 ? agency.name.substring(0, 15) : agency.name;
                     return (
@@ -434,7 +438,7 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
                     );
                   })}
                   <Tooltip />
-                  <Legend wrapperStyle={{ fontSize: '11px' }} />
+                  <Legend wrapperStyle={{ fontSize: '10px' }} />
                 </RadarChart>
               </ResponsiveContainer>
             </div>
@@ -442,17 +446,19 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
         )}
 
         {/* Efficiency Matrix */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <Activity size={18} className="text-green-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Activity size={16} className="text-green-500" />
             Agency Efficiency Matrix
           </h3>
           <div className="w-full h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="x" name="Avg Progress %" domain={[0, 100]} tick={{ fontSize: 11 }} />
-                <YAxis dataKey="y" name="Avg Efficiency %" domain={[0, 100]} tick={{ fontSize: 11 }} />
+                <XAxis dataKey="x" name="Avg Progress %" domain={[0, 100]} tick={{ fontSize: 10 }} />
+                <YAxis dataKey="y" name="Avg Efficiency %" domain={[0, 100]} tick={{ fontSize: 10 }} />
                 <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
                 <Scatter 
                   name="Agencies" 
@@ -472,9 +478,11 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Budget Allocation by Agency */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <IndianRupee size={18} className="text-green-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <IndianRupee size={16} className="text-green-500" />
           Agency Budget Allocation vs Utilization
         </h3>
         <div className="w-full h-[350px]">
@@ -486,12 +494,12 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
                 angle={-45} 
                 textAnchor="end" 
                 height={80} 
-                tick={{ fontSize: 10, cursor: 'pointer' }}
+                tick={{ fontSize: 9, cursor: 'pointer' }}
                 onClick={(e) => e && e.value && handleAgencyClick(agencyMetrics.budgetComparison.find(a => a.agency === e.value)?.fullName || e.value)}
               />
-              <YAxis tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 10 }} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Bar dataKey="allocated" fill="#3b82f6" name="Allocated (Cr)" onClick={(data) => handleAgencyClick(data.fullName)} style={{ cursor: 'pointer' }} />
               <Bar dataKey="spent" fill="#10b981" name="Spent (Cr)" />
               <Bar dataKey="remaining" fill="#f59e0b" name="Remaining (Cr)" />
@@ -501,9 +509,11 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Risk Distribution by Agency */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Shield size={18} className="text-red-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Shield size={16} className="text-red-500" />
           Risk Distribution by Agency
         </h3>
         <div className="w-full h-[350px]">
@@ -515,12 +525,12 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
                 angle={-45} 
                 textAnchor="end" 
                 height={80} 
-                tick={{ fontSize: 10, cursor: 'pointer' }}
+                tick={{ fontSize: 9, cursor: 'pointer' }}
                 onClick={(e) => e && e.value && handleAgencyClick(agencyMetrics.riskDistribution.find(a => a.agency === e.value)?.fullName || e.value)}
               />
-              <YAxis tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Bar dataKey="critical" stackId="a" fill="#ef4444" name="Critical" />
               <Bar dataKey="high" stackId="a" fill="#f59e0b" name="High" />
               <Bar dataKey="medium" stackId="a" fill="#fbbf24" name="Medium" />
@@ -533,42 +543,44 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
       {/* Top vs Bottom Performers */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Performers */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <Award size={18} className="text-green-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Award size={16} className="text-green-500" />
             Top Performing Agencies
           </h3>
           <div className="space-y-3">
             {agencyMetrics.topPerformers.map((agency, index) => (
               <div 
                 key={index}
-                className={`p-4 rounded-lg border cursor-pointer transition-all hover:scale-[1.02] ${
+                className={`p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.02] ${
                   darkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50'
                 }`}
                 onClick={() => handleAgencyClick(agency.name)}
               >
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold text-sm">{agency.name}</span>
-                  <span className="text-green-600 font-bold text-lg">{agency.performanceScore}</span>
+                  <span className="font-semibold text-xs text-gray-900 dark:text-gray-100">{agency.name}</span>
+                  <span className="text-green-600 font-bold text-base">{agency.performanceScore}</span>
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
                   <div>
                     <span className="text-gray-500">Projects:</span>
-                    <span className="ml-1 font-medium">{agency.projects}</span>
+                    <span className="ml-1 font-medium text-gray-700 dark:text-gray-300">{agency.projects}</span>
                   </div>
                   <div>
                     <span className="text-gray-500">Progress:</span>
-                    <span className="ml-1 font-medium">{agency.avgProgress}%</span>
+                    <span className="ml-1 font-medium text-gray-700 dark:text-gray-300">{agency.avgProgress}%</span>
                   </div>
                   <div>
                     <span className="text-gray-500">On Track:</span>
                     <span className="ml-1 font-medium text-green-600">{agency.onTrackRate}%</span>
                   </div>
                 </div>
-                <div className="mt-3 pt-2 border-t border-green-300 dark:border-green-800">
+                <div className="mt-2 pt-2 border-t border-green-300 dark:border-green-800">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500">Click to view all {agency.projects} projects</span>
-                    <Eye size={14} className="text-green-600" />
+                    <Eye size={12} className="text-green-600" />
                   </div>
                 </div>
               </div>
@@ -577,28 +589,30 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
 
         {/* Bottom Performers */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <AlertTriangle size={18} className="text-red-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <AlertTriangle size={16} className="text-red-500" />
             Agencies Needing Attention
           </h3>
           <div className="space-y-3">
             {agencyMetrics.bottomPerformers.map((agency, index) => (
               <div 
                 key={index}
-                className={`p-4 rounded-lg border cursor-pointer transition-all hover:scale-[1.02] ${
+                className={`p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.02] ${
                   darkMode ? 'border-red-800 bg-red-900/20' : 'border-red-200 bg-red-50'
                 }`}
                 onClick={() => handleAgencyClick(agency.name)}
               >
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold text-sm">{agency.name}</span>
-                  <span className="text-red-600 font-bold text-lg">{agency.performanceScore}</span>
+                  <span className="font-semibold text-xs text-gray-900 dark:text-gray-100">{agency.name}</span>
+                  <span className="text-red-600 font-bold text-base">{agency.performanceScore}</span>
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
                   <div>
                     <span className="text-gray-500">Projects:</span>
-                    <span className="ml-1 font-medium">{agency.projects}</span>
+                    <span className="ml-1 font-medium text-gray-700 dark:text-gray-300">{agency.projects}</span>
                   </div>
                   <div>
                     <span className="text-gray-500">Delayed:</span>
@@ -609,10 +623,10 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
                     <span className="ml-1 font-medium text-red-600">{agency.criticalRate}%</span>
                   </div>
                 </div>
-                <div className="mt-3 pt-2 border-t border-red-300 dark:border-red-800">
+                <div className="mt-2 pt-2 border-t border-red-300 dark:border-red-800">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500">Click to analyze {agency.projects} projects</span>
-                    <Eye size={14} className="text-red-600" />
+                    <Eye size={12} className="text-red-600" />
                   </div>
                 </div>
               </div>
@@ -622,46 +636,48 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Completion Rates Table */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <CheckCircle size={18} className="text-blue-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <CheckCircle size={16} className="text-blue-500" />
           Agency Completion Rates
         </h3>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead className={`${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
               <tr>
-                <th className="px-4 py-2 text-left">Agency</th>
-                <th className="px-4 py-2 text-center">Total</th>
-                <th className="px-4 py-2 text-center">Completed</th>
-                <th className="px-4 py-2 text-center">Ongoing</th>
-                <th className="px-4 py-2 text-center">Not Started</th>
-                <th className="px-4 py-2 text-center">Completion Rate</th>
-                <th className="px-4 py-2 text-center">Actions</th>
+                <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Agency</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Total</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Completed</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Ongoing</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Not Started</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Completion Rate</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Actions</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
               {agencyMetrics.completionRates.map((agency, index) => (
                 <tr 
                   key={index} 
-                  className={`hover:${darkMode ? 'bg-gray-700' : 'bg-orange-50'} transition-colors`}
+                  className={`hover:${darkMode ? 'bg-gray-700' : 'bg-blue-50'} transition-colors`}
                 >
-                  <td className="px-4 py-2 font-medium">{agency.agency}</td>
-                  <td className="px-4 py-2 text-center">{agency.total}</td>
-                  <td className="px-4 py-2 text-center text-green-600 font-medium">{agency.completed}</td>
-                  <td className="px-4 py-2 text-center text-blue-600">{agency.ongoing}</td>
-                  <td className="px-4 py-2 text-center text-gray-500">{agency.notStarted}</td>
-                  <td className="px-4 py-2 text-center">
+                  <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{agency.agency}</td>
+                  <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{agency.total}</td>
+                  <td className="px-3 py-2 text-center text-green-600 font-medium">{agency.completed}</td>
+                  <td className="px-3 py-2 text-center text-blue-600">{agency.ongoing}</td>
+                  <td className="px-3 py-2 text-center text-gray-500">{agency.notStarted}</td>
+                  <td className="px-3 py-2 text-center">
                     <div className="flex items-center justify-center gap-2">
-                      <span className={`font-bold ${
+                      <span className={`font-bold text-xs ${
                         agency.rate > 50 ? 'text-green-600' :
                         agency.rate > 25 ? 'text-yellow-600' : 'text-red-600'
                       }`}>
                         {agency.rate}%
                       </span>
-                      <div className="w-16 bg-gray-200 rounded-full h-2">
+                      <div className="w-14 bg-gray-200 rounded-full h-1.5">
                         <div 
-                          className={`h-2 rounded-full ${
+                          className={`h-1.5 rounded-full ${
                             agency.rate > 50 ? 'bg-green-500' :
                             agency.rate > 25 ? 'bg-yellow-500' : 'bg-red-500'
                           }`}
@@ -670,14 +686,14 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-center">
+                  <td className="px-3 py-2 text-center">
                     <button
                       onClick={() => handleAgencyClick(agency.fullName)}
-                      className={`px-3 py-1 rounded-lg text-xs flex items-center gap-1 mx-auto ${
-                        darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-orange-100 hover:bg-orange-200'
-                      } transition-colors`}
+                      className={`px-2 py-1 rounded-lg text-xs flex items-center gap-1 mx-auto ${
+                        darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-blue-50 hover:bg-blue-100'
+                      } transition-colors text-blue-600 dark:text-blue-400`}
                     >
-                      <Eye size={14} />
+                      <Eye size={12} />
                       View
                     </button>
                   </td>

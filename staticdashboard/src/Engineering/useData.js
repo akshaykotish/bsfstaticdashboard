@@ -83,6 +83,13 @@ const forecastCompletion = (row) => {
   return forecastDate.toISOString().split('T')[0];
 };
 
+// Safe string conversion helper
+const safeString = (value) => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  return String(value);
+};
+
 // Main data hook
 export const useData = () => {
   const [rawData, setRawData] = useState([]);
@@ -94,46 +101,52 @@ export const useData = () => {
   const retryCount = useRef(0);
   const maxRetries = 3;
 
-  // Process raw CSV data
+  // Process raw CSV data with proper type checking
   const processData = useCallback((data) => {
     return data
-      .filter(row => row.serial_no && row.scheme_name)
+      .filter(row => row && (row.serial_no || row.scheme_name))
       .map((row, index) => {
         const cleanRow = {};
+        
+        // Clean and normalize all keys
         Object.keys(row).forEach(key => {
-          const cleanKey = key.trim().replace(/\s+/g, '_').toLowerCase();
-          cleanRow[cleanKey] = row[key];
+          if (key) {
+            const cleanKey = key.trim().replace(/\s+/g, '_').toLowerCase();
+            cleanRow[cleanKey] = row[key];
+          }
         });
 
+        // Process each field with safe string conversion where needed
         const processedRow = {
           id: index + 1,
-          serial_no: cleanRow.serial_no || index + 1,
-          budget_head: cleanRow.budget_head || 'N/A',
-          scheme_name: cleanRow.scheme_name || 'Unnamed Scheme',
-          ftr_hq: cleanRow.ftr_hq || 'Unknown',
-          shq: cleanRow.shq || 'Unknown',
-          work_site: cleanRow.work_site || 'Unknown Location',
-          executive_agency: cleanRow.executive_agency || 'Unknown Agency',
+          serial_no: safeString(cleanRow.serial_no || index + 1),
+          budget_head: safeString(cleanRow.budget_head || 'N/A'),
+          scheme_name: safeString(cleanRow.scheme_name || 'Unnamed Scheme'),
+          ftr_hq: safeString(cleanRow.ftr_hq || 'Unknown'),
+          shq: safeString(cleanRow.shq || 'Unknown'),
+          work_site: safeString(cleanRow.work_site || 'Unknown Location'),
+          executive_agency: safeString(cleanRow.executive_agency || 'Unknown Agency'),
           sanctioned_amount: parseFloat(cleanRow.sanctioned_amount) || 0,
-          date_award: cleanRow.date_award || '',
-          date_tender: cleanRow.date_tender || '',
-          pdc_agreement: cleanRow.pdc_agreement || '',
-          revised_pdc: cleanRow.revised_pdc || '',
-          actual_completion_date: cleanRow.actual_completion_date || '',
-          firm_name: cleanRow.firm_name || 'Unknown Contractor',
+          date_award: safeString(cleanRow.date_award || ''),
+          date_tender: safeString(cleanRow.date_tender || ''),
+          pdc_agreement: safeString(cleanRow.pdc_agreement || ''),
+          revised_pdc: safeString(cleanRow.revised_pdc || ''),
+          actual_completion_date: safeString(cleanRow.actual_completion_date || ''),
+          firm_name: safeString(cleanRow.firm_name || 'Unknown Contractor'),
           physical_progress: parseFloat(cleanRow.physical_progress) || 0,
-          progress_status: cleanRow.progress_status || 'Unknown',
+          progress_status: safeString(cleanRow.progress_status || 'Unknown'),
           expdr_upto_31mar25: parseFloat(cleanRow.expdr_upto_31mar25) || 0,
           expdr_cfy: parseFloat(cleanRow.expdr_cfy) || 0,
           total_expdr: parseFloat(cleanRow.total_expdr) || 0,
           percent_expdr: parseFloat(cleanRow.percent_expdr) || 0,
           time_allowed_days: parseInt(cleanRow.time_allowed_days) || 0,
-          remarks: cleanRow.remarks || '',
-          aa_es_ref: cleanRow.aa_es_ref || '',
-          date_acceptance: cleanRow.date_acceptance || '',
-          aa_es_pending_with: cleanRow.aa_es_pending_with || ''
+          remarks: safeString(cleanRow.remarks || ''),
+          aa_es_ref: safeString(cleanRow.aa_es_ref || ''),
+          date_acceptance: safeString(cleanRow.date_acceptance || ''),
+          aa_es_pending_with: safeString(cleanRow.aa_es_pending_with || '')
         };
 
+        // Calculate derived fields
         processedRow.remaining_amount = processedRow.sanctioned_amount - processedRow.total_expdr;
         processedRow.efficiency_score = calculateEfficiency(processedRow);
         processedRow.delay_days = calculateDelay(processedRow);
@@ -163,14 +176,12 @@ export const useData = () => {
 
   // Load data from CSV using fetch
   const loadData = useCallback(async () => {
-    // Don't start if component is unmounted
     if (!isMountedRef.current) return;
     
     try {
       setLoading(true);
       setError(null);
       
-      // Use fetch to get the CSV file
       const response = await fetch('/engineering.csv', {
         method: 'GET',
         headers: {
@@ -178,7 +189,6 @@ export const useData = () => {
         }
       });
       
-      // Check if component is still mounted after fetch
       if (!isMountedRef.current) {
         console.log('Component unmounted, cancelling data processing');
         return;
@@ -188,12 +198,9 @@ export const useData = () => {
         throw new Error(`Failed to load data: ${response.status} ${response.statusText}`);
       }
       
-
       const fileContent = await response.text();
-      console.log(fileContent);
-
+      console.log('CSV file loaded, processing...');
       
-      // Check again if component is still mounted
       if (!isMountedRef.current) {
         console.log('Component unmounted, cancelling CSV parsing');
         return;
@@ -207,7 +214,11 @@ export const useData = () => {
         dynamicTyping: true,
         skipEmptyLines: true,
         delimitersToGuess: [',', '\t', '|', ';'],
-        transformHeader: (header) => header.trim().toLowerCase().replace(/\s+/g, '_')
+        transformHeader: (header) => {
+          // Safely transform headers
+          if (!header) return '';
+          return header.trim().toLowerCase().replace(/\s+/g, '_');
+        }
       });
       
       if (!isMountedRef.current) {
@@ -219,8 +230,9 @@ export const useData = () => {
         console.warn('CSV parsing warnings:', result.errors);
       }
       
-      // Process data
+      // Process data with error handling
       const processedData = processData(result.data);
+      console.log(`Processed ${processedData.length} records`);
       
       // Calculate data statistics
       const stats = {
@@ -229,8 +241,12 @@ export const useData = () => {
           earliest: processedData
             .filter(d => d.date_award)
             .reduce((min, d) => {
-              const date = new Date(d.date_award);
-              return date < min ? date : min;
+              try {
+                const date = new Date(d.date_award);
+                return date < min ? date : min;
+              } catch {
+                return min;
+              }
             }, new Date()),
           latest: new Date()
         },
@@ -238,7 +254,6 @@ export const useData = () => {
         lastUpdate: new Date()
       };
       
-      // Final check before updating state
       if (!isMountedRef.current) {
         console.log('Component unmounted, not updating state');
         return;
@@ -253,7 +268,6 @@ export const useData = () => {
       return processedData;
       
     } catch (err) {
-      // Only handle errors if component is still mounted
       if (!isMountedRef.current) {
         console.log('Component unmounted, ignoring error');
         return;
@@ -279,7 +293,7 @@ export const useData = () => {
 
   // Calculate data completeness
   const calculateDataCompleteness = (data) => {
-    if (data.length === 0) return 0;
+    if (!data || data.length === 0) return 0;
     
     const requiredFields = [
       'serial_no', 'scheme_name', 'budget_head', 'work_site',
@@ -288,7 +302,9 @@ export const useData = () => {
     
     let totalCompleteness = 0;
     data.forEach(row => {
-      const filledFields = requiredFields.filter(field => row[field] && row[field] !== 'N/A').length;
+      const filledFields = requiredFields.filter(field => 
+        row[field] && row[field] !== 'N/A' && row[field] !== ''
+      ).length;
       totalCompleteness += (filledFields / requiredFields.length) * 100;
     });
     
@@ -335,15 +351,15 @@ export const useData = () => {
     setRawData(prevData => prevData.filter(record => !ids.includes(record.id)));
   }, []);
 
-  // Get aggregate statistics
+  // Get aggregate statistics with safe string handling
   const getAggregateStats = useCallback(() => {
-    if (rawData.length === 0) return null;
+    if (!rawData || rawData.length === 0) return null;
     
     const aggregateByField = (data, field) => {
       const grouped = {};
       
       data.forEach(item => {
-        const key = item[field] || 'Unknown';
+        const key = safeString(item[field] || 'Unknown');
         if (!grouped[key]) {
           grouped[key] = {
             count: 0,
@@ -356,16 +372,18 @@ export const useData = () => {
         }
         
         grouped[key].count++;
-        grouped[key].totalBudget += item.sanctioned_amount;
-        grouped[key].totalExpenditure += item.total_expdr;
-        grouped[key].avgProgress += item.physical_progress;
-        grouped[key].avgEfficiency += item.efficiency_score;
+        grouped[key].totalBudget += item.sanctioned_amount || 0;
+        grouped[key].totalExpenditure += item.total_expdr || 0;
+        grouped[key].avgProgress += item.physical_progress || 0;
+        grouped[key].avgEfficiency += item.efficiency_score || 0;
         grouped[key].projects.push(item.id);
       });
       
       Object.keys(grouped).forEach(key => {
-        grouped[key].avgProgress /= grouped[key].count;
-        grouped[key].avgEfficiency /= grouped[key].count;
+        if (grouped[key].count > 0) {
+          grouped[key].avgProgress /= grouped[key].count;
+          grouped[key].avgEfficiency /= grouped[key].count;
+        }
       });
       
       return grouped;
@@ -375,7 +393,9 @@ export const useData = () => {
       const locations = {};
       
       data.forEach(item => {
-        const location = item.work_site?.split(',')[0]?.trim() || 'Unknown';
+        const workSite = safeString(item.work_site);
+        const location = workSite ? workSite.split(',')[0].trim() : 'Unknown';
+        
         if (!locations[location]) {
           locations[location] = {
             count: 0,
@@ -386,7 +406,7 @@ export const useData = () => {
         }
         
         locations[location].count++;
-        locations[location].totalBudget += item.sanctioned_amount;
+        locations[location].totalBudget += item.sanctioned_amount || 0;
         locations[location].projects.push(item.id);
       });
       
@@ -398,24 +418,30 @@ export const useData = () => {
       
       data.forEach(item => {
         if (item.date_award) {
-          const date = new Date(item.date_award);
-          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-          
-          if (!timeline[monthKey]) {
-            timeline[monthKey] = {
-              started: 0,
-              completed: 0,
-              budget: 0,
-              expenditure: 0
-            };
-          }
-          
-          timeline[monthKey].started++;
-          timeline[monthKey].budget += item.sanctioned_amount;
-          timeline[monthKey].expenditure += item.total_expdr;
-          
-          if (item.physical_progress >= 100) {
-            timeline[monthKey].completed++;
+          try {
+            const date = new Date(item.date_award);
+            if (!isNaN(date.getTime())) {
+              const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+              
+              if (!timeline[monthKey]) {
+                timeline[monthKey] = {
+                  started: 0,
+                  completed: 0,
+                  budget: 0,
+                  expenditure: 0
+                };
+              }
+              
+              timeline[monthKey].started++;
+              timeline[monthKey].budget += item.sanctioned_amount || 0;
+              timeline[monthKey].expenditure += item.total_expdr || 0;
+              
+              if (item.physical_progress >= 100) {
+                timeline[monthKey].completed++;
+              }
+            }
+          } catch (err) {
+            console.warn('Invalid date in timeline stats:', item.date_award);
           }
         }
       });

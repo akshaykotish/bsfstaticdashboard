@@ -448,8 +448,8 @@ const Engineering = () => {
             line-height: 1.6;
           }
           h1 { 
-            color: #f97316; 
-            border-bottom: 2px solid #f97316;
+            color: #3b82f6; 
+            border-bottom: 2px solid #3b82f6;
             padding-bottom: 10px;
           }
           h2 { 
@@ -457,7 +457,7 @@ const Engineering = () => {
             margin-top: 30px;
             background: #f5f5f5;
             padding: 10px;
-            border-left: 4px solid #f97316;
+            border-left: 4px solid #3b82f6;
           }
           table { 
             width: 100%; 
@@ -470,7 +470,7 @@ const Engineering = () => {
             text-align: left; 
           }
           th { 
-            background-color: #f97316; 
+            background-color: #3b82f6; 
             color: white;
             font-weight: bold;
           }
@@ -493,7 +493,7 @@ const Engineering = () => {
           .metric-value { 
             font-size: 24px; 
             font-weight: bold; 
-            color: #f97316; 
+            color: #3b82f6; 
           }
           .metric-label { 
             color: #666; 
@@ -700,12 +700,12 @@ const Engineering = () => {
           onClick={() => setShowDrillDownModal(false)}
         />
         
-        <div className={`relative w-[70vw] max-h-[85vh] ${
+        <div className={`relative w-[90vw] max-h-[85vh] ${
           darkMode ? 'bg-gray-900' : 'bg-white'
         } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
           
           <div className={`px-6 py-4 border-b ${
-            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-orange-500 to-orange-600'
+            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
           }`}>
             <div className="flex justify-between items-center">
               <div>
@@ -713,7 +713,7 @@ const Engineering = () => {
                   Drill-down View: {drillDownData.type.charAt(0).toUpperCase() + drillDownData.type.slice(1)}
                 </h2>
                 {drillDownData.filter && (
-                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-orange-100'}`}>
+                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
                     Filter: {drillDownData.filter}
                   </p>
                 )}
@@ -726,7 +726,7 @@ const Engineering = () => {
                     addNotification('Data exported', 'success');
                   }}
                   className={`px-3 py-1 rounded ${
-                    darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-orange-700 hover:bg-orange-800'
+                    darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-blue-700 hover:bg-blue-800'
                   } text-white transition-colors`}
                 >
                   <Download size={16} />
@@ -734,7 +734,7 @@ const Engineering = () => {
                 <button
                   onClick={() => setShowDrillDownModal(false)}
                   className={`p-2 rounded-lg ${
-                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-700'
+                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
                   } transition-colors`}
                 >
                   <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
@@ -792,7 +792,7 @@ const Engineering = () => {
       <div className={`${
         darkMode ? 'bg-gray-800' : 'bg-white'
       } rounded-xl shadow-2xl p-4 border ${
-        darkMode ? 'border-gray-700' : 'border-orange-200'
+        darkMode ? 'border-gray-700' : 'border-blue-200'
       }`}>
         <h3 className="text-sm font-bold mb-3">Quick Actions</h3>
         <div className="space-y-2">
@@ -829,15 +829,15 @@ const Engineering = () => {
   if (loading) {
     return (
       <div className={`flex flex-col items-center justify-center min-h-screen ${
-        darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-orange-50 to-amber-50'
+        darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100'
       }`}>
         <div className="text-center">
           <div className="w-20 h-20 mx-auto mb-4">
             <div className={`w-full h-full border-4 ${
-              darkMode ? 'border-gray-700 border-t-orange-500' : 'border-orange-200 border-t-orange-500'
+              darkMode ? 'border-gray-700 border-t-blue-500' : 'border-blue-200 border-t-blue-500'
             } rounded-full animate-spin`}></div>
           </div>
-          <p className={`text-lg font-bold ${darkMode ? 'text-gray-200' : 'text-orange-800'}`}>
+          <p className={`text-lg font-bold ${darkMode ? 'text-gray-200' : 'text-gray-900'}`}>
             Loading Engineering Analytics...
           </p>
         </div>
@@ -849,10 +849,10 @@ const Engineering = () => {
   if (error) {
     return (
       <div className={`flex flex-col items-center justify-center min-h-screen ${
-        darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-red-50 to-orange-50'
+        darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100'
       }`}>
         <AlertCircle size={48} className="text-red-500 mb-4" />
-        <p className={`text-lg font-bold ${darkMode ? 'text-red-400' : 'text-red-800'}`}>
+        <p className={`text-lg font-bold ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
           {error}
         </p>
         <button
@@ -870,23 +870,23 @@ const Engineering = () => {
     <div className={`min-h-screen transition-colors duration-300 ${
       darkMode 
         ? 'bg-gray-900 text-gray-100' 
-        : 'bg-gradient-to-br from-slate-50 via-orange-50 to-amber-50'
+        : 'bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100'
     }`}>
-      <div className={`p-4 lg:p-6 ${layoutMode === 'compact' ? 'max-w-[1400px]' : 'max-w-[1800px]'} mx-auto`}>
+      <div className={`p-4 lg:p-6 ${layoutMode === 'compact' ? 'max-w-[1600px]' : 'max-w-[1920px]'} mx-auto`}>
         <div className="space-y-6">
           {/* Header */}
           <div className={`${
-            darkMode ? 'bg-gray-800/90' : 'bg-white/90'
-          } backdrop-blur rounded-2xl shadow-xl p-6 border ${
-            darkMode ? 'border-gray-700' : 'border-orange-200'
+            darkMode ? 'bg-gray-800/90' : 'bg-white'
+          } backdrop-blur rounded-2xl shadow-sm p-6 border ${
+            darkMode ? 'border-gray-700' : 'border-gray-100'
           }`}>
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl shadow-lg bg-gradient-to-r from-orange-500 to-orange-600">
-                  <Building size={32} className="text-white" />
+                <div className="w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
+                  <Building size={28} className="text-white" />
                 </div>
                 <div>
-                  <h1 className={`text-3xl font-black ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>
+                  <h1 className={`text-3xl font-bold ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
                     Engineering Analytics Hub
                   </h1>
                   <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-1 flex items-center gap-3`}>
@@ -904,14 +904,14 @@ const Engineering = () => {
               
               <div className="flex flex-wrap gap-2">
                 {/* View Mode Toggle */}
-                <div className="flex rounded-lg overflow-hidden shadow-md">
+                <div className="flex rounded-lg overflow-hidden shadow-sm">
                   {['dashboard', 'table', 'kanban'].map(mode => (
                     <button
                       key={mode}
                       onClick={() => setViewMode(mode)}
-                      className={`px-3 py-2 capitalize ${
+                      className={`px-3 py-2 text-sm capitalize ${
                         viewMode === mode
-                          ? 'bg-orange-500 text-white'
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
                           : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
                       } hover:opacity-90 transition-all`}
                     >
@@ -926,13 +926,13 @@ const Engineering = () => {
                     setCompareMode(!compareMode);
                     setSelectedProjects([]);
                   }}
-                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                  className={`px-4 py-2 text-sm rounded-lg transition-all flex items-center gap-2 ${
                     compareMode 
                       ? 'bg-blue-500 text-white' 
                       : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
                   }`}
                 >
-                  <GitBranch size={18} />
+                  <GitBranch size={16} />
                   {compareMode ? 'Exit Compare' : 'Compare'}
                 </button>
 
@@ -942,19 +942,19 @@ const Engineering = () => {
                     filters.resetFilters();
                     setSelectedProjects([]);
                   }}
-                  className={`px-4 py-2 rounded-lg hover:opacity-90 transition-all flex items-center gap-2 ${
+                  className={`px-4 py-2 text-sm rounded-lg hover:opacity-90 transition-all flex items-center gap-2 ${
                     darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
                   }`}
                 >
-                  <RefreshCw size={18} />
+                  <RefreshCw size={16} />
                   Reset
                 </button>
 
                 <button
                   onClick={() => handleExport('csv')}
-                  className="px-4 py-2 text-white rounded-lg shadow-lg hover:shadow-xl transition-all flex items-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600"
+                  className="px-4 py-2 text-sm text-white rounded-lg shadow-sm hover:shadow-md transition-all flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600"
                 >
-                  <Download size={18} />
+                  <Download size={16} />
                   Export
                 </button>
 
@@ -965,7 +965,7 @@ const Engineering = () => {
                     darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-700'
                   }`}
                 >
-                  {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+                  {darkMode ? <Sun size={16} /> : <Moon size={16} />}
                 </button>
               </div>
             </div>
@@ -1007,7 +1007,7 @@ const Engineering = () => {
 
           {viewMode === 'table' && (
             <div className="flex items-center justify-center">
-              <div className="w-[90vw]">
+              <div className="w-full">
                 <DataTable
                   data={filteredData}
                   darkMode={darkMode}
@@ -1020,12 +1020,12 @@ const Engineering = () => {
           )}
 
           {viewMode === 'kanban' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
               {['NOT_STARTED', 'IN_PROGRESS', 'ADVANCED', 'COMPLETED'].map(status => (
                 <div key={status} className={`${
                   darkMode ? 'bg-gray-800' : 'bg-white'
-                } rounded-lg shadow-lg p-4`}>
-                  <h3 className="font-bold mb-3 text-sm uppercase tracking-wider flex items-center justify-between">
+                } rounded-2xl shadow-sm p-4 border ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                  <h3 className="font-semibold mb-3 text-sm uppercase tracking-wider flex items-center justify-between">
                     {status.replace('_', ' ')}
                     <span className={`px-2 py-1 rounded-full text-xs ${
                       darkMode ? 'bg-gray-700' : 'bg-gray-100'
@@ -1055,7 +1055,7 @@ const Engineering = () => {
                           onClick={() => handleProjectSelect(project)}
                           className={`p-3 rounded-lg cursor-pointer transition-all ${
                             darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'
-                          } ${selectedProjects.find(p => p.id === project.id) ? 'ring-2 ring-orange-500' : ''}`}
+                          } ${selectedProjects.find(p => p.id === project.id) ? 'ring-2 ring-blue-500' : ''}`}
                         >
                           <p className="text-sm font-semibold mb-1 truncate">
                             {project.scheme_name}
@@ -1073,7 +1073,7 @@ const Engineering = () => {
                           </div>
                           <div className="mt-2 w-full bg-gray-200 rounded-full h-1">
                             <div 
-                              className="h-1 rounded-full bg-orange-500"
+                              className="h-1 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
                               style={{ width: `${project.physical_progress}%` }}
                             />
                           </div>
@@ -1094,7 +1094,7 @@ const Engineering = () => {
             </div>
           )}
 
-          {/* Project Detail Modal - Centered with 70vw width */}
+          {/* Project Detail Modal - Centered with 90vw width */}
           {selectedProject && modalOpen && (
             <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center">
               <div 
@@ -1104,7 +1104,7 @@ const Engineering = () => {
                   setSelectedProject(null);
                 }}
               />
-              <div className="relative w-[70vw] max-h-[90vh] overflow-auto">
+              <div className="relative w-[90vw] max-h-[90vh] overflow-auto">
                 <Modal
                   isOpen={modalOpen}
                   onClose={() => {
@@ -1124,15 +1124,15 @@ const Engineering = () => {
           {/* Quick Actions Panel */}
           <QuickActionsPanel />
 
-          {/* Comparison Panel */}
+          {/* Comparison Panel - Full Width at Bottom */}
           {compareMode && selectedProjects.length > 0 && (
-            <div className={`fixed bottom-4 left-4 right-4 z-30 ${
+            <div className={`fixed bottom-4 left-4 right-4 max-w-[1920px] mx-auto z-30 ${
               darkMode ? 'bg-gray-800' : 'bg-white'
-            } rounded-xl shadow-2xl p-4 border ${
-              darkMode ? 'border-gray-700' : 'border-orange-200'
+            } rounded-xl shadow-lg p-4 border ${
+              darkMode ? 'border-gray-700' : 'border-gray-100'
             }`}>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold">Comparing {selectedProjects.length} Projects</h3>
+                <h3 className="font-semibold text-sm">Comparing {selectedProjects.length} Projects</h3>
                 <button
                   onClick={() => {
                     setCompareMode(false);
@@ -1145,7 +1145,7 @@ const Engineering = () => {
               </div>
               <div className="flex gap-2 overflow-x-auto">
                 {selectedProjects.map(project => (
-                  <div key={project.id} className={`min-w-[200px] p-3 rounded-lg ${
+                  <div key={project.id} className={`min-w-[250px] p-3 rounded-lg ${
                     darkMode ? 'bg-gray-700' : 'bg-gray-50'
                   }`}>
                     <p className="text-sm font-semibold truncate">{project.scheme_name}</p>
@@ -1175,7 +1175,7 @@ const Engineering = () => {
               </div>
               <button
                 onClick={() => setActiveTab('comparison')}
-                className="mt-3 w-full px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                className="mt-3 w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:opacity-90 transition-all text-sm"
               >
                 View Detailed Comparison
               </button>

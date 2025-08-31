@@ -1,295 +1,264 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   BarChart, Bar, LineChart, Line, RadarChart, Radar,
   ComposedChart, ScatterChart, Scatter, PolarGrid,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, PolarAngleAxis, PolarRadiusAxis,
-  Cell, PieChart, Pie
+  Cell, PieChart, Pie, Area, AreaChart, Treemap
 } from 'recharts';
 import {
-  GitBranch, BarChart3, Target, TrendingUp,
-  Users, Building2, IndianRupee, Clock,
+  GitBranch, BarChart3, Target, TrendingUp, Filter,
+  Users, Building2, IndianRupee, Clock, MapPin,
   Award, AlertTriangle, Activity, Layers, Gauge,
+  Package, Calendar, Percent, X, ChevronDown,
+  Plus, Minus, Eye, Download, Settings, Info,
+  CheckCircle, XCircle, Zap, Shield, Database
 } from 'lucide-react';
 
 const COLORS = {
-  comparison: ['#f97316', '#3b82f6', '#10b981', '#a855f7', '#ec4899'],
-  metrics: {
-    primary: '#f97316',
-    secondary: '#3b82f6',
-    tertiary: '#10b981'
-  },
-  performance: {
-    better: '#10b981',
-    same: '#3b82f6',
-    worse: '#ef4444'
-  }
+  primary: ['#f97316', '#3b82f6', '#10b981', '#a855f7', '#ec4899', '#06b6d4', '#eab308', '#ef4444'],
+  secondary: ['#fb923c', '#60a5fa', '#34d399', '#c084fc', '#f472b6', '#22d3ee', '#facc15', '#f87171'],
+  gradient: [
+    { start: '#f97316', end: '#fb923c' },
+    { start: '#3b82f6', end: '#60a5fa' },
+    { start: '#10b981', end: '#34d399' },
+    { start: '#a855f7', end: '#c084fc' },
+    { start: '#ec4899', end: '#f472b6' },
+    { start: '#06b6d4', end: '#22d3ee' }
+  ]
 };
 
-const Comparison = ({ data, darkMode, onChartClick, formatAmount, selectedProjects = [] }) => {
-  const comparisonData = useMemo(() => {
-    if (!data || data.length === 0) {
-      return {
-        budgetHeadComparison: [],
-        agencyComparison: [],
-        timelineComparison: [],
-        performanceComparison: [],
-        selectedProjectsComparison: [],
-        riskComparison: [],
-        efficiencyComparison: [],
-        regionalComparison: []
-      };
-    }
+const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
+  // State for dynamic comparison
+  const [comparisonType, setComparisonType] = useState('frontier');
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [chartType, setChartType] = useState('bar');
+  const [metrics, setMetrics] = useState(['progress', 'efficiency', 'budget']);
+  const [showDetails, setShowDetails] = useState(true);
+  const [timeRange, setTimeRange] = useState('all');
+  const [aggregationType, setAggregationType] = useState('average');
 
-    // Budget Head Comparison
-    const budgetHeads = {};
-    data.forEach(d => {
-      const head = d.budget_head || 'Unspecified';
-      if (!budgetHeads[head]) {
-        budgetHeads[head] = {
-          name: head,
-          projects: 0,
-          budget: 0,
-          spent: 0,
-          totalProgress: 0,
-          totalEfficiency: 0,
-          completed: 0,
-          delayed: 0,
-          critical: 0
-        };
-      }
-      budgetHeads[head].projects++;
-      budgetHeads[head].budget += (d.sanctioned_amount || 0) / 100;
-      budgetHeads[head].spent += (d.total_expdr || 0) / 100;
-      budgetHeads[head].totalProgress += d.physical_progress || 0;
-      budgetHeads[head].totalEfficiency += d.efficiency_score || 0;
-      if (d.physical_progress >= 100) budgetHeads[head].completed++;
-      if (d.delay_days > 0) budgetHeads[head].delayed++;
-      if (d.risk_level === 'CRITICAL') budgetHeads[head].critical++;
-    });
-
-    const budgetHeadComparison = Object.values(budgetHeads).map(h => ({
-      ...h,
-      avgProgress: h.projects ? (h.totalProgress / h.projects).toFixed(1) : 0,
-      avgEfficiency: h.projects ? (h.totalEfficiency / h.projects).toFixed(1) : 0,
-      completionRate: h.projects ? ((h.completed / h.projects) * 100).toFixed(1) : 0,
-      delayRate: h.projects ? ((h.delayed / h.projects) * 100).toFixed(1) : 0,
-      criticalRate: h.projects ? ((h.critical / h.projects) * 100).toFixed(1) : 0,
-      utilization: h.budget ? ((h.spent / h.budget) * 100).toFixed(1) : 0
-    }));
-
-    // Agency Comparison
-    const agencies = {};
-    data.forEach(d => {
-      const agency = d.executive_agency || 'Unknown';
-      if (!agencies[agency]) {
-        agencies[agency] = {
-          name: agency,
-          projects: 0,
-          budget: 0,
-          spent: 0,
-          totalProgress: 0,
-          totalEfficiency: 0,
-          totalDelay: 0,
-          completed: 0,
-          onTrack: 0
-        };
-      }
-      agencies[agency].projects++;
-      agencies[agency].budget += (d.sanctioned_amount || 0) / 100;
-      agencies[agency].spent += (d.total_expdr || 0) / 100;
-      agencies[agency].totalProgress += d.physical_progress || 0;
-      agencies[agency].totalEfficiency += d.efficiency_score || 0;
-      agencies[agency].totalDelay += d.delay_days || 0;
-      if (d.physical_progress >= 100) agencies[agency].completed++;
-      if (d.delay_days === 0 && d.physical_progress > 0) agencies[agency].onTrack++;
-    });
-
-    const agencyComparison = Object.values(agencies)
-      .map(a => ({
-        ...a,
-        avgProgress: a.projects ? (a.totalProgress / a.projects).toFixed(1) : 0,
-        avgEfficiency: a.projects ? (a.totalEfficiency / a.projects).toFixed(1) : 0,
-        avgDelay: a.projects ? (a.totalDelay / a.projects).toFixed(1) : 0,
-        completionRate: a.projects ? ((a.completed / a.projects) * 100).toFixed(1) : 0,
-        onTrackRate: a.projects ? ((a.onTrack / a.projects) * 100).toFixed(1) : 0,
-        utilization: a.budget ? ((a.spent / a.budget) * 100).toFixed(1) : 0
-      }))
-      .sort((a, b) => b.projects - a.projects)
-      .slice(0, 10);
-
-    // Timeline Comparison (by quarters/years)
-    const timelineData = {};
-    data.forEach(d => {
-      if (d.date_award) {
-        const date = new Date(d.date_award);
-        const year = date.getFullYear();
-        const quarter = Math.floor(date.getMonth() / 3) + 1;
-        const key = `${year}-Q${quarter}`;
-        
-        if (!timelineData[key]) {
-          timelineData[key] = {
-            period: key,
-            projects: 0,
-            budget: 0,
-            avgProgress: 0,
-            totalProgress: 0,
-            completed: 0,
-            delayed: 0
-          };
-        }
-        timelineData[key].projects++;
-        timelineData[key].budget += (d.sanctioned_amount || 0) / 100;
-        timelineData[key].totalProgress += d.physical_progress || 0;
-        if (d.physical_progress >= 100) timelineData[key].completed++;
-        if (d.delay_days > 0) timelineData[key].delayed++;
-      }
-    });
-
-    const timelineComparison = Object.values(timelineData)
-      .map(t => ({
-        ...t,
-        avgProgress: t.projects ? (t.totalProgress / t.projects).toFixed(1) : 0,
-        completionRate: t.projects ? ((t.completed / t.projects) * 100).toFixed(1) : 0,
-        delayRate: t.projects ? ((t.delayed / t.projects) * 100).toFixed(1) : 0
-      }))
-      .sort((a, b) => a.period.localeCompare(b.period))
-      .slice(-8); // Last 8 quarters
-
-    // Performance Comparison Metrics
-    const performanceMetrics = ['Progress', 'Efficiency', 'Timeline', 'Budget', 'Quality'];
-    const performanceComparison = performanceMetrics.map(metric => {
-      const dataPoint = { metric };
-      
-      // Add data for each budget head
-      budgetHeadComparison.slice(0, 4).forEach(head => {
-        switch(metric) {
-          case 'Progress':
-            dataPoint[head.name] = parseFloat(head.avgProgress);
-            break;
-          case 'Efficiency':
-            dataPoint[head.name] = parseFloat(head.avgEfficiency);
-            break;
-          case 'Timeline':
-            dataPoint[head.name] = 100 - parseFloat(head.delayRate);
-            break;
-          case 'Budget':
-            dataPoint[head.name] = parseFloat(head.utilization);
-            break;
-          case 'Quality':
-            dataPoint[head.name] = 100 - parseFloat(head.criticalRate);
-            break;
-        }
-      });
-      
-      return dataPoint;
-    });
-
-    // Selected Projects Comparison (if in compare mode)
-    const selectedProjectsComparison = selectedProjects.map(project => ({
-      name: project.scheme_name?.substring(0, 20) || 'Unknown',
-      progress: project.physical_progress || 0,
-      efficiency: project.efficiency_score || 0,
-      budgetUsed: project.percent_expdr || 0,
-      delay: project.delay_days || 0,
-      budget: (project.sanctioned_amount / 100).toFixed(2),
-      risk: project.risk_level || 'LOW'
-    }));
-
-    // Risk Level Comparison
-    const riskLevels = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
-    const riskComparison = riskLevels.map(level => {
-      const projects = data.filter(d => d.risk_level === level);
-      return {
-        level,
-        count: projects.length,
-        avgProgress: projects.length ? 
-          (projects.reduce((sum, p) => sum + (p.physical_progress || 0), 0) / projects.length).toFixed(1) : 0,
-        avgDelay: projects.length ?
-          (projects.reduce((sum, p) => sum + (p.delay_days || 0), 0) / projects.length).toFixed(1) : 0,
-        totalBudget: projects.reduce((sum, p) => sum + (p.sanctioned_amount || 0), 0) / 100
-      };
-    });
-
-    // Efficiency Comparison
-    const efficiencyRanges = [
-      { range: '0-40%', min: 0, max: 40 },
-      { range: '41-60%', min: 41, max: 60 },
-      { range: '61-80%', min: 61, max: 80 },
-      { range: '81-100%', min: 81, max: 100 }
-    ];
-
-    const efficiencyComparison = efficiencyRanges.map(range => {
-      const projects = data.filter(d => 
-        d.efficiency_score >= range.min && d.efficiency_score <= range.max
-      );
-      return {
-        ...range,
-        projects: projects.length,
-        avgProgress: projects.length ?
-          (projects.reduce((sum, p) => sum + (p.physical_progress || 0), 0) / projects.length).toFixed(1) : 0,
-        totalBudget: projects.reduce((sum, p) => sum + (p.sanctioned_amount || 0), 0) / 100,
-        avgDelay: projects.length ?
-          (projects.reduce((sum, p) => sum + (p.delay_days || 0), 0) / projects.length).toFixed(1) : 0
-      };
-    });
-
-    // Regional Comparison (by work site)
-    const regions = {};
-    data.forEach(d => {
-      const region = d.work_site?.split(',')[0]?.trim() || 'Unknown';
-      if (!regions[region]) {
-        regions[region] = {
-          region,
-          projects: 0,
-          budget: 0,
-          totalProgress: 0,
-          completed: 0,
-          delayed: 0
-        };
-      }
-      regions[region].projects++;
-      regions[region].budget += (d.sanctioned_amount || 0) / 100;
-      regions[region].totalProgress += d.physical_progress || 0;
-      if (d.physical_progress >= 100) regions[region].completed++;
-      if (d.delay_days > 0) regions[region].delayed++;
-    });
-
-    const regionalComparison = Object.values(regions)
-      .map(r => ({
-        ...r,
-        avgProgress: r.projects ? (r.totalProgress / r.projects).toFixed(1) : 0,
-        completionRate: r.projects ? ((r.completed / r.projects) * 100).toFixed(1) : 0,
-        delayRate: r.projects ? ((r.delayed / r.projects) * 100).toFixed(1) : 0
-      }))
-      .sort((a, b) => b.projects - a.projects)
-      .slice(0, 10);
-
+  // Extract unique values for comparison
+  const uniqueValues = useMemo(() => {
+    if (!data || data.length === 0) return {};
+    
     return {
-      budgetHeadComparison,
-      agencyComparison,
-      timelineComparison,
-      performanceComparison,
-      selectedProjectsComparison,
-      riskComparison,
-      efficiencyComparison,
-      regionalComparison
+      frontiers: [...new Set([
+        ...data.map(d => d.ftr_hq).filter(Boolean),
+        ...data.map(d => d.shq).filter(Boolean)
+      ])].sort(),
+      budgetHeads: [...new Set(data.map(d => d.budget_head).filter(Boolean))].sort(),
+      agencies: [...new Set(data.map(d => d.executive_agency).filter(Boolean))].sort(),
+      contractors: [...new Set(data.map(d => d.firm_name).filter(Boolean))].sort(),
+      locations: [...new Set(data.map(d => d.work_site?.split(',')[0]?.trim()).filter(Boolean))].sort(),
+      riskLevels: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'],
+      statuses: ['COMPLETED', 'NEAR_COMPLETION', 'ADVANCED', 'IN_PROGRESS', 'INITIAL', 'NOT_STARTED']
     };
-  }, [data, selectedProjects]);
+  }, [data]);
 
-  // Custom Tooltip
+  // Get items for current comparison type
+  const availableItems = useMemo(() => {
+    switch(comparisonType) {
+      case 'frontier': return uniqueValues.frontiers || [];
+      case 'budgetHead': return uniqueValues.budgetHeads || [];
+      case 'agency': return uniqueValues.agencies || [];
+      case 'contractor': return uniqueValues.contractors || [];
+      case 'location': return uniqueValues.locations || [];
+      case 'riskLevel': return uniqueValues.riskLevels || [];
+      case 'status': return uniqueValues.statuses || [];
+      case 'project': return data?.slice(0, 50).map(d => ({ 
+        id: d.serial_no, 
+        name: d.scheme_name?.substring(0, 30) 
+      })) || [];
+      default: return [];
+    }
+  }, [comparisonType, uniqueValues, data]);
+
+  // Auto-select top items when comparison type changes
+  useEffect(() => {
+    if (comparisonType === 'project') {
+      setSelectedItems(availableItems.slice(0, 5).map(item => item.id));
+    } else {
+      setSelectedItems(availableItems.slice(0, Math.min(5, availableItems.length)));
+    }
+  }, [comparisonType, availableItems]);
+
+  // Process comparison data
+  const comparisonData = useMemo(() => {
+    if (!data || selectedItems.length === 0) return [];
+
+    return selectedItems.map(item => {
+      let filteredProjects = [];
+      
+      // Filter projects based on comparison type
+      switch(comparisonType) {
+        case 'frontier':
+          filteredProjects = data.filter(d => d.ftr_hq === item || d.shq === item);
+          break;
+        case 'budgetHead':
+          filteredProjects = data.filter(d => d.budget_head === item);
+          break;
+        case 'agency':
+          filteredProjects = data.filter(d => d.executive_agency === item);
+          break;
+        case 'contractor':
+          filteredProjects = data.filter(d => d.firm_name === item);
+          break;
+        case 'location':
+          filteredProjects = data.filter(d => d.work_site?.includes(item));
+          break;
+        case 'riskLevel':
+          filteredProjects = data.filter(d => d.risk_level === item);
+          break;
+        case 'status':
+          filteredProjects = data.filter(d => d.status === item);
+          break;
+        case 'project':
+          filteredProjects = data.filter(d => d.serial_no === item);
+          break;
+        default:
+          filteredProjects = [];
+      }
+
+      // Apply time range filter
+      if (timeRange !== 'all' && filteredProjects.length > 0) {
+        const now = new Date();
+        const filterDate = new Date();
+        
+        switch(timeRange) {
+          case 'month':
+            filterDate.setMonth(now.getMonth() - 1);
+            break;
+          case 'quarter':
+            filterDate.setMonth(now.getMonth() - 3);
+            break;
+          case 'year':
+            filterDate.setFullYear(now.getFullYear() - 1);
+            break;
+        }
+        
+        filteredProjects = filteredProjects.filter(p => {
+          if (p.date_award) {
+            return new Date(p.date_award) >= filterDate;
+          }
+          return true;
+        });
+      }
+
+      // Calculate metrics
+      const calculateMetric = (projects, metric, type = 'average') => {
+        if (projects.length === 0) return 0;
+        
+        switch(metric) {
+          case 'count':
+            return projects.length;
+          case 'budget':
+            return projects.reduce((sum, p) => sum + (p.sanctioned_amount || 0), 0) / 100;
+          case 'spent':
+            return projects.reduce((sum, p) => sum + (p.total_expdr || 0), 0) / 100;
+          case 'progress':
+            if (type === 'sum') return projects.reduce((sum, p) => sum + (p.physical_progress || 0), 0);
+            return projects.reduce((sum, p) => sum + (p.physical_progress || 0), 0) / projects.length;
+          case 'efficiency':
+            if (type === 'sum') return projects.reduce((sum, p) => sum + (p.efficiency_score || 0), 0);
+            return projects.reduce((sum, p) => sum + (p.efficiency_score || 0), 0) / projects.length;
+          case 'health':
+            if (type === 'sum') return projects.reduce((sum, p) => sum + (p.health_score || 0), 0);
+            return projects.reduce((sum, p) => sum + (p.health_score || 0), 0) / projects.length;
+          case 'delay':
+            if (type === 'sum') return projects.reduce((sum, p) => sum + (p.delay_days || 0), 0);
+            return projects.reduce((sum, p) => sum + (p.delay_days || 0), 0) / projects.length;
+          case 'utilization':
+            const totalBudget = projects.reduce((sum, p) => sum + (p.sanctioned_amount || 0), 0);
+            const totalSpent = projects.reduce((sum, p) => sum + (p.total_expdr || 0), 0);
+            return totalBudget > 0 ? (totalSpent / totalBudget * 100) : 0;
+          case 'completed':
+            return projects.filter(p => p.physical_progress >= 100).length;
+          case 'critical':
+            return projects.filter(p => p.risk_level === 'CRITICAL').length;
+          case 'onTrack':
+            return projects.filter(p => p.delay_days === 0 && p.physical_progress > 0).length;
+          default:
+            return 0;
+        }
+      };
+
+      const itemName = comparisonType === 'project' 
+        ? availableItems.find(i => i.id === item)?.name || item
+        : item;
+
+      return {
+        name: itemName,
+        projects: filteredProjects.length,
+        budget: calculateMetric(filteredProjects, 'budget'),
+        spent: calculateMetric(filteredProjects, 'spent'),
+        progress: calculateMetric(filteredProjects, 'progress', aggregationType),
+        efficiency: calculateMetric(filteredProjects, 'efficiency', aggregationType),
+        health: calculateMetric(filteredProjects, 'health', aggregationType),
+        delay: calculateMetric(filteredProjects, 'delay', aggregationType),
+        utilization: calculateMetric(filteredProjects, 'utilization'),
+        completed: calculateMetric(filteredProjects, 'completed'),
+        critical: calculateMetric(filteredProjects, 'critical'),
+        onTrack: calculateMetric(filteredProjects, 'onTrack'),
+        completionRate: filteredProjects.length > 0 
+          ? (calculateMetric(filteredProjects, 'completed') / filteredProjects.length * 100)
+          : 0,
+        criticalRate: filteredProjects.length > 0
+          ? (calculateMetric(filteredProjects, 'critical') / filteredProjects.length * 100)
+          : 0,
+        delayRate: filteredProjects.length > 0
+          ? (filteredProjects.filter(p => p.delay_days > 0).length / filteredProjects.length * 100)
+          : 0
+      };
+    });
+  }, [data, selectedItems, comparisonType, availableItems, timeRange, aggregationType]);
+
+  // Toggle item selection
+  const toggleItem = useCallback((item) => {
+    setSelectedItems(prev => {
+      if (prev.includes(item)) {
+        return prev.filter(i => i !== item);
+      }
+      if (prev.length < 8) {
+        return [...prev, item];
+      }
+      return prev;
+    });
+  }, []);
+
+  // Select all items
+  const selectAll = useCallback(() => {
+    if (comparisonType === 'project') {
+      setSelectedItems(availableItems.slice(0, 8).map(i => i.id));
+    } else {
+      setSelectedItems(availableItems.slice(0, 8));
+    }
+  }, [availableItems, comparisonType]);
+
+  // Clear selection
+  const clearSelection = useCallback(() => {
+    setSelectedItems([]);
+  }, []);
+
+  // Custom tooltip
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className={`p-3 rounded-lg shadow-xl backdrop-blur-sm border ${
-          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-orange-200'
+        <div className={`p-3 rounded-lg shadow-lg backdrop-blur-sm border ${
+          darkMode ? 'bg-gray-900/95 border-gray-700' : 'bg-white/95 border-gray-200'
         }`}>
-          <p className="text-sm font-bold mb-2">{label}</p>
+          <p className="text-sm font-semibold mb-2">{label}</p>
           {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2 text-xs">
               <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></span>
-              <span className="font-semibold">{entry.name}:</span>
-              <span className="font-medium">{entry.value}</span>
+              <span className="font-medium">{entry.name}:</span>
+              <span className="font-bold">
+                {entry.name.includes('Rate') || entry.name.includes('utilization') 
+                  ? `${entry.value?.toFixed(1)}%`
+                  : entry.name.includes('budget') || entry.name.includes('spent')
+                  ? formatAmount(entry.value * 100)
+                  : entry.value?.toFixed?.(1) || entry.value}
+              </span>
             </div>
           ))}
         </div>
@@ -298,215 +267,435 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount, selectedProjec
     return null;
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Comparative Overview */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <GitBranch size={20} className="text-orange-500" />
-          Comparative Analysis Dashboard
-        </h3>
-        
-        {/* Budget Head Comparison */}
-        <div className="mb-6">
-          <h4 className="text-base font-semibold mb-3">Budget Head Performance Comparison</h4>
-          <div className="w-full h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={comparisonData.budgetHeadComparison}>
-                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend />
-                <Bar yAxisId="left" dataKey="projects" fill="#3b82f6" name="Projects" />
-                <Bar yAxisId="left" dataKey="budget" fill="#10b981" name="Budget (Cr)" />
-                <Line yAxisId="right" type="monotone" dataKey="avgProgress" stroke="#f97316" name="Avg Progress %" strokeWidth={2} />
-                <Line yAxisId="right" type="monotone" dataKey="avgEfficiency" stroke="#a855f7" name="Avg Efficiency %" strokeWidth={2} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
+  // Render different chart types
+  const renderChart = () => {
+    const chartData = comparisonData;
+    const height = 350;
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Performance Radar Comparison */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <Target size={18} className="text-purple-500" />
-            Multi-Dimensional Performance Comparison
-          </h3>
-          <div className="w-full h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={comparisonData.performanceComparison}>
-                <PolarGrid stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10 }} />
-                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
-                {comparisonData.budgetHeadComparison.slice(0, 4).map((head, index) => (
-                  <Radar
-                    key={head.name}
-                    name={head.name}
-                    dataKey={head.name}
-                    stroke={COLORS.comparison[index]}
-                    fill={COLORS.comparison[index]}
-                    fillOpacity={0.3}
-                  />
-                ))}
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: '11px' }} />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Agency Comparison */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <Users size={18} className="text-blue-500" />
-            Agency Performance Comparison
-          </h3>
-          <div className="w-full h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={comparisonData.agencyComparison.slice(0, 6)}>
-                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="avgProgress" fill="#3b82f6" name="Avg Progress %" />
-                <Bar dataKey="avgEfficiency" fill="#10b981" name="Avg Efficiency %" />
-                <Bar dataKey="onTrackRate" fill="#f97316" name="On Track Rate %" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Timeline Comparison */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Clock size={18} className="text-green-500" />
-          Quarterly Performance Trend Comparison
-        </h3>
-        <div className="w-full h-[350px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={comparisonData.timelineComparison}>
+    switch(chartType) {
+      case 'bar':
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="period" tick={{ fontSize: 11 }} />
+              <XAxis 
+                dataKey="name" 
+                angle={-45} 
+                textAnchor="end" 
+                height={100}
+                tick={{ fontSize: 11 }}
+              />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: '12px' }} />
+              {metrics.includes('progress') && (
+                <Bar dataKey="progress" fill={COLORS.primary[0]} name="Avg Progress %" />
+              )}
+              {metrics.includes('efficiency') && (
+                <Bar dataKey="efficiency" fill={COLORS.primary[1]} name="Avg Efficiency %" />
+              )}
+              {metrics.includes('health') && (
+                <Bar dataKey="health" fill={COLORS.primary[2]} name="Health Score" />
+              )}
+              {metrics.includes('utilization') && (
+                <Bar dataKey="utilization" fill={COLORS.primary[3]} name="Budget Utilization %" />
+              )}
+              {metrics.includes('delay') && (
+                <Bar dataKey="delay" fill={COLORS.primary[4]} name="Avg Delay (days)" />
+              )}
+              {metrics.includes('projects') && (
+                <Bar dataKey="projects" fill={COLORS.primary[5]} name="Project Count" />
+              )}
+            </BarChart>
+          </ResponsiveContainer>
+        );
+
+      case 'line':
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
+              <XAxis 
+                dataKey="name" 
+                angle={-45} 
+                textAnchor="end" 
+                height={100}
+                tick={{ fontSize: 11 }}
+              />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: '12px' }} />
+              {metrics.includes('progress') && (
+                <Line type="monotone" dataKey="progress" stroke={COLORS.primary[0]} name="Avg Progress %" strokeWidth={2} />
+              )}
+              {metrics.includes('efficiency') && (
+                <Line type="monotone" dataKey="efficiency" stroke={COLORS.primary[1]} name="Avg Efficiency %" strokeWidth={2} />
+              )}
+              {metrics.includes('health') && (
+                <Line type="monotone" dataKey="health" stroke={COLORS.primary[2]} name="Health Score" strokeWidth={2} />
+              )}
+              {metrics.includes('completionRate') && (
+                <Line type="monotone" dataKey="completionRate" stroke={COLORS.primary[3]} name="Completion Rate %" strokeWidth={2} />
+              )}
+              {metrics.includes('delayRate') && (
+                <Line type="monotone" dataKey="delayRate" stroke={COLORS.primary[4]} name="Delay Rate %" strokeWidth={2} />
+              )}
+            </LineChart>
+          </ResponsiveContainer>
+        );
+
+      case 'radar':
+        const radarData = metrics.map(metric => ({
+          metric: metric.charAt(0).toUpperCase() + metric.slice(1),
+          ...Object.fromEntries(
+            comparisonData.map(item => [
+              item.name,
+              item[metric] || 0
+            ])
+          )
+        }));
+
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <RadarChart data={radarData}>
+              <PolarGrid stroke={darkMode ? '#374151' : '#e5e7eb'} />
+              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10 }} />
+              <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
+              {comparisonData.map((item, index) => (
+                <Radar
+                  key={item.name}
+                  name={item.name}
+                  dataKey={item.name}
+                  stroke={COLORS.primary[index % COLORS.primary.length]}
+                  fill={COLORS.primary[index % COLORS.primary.length]}
+                  fillOpacity={0.3}
+                />
+              ))}
+              <Tooltip />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
+            </RadarChart>
+          </ResponsiveContainer>
+        );
+
+      case 'composed':
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <ComposedChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
+              <XAxis 
+                dataKey="name" 
+                angle={-45} 
+                textAnchor="end" 
+                height={100}
+                tick={{ fontSize: 11 }}
+              />
               <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
               <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Legend />
-              <Bar yAxisId="left" dataKey="projects" fill="#3b82f6" name="Projects Started" />
-              <Line yAxisId="right" type="monotone" dataKey="avgProgress" stroke="#10b981" name="Avg Progress %" strokeWidth={2} />
-              <Line yAxisId="right" type="monotone" dataKey="completionRate" stroke="#f97316" name="Completion Rate %" strokeWidth={2} />
-              <Line yAxisId="right" type="monotone" dataKey="delayRate" stroke="#ef4444" name="Delay Rate %" strokeWidth={2} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: '12px' }} />
+              <Bar yAxisId="left" dataKey="projects" fill={COLORS.primary[0]} name="Projects" />
+              <Bar yAxisId="left" dataKey="budget" fill={COLORS.primary[1]} name="Budget (Cr)" />
+              <Line yAxisId="right" type="monotone" dataKey="progress" stroke={COLORS.primary[2]} name="Avg Progress %" strokeWidth={2} />
+              <Line yAxisId="right" type="monotone" dataKey="efficiency" stroke={COLORS.primary[3]} name="Avg Efficiency %" strokeWidth={2} />
             </ComposedChart>
           </ResponsiveContainer>
-        </div>
-      </div>
+        );
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Risk Level Comparison */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <AlertTriangle size={18} className="text-red-500" />
-            Risk Level Comparison
-          </h3>
-          <div className="w-full h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={comparisonData.riskComparison}>
-                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="level" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="count" fill="#ef4444" name="Projects" />
-                <Bar dataKey="avgProgress" fill="#3b82f6" name="Avg Progress %" />
-                <Bar dataKey="avgDelay" fill="#f59e0b" name="Avg Delay (days)" />
-              </BarChart>
-            </ResponsiveContainer>
+      case 'scatter':
+        const scatterData = comparisonData.map(item => ({
+          name: item.name,
+          x: item.progress,
+          y: item.efficiency,
+          z: item.projects
+        }));
+
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <ScatterChart>
+              <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
+              <XAxis 
+                type="number" 
+                dataKey="x" 
+                name="Progress" 
+                unit="%" 
+                tick={{ fontSize: 11 }}
+              />
+              <YAxis 
+                type="number" 
+                dataKey="y" 
+                name="Efficiency" 
+                unit="%" 
+                tick={{ fontSize: 11 }}
+              />
+              <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
+              <Scatter name="Comparison" data={scatterData} fill={COLORS.primary[0]}>
+                {scatterData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS.primary[index % COLORS.primary.length]} />
+                ))}
+              </Scatter>
+            </ScatterChart>
+          </ResponsiveContainer>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  // Export comparison data
+  const exportData = () => {
+    const csvContent = [
+      ['Name', ...metrics.map(m => m.charAt(0).toUpperCase() + m.slice(1))].join(','),
+      ...comparisonData.map(row =>
+        [row.name, ...metrics.map(m => row[m] || 0)].join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `comparison-${comparisonType}-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Control Panel */}
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <GitBranch size={20} className="text-orange-500" />
+          Dynamic Comparison Controls
+        </h3>
+
+        {/* Comparison Type Selector */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">
+              Compare By
+            </label>
+            <select
+              value={comparisonType}
+              onChange={(e) => setComparisonType(e.target.value)}
+              className={`w-full px-3 py-2 rounded-lg text-sm ${
+                darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-50'
+              } border ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}
+            >
+              <option value="frontier">Frontiers (FHQ/SHQ)</option>
+              <option value="budgetHead">Budget Heads</option>
+              <option value="agency">Executive Agencies</option>
+              <option value="contractor">Contractors</option>
+              <option value="location">Locations</option>
+              <option value="riskLevel">Risk Levels</option>
+              <option value="status">Project Status</option>
+              <option value="project">Individual Projects</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">
+              Chart Type
+            </label>
+            <select
+              value={chartType}
+              onChange={(e) => setChartType(e.target.value)}
+              className={`w-full px-3 py-2 rounded-lg text-sm ${
+                darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-50'
+              } border ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}
+            >
+              <option value="bar">Bar Chart</option>
+              <option value="line">Line Chart</option>
+              <option value="radar">Radar Chart</option>
+              <option value="composed">Composed Chart</option>
+              <option value="scatter">Scatter Plot</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">
+              Time Range
+            </label>
+            <select
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value)}
+              className={`w-full px-3 py-2 rounded-lg text-sm ${
+                darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-50'
+              } border ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}
+            >
+              <option value="all">All Time</option>
+              <option value="month">Last Month</option>
+              <option value="quarter">Last Quarter</option>
+              <option value="year">Last Year</option>
+            </select>
           </div>
         </div>
 
-        {/* Efficiency Range Comparison */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <Gauge size={18} className="text-purple-500" />
-            Efficiency Range Analysis
-          </h3>
-          <div className="w-full h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={comparisonData.efficiencyComparison}>
-                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="range" tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend />
-                <Bar yAxisId="left" dataKey="projects" fill="#8b5cf6" name="Projects" />
-                <Line yAxisId="right" type="monotone" dataKey="avgProgress" stroke="#10b981" name="Avg Progress %" strokeWidth={2} />
-                <Line yAxisId="right" type="monotone" dataKey="avgDelay" stroke="#ef4444" name="Avg Delay (days)" strokeWidth={2} />
-              </ComposedChart>
-            </ResponsiveContainer>
+        {/* Item Selection */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+              Select Items to Compare ({selectedItems.length}/8 selected)
+            </label>
+            <div className="flex gap-2">
+              <button
+                onClick={selectAll}
+                className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Select Top 8
+              </button>
+              <button
+                onClick={clearSelection}
+                className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+            {availableItems.map(item => {
+              const itemValue = comparisonType === 'project' ? item.id : item;
+              const itemLabel = comparisonType === 'project' ? item.name : item;
+              const isSelected = selectedItems.includes(itemValue);
+              
+              return (
+                <button
+                  key={itemValue}
+                  onClick={() => toggleItem(itemValue)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    isSelected
+                      ? 'bg-orange-500 text-white'
+                      : darkMode 
+                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  {isSelected ? '✓ ' : ''}{itemLabel}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Metrics Selection */}
+        <div>
+          <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 block">
+            Metrics to Display
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'projects', label: 'Count', icon: Package },
+              { id: 'budget', label: 'Budget', icon: IndianRupee },
+              { id: 'progress', label: 'Progress', icon: TrendingUp },
+              { id: 'efficiency', label: 'Efficiency', icon: Target },
+              { id: 'health', label: 'Health', icon: Activity },
+              { id: 'delay', label: 'Delay', icon: Clock },
+              { id: 'utilization', label: 'Utilization', icon: Percent },
+              { id: 'completionRate', label: 'Completion %', icon: CheckCircle }
+            ].map(metric => (
+              <button
+                key={metric.id}
+                onClick={() => {
+                  setMetrics(prev =>
+                    prev.includes(metric.id)
+                      ? prev.filter(m => m !== metric.id)
+                      : [...prev, metric.id]
+                  );
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${
+                  metrics.includes(metric.id)
+                    ? 'bg-blue-500 text-white'
+                    : darkMode
+                    ? 'bg-gray-700 text-gray-300'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                <metric.icon size={12} />
+                {metric.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Selected Projects Comparison (if any selected) */}
-      {selectedProjects.length > 0 && (
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <Layers size={18} className="text-indigo-500" />
-            Selected Projects Comparison
-          </h3>
+      {/* Main Chart */}
+      {selectedItems.length > 0 && (
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-semibold">
+              {comparisonType.charAt(0).toUpperCase() + comparisonType.slice(1)} Comparison
+            </h3>
+            <button
+              onClick={exportData}
+              className="px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-xs flex items-center gap-1"
+            >
+              <Download size={14} />
+              Export
+            </button>
+          </div>
+          
+          {renderChart()}
+        </div>
+      )}
+
+      {/* Detailed Comparison Table */}
+      {selectedItems.length > 0 && showDetails && (
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-base font-semibold mb-4">Detailed Comparison</h3>
+          
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className={`${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-                <tr>
-                  <th className="px-4 py-2 text-left">Project</th>
-                  <th className="px-4 py-2 text-center">Progress %</th>
-                  <th className="px-4 py-2 text-center">Efficiency %</th>
-                  <th className="px-4 py-2 text-center">Budget Used %</th>
-                  <th className="px-4 py-2 text-center">Delay (days)</th>
-                  <th className="px-4 py-2 text-center">Budget (Cr)</th>
-                  <th className="px-4 py-2 text-center">Risk</th>
+              <thead>
+                <tr className={`border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                  <th className="text-left py-2 px-3">Name</th>
+                  <th className="text-center py-2 px-3">Projects</th>
+                  <th className="text-center py-2 px-3">Budget (Cr)</th>
+                  <th className="text-center py-2 px-3">Spent (Cr)</th>
+                  <th className="text-center py-2 px-3">Progress %</th>
+                  <th className="text-center py-2 px-3">Efficiency %</th>
+                  <th className="text-center py-2 px-3">Health</th>
+                  <th className="text-center py-2 px-3">Delay (days)</th>
+                  <th className="text-center py-2 px-3">Utilization %</th>
+                  <th className="text-center py-2 px-3">Completion %</th>
                 </tr>
               </thead>
-              <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                {comparisonData.selectedProjectsComparison.map((project, index) => (
-                  <tr key={index} className={`hover:${darkMode ? 'bg-gray-700' : 'bg-orange-50'}`}>
-                    <td className="px-4 py-2 truncate max-w-[200px]">{project.name}</td>
-                    <td className="px-4 py-2 text-center">
+              <tbody>
+                {comparisonData.map((item, index) => (
+                  <tr key={index} className={`border-b ${
+                    darkMode ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-100 hover:bg-gray-50'
+                  } transition-colors`}>
+                    <td className="py-2 px-3 font-medium">{item.name}</td>
+                    <td className="text-center py-2 px-3">{item.projects}</td>
+                    <td className="text-center py-2 px-3">{formatAmount(item.budget * 100)}</td>
+                    <td className="text-center py-2 px-3">{formatAmount(item.spent * 100)}</td>
+                    <td className="text-center py-2 px-3">
                       <span className={`font-medium ${
-                        project.progress >= 75 ? 'text-green-600' :
-                        project.progress >= 50 ? 'text-blue-600' :
-                        project.progress >= 25 ? 'text-yellow-600' : 'text-red-600'
+                        item.progress >= 75 ? 'text-green-600' :
+                        item.progress >= 50 ? 'text-blue-600' :
+                        item.progress >= 25 ? 'text-yellow-600' : 'text-red-600'
                       }`}>
-                        {project.progress}%
+                        {item.progress.toFixed(1)}%
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-center">{project.efficiency}%</td>
-                    <td className="px-4 py-2 text-center">{project.budgetUsed}%</td>
-                    <td className="px-4 py-2 text-center">
+                    <td className="text-center py-2 px-3">{item.efficiency.toFixed(1)}%</td>
+                    <td className="text-center py-2 px-3">{item.health.toFixed(0)}</td>
+                    <td className="text-center py-2 px-3">
                       <span className={`font-medium ${
-                        project.delay === 0 ? 'text-green-600' :
-                        project.delay <= 30 ? 'text-yellow-600' : 'text-red-600'
+                        item.delay <= 0 ? 'text-green-600' :
+                        item.delay <= 30 ? 'text-yellow-600' : 'text-red-600'
                       }`}>
-                        {project.delay}
+                        {item.delay.toFixed(0)}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-center">₹{project.budget}</td>
-                    <td className="px-4 py-2 text-center">
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                        project.risk === 'CRITICAL' ? 'bg-red-100 text-red-700' :
-                        project.risk === 'HIGH' ? 'bg-orange-100 text-orange-700' :
-                        project.risk === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-green-100 text-green-700'
-                      }`}>
-                        {project.risk}
-                      </span>
-                    </td>
+                    <td className="text-center py-2 px-3">{item.utilization.toFixed(1)}%</td>
+                    <td className="text-center py-2 px-3">{item.completionRate.toFixed(1)}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -515,27 +704,49 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount, selectedProjec
         </div>
       )}
 
-      {/* Regional Comparison */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Building2 size={18} className="text-cyan-500" />
-          Regional Performance Comparison
-        </h3>
-        <div className="w-full h-[350px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={comparisonData.regionalComparison}>
-              <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="region" angle={-45} textAnchor="end" height={100} tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="projects" fill="#06b6d4" name="Projects" />
-              <Bar dataKey="avgProgress" fill="#3b82f6" name="Avg Progress %" />
-              <Bar dataKey="completionRate" fill="#10b981" name="Completion Rate %" />
-            </BarChart>
-          </ResponsiveContainer>
+      {/* Summary Statistics */}
+      {comparisonData.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            {
+              label: 'Total Projects',
+              value: comparisonData.reduce((sum, item) => sum + item.projects, 0),
+              icon: Package,
+              color: 'blue'
+            },
+            {
+              label: 'Total Budget',
+              value: formatAmount(comparisonData.reduce((sum, item) => sum + item.budget, 0) * 100),
+              icon: IndianRupee,
+              color: 'green'
+            },
+            {
+              label: 'Avg Progress',
+              value: `${(comparisonData.reduce((sum, item) => sum + item.progress, 0) / comparisonData.length).toFixed(1)}%`,
+              icon: TrendingUp,
+              color: 'orange'
+            },
+            {
+              label: 'Avg Efficiency',
+              value: `${(comparisonData.reduce((sum, item) => sum + item.efficiency, 0) / comparisonData.length).toFixed(1)}%`,
+              icon: Target,
+              color: 'purple'
+            }
+          ].map((stat, index) => (
+            <div key={index} className={`${
+              darkMode ? 'bg-gray-800' : 'bg-white'
+            } rounded-xl shadow-sm p-4 border ${
+              darkMode ? 'border-gray-700' : 'border-gray-100'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-500">{stat.label}</span>
+                <stat.icon size={16} className={`text-${stat.color}-500`} />
+              </div>
+              <div className="text-xl font-bold">{stat.value}</div>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
     </div>
   );
 };

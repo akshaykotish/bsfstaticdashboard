@@ -541,15 +541,15 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className={`p-3 rounded-lg shadow-xl backdrop-blur-sm border ${
-          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-orange-200'
+        <div className={`p-2 rounded-lg shadow-lg backdrop-blur-sm border ${
+          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-200'
         }`}>
-          <p className="text-sm font-bold mb-2">{label}</p>
+          <p className="text-xs font-semibold mb-1">{label}</p>
           {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></span>
-              <span className="font-semibold">{entry.name}:</span>
-              <span className="font-medium">{entry.value}</span>
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
+              <span className="font-medium">{entry.name}:</span>
+              <span className="font-semibold">{entry.value}</span>
             </div>
           ))}
         </div>
@@ -569,29 +569,29 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
           onClick={() => setShowDelayModal(false)}
         />
         
-        <div className={`relative w-[70vw] max-w-[1400px] h-[70vh] ${
+        <div className={`relative w-[90vw] max-w-[1600px] h-[85vh] ${
           darkMode ? 'bg-gray-900' : 'bg-white'
         } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
           
           <div className={`px-6 py-4 border-b ${
-            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-orange-500 to-red-500'
+            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
           }`}>
             <div className="flex justify-between items-center">
               <div>
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                <h2 className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
                   {selectedDelayData.title}
                 </h2>
-                <div className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-orange-100'}`}>
+                <div className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
                   Total Projects: <strong>{selectedDelayData.projects.length}</strong>
                 </div>
               </div>
               <button
                 onClick={() => setShowDelayModal(false)}
                 className={`p-2 rounded-lg ${
-                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-700'
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
                 } transition-colors`}
               >
-                <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
+                <X size={18} className={darkMode ? 'text-gray-300' : 'text-white'} />
               </button>
             </div>
           </div>
@@ -615,9 +615,11 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
   return (
     <div className="space-y-6">
       {/* Delay Overview Cards */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <Clock size={20} className="text-orange-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Clock size={18} className="text-orange-500" />
           Timeline & Delay Overview
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -626,7 +628,7 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
             return (
               <div 
                 key={index}
-                className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:scale-105`}
+                className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:scale-105`}
                 style={{ 
                   borderColor: cat.color,
                   backgroundColor: cat.color + '10'
@@ -637,12 +639,12 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
                 )}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <span className="text-sm font-bold" style={{ color: cat.color }}>
+                  <span className="text-xs font-semibold" style={{ color: cat.color }}>
                     {cat.category}
                   </span>
-                  <IconComponent size={16} style={{ color: cat.color }} />
+                  <IconComponent size={14} style={{ color: cat.color }} />
                 </div>
-                <div className="text-2xl font-bold">{cat.count}</div>
+                <div className="text-xl font-bold text-gray-900 dark:text-gray-100">{cat.count}</div>
                 <div className="text-xs text-gray-500 mt-1">{cat.percentage}%</div>
                 <div className="text-xs text-gray-500">₹{(cat.totalBudget / 100).toFixed(2)} Cr</div>
               </div>
@@ -653,9 +655,11 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
 
       {/* Delay Distribution Bar Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <BarChart3 size={18} className="text-blue-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <BarChart3 size={16} className="text-blue-500" />
             Delay Distribution
           </h3>
           <div className="w-full h-[350px]">
@@ -672,8 +676,8 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="range" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 11 }} />
+                <XAxis dataKey="range" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 9 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="count" fill="#f97316" name="Projects">
                   {timelineMetrics.delayDistribution.map((entry, index) => (
@@ -693,9 +697,11 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
 
         {/* Projects by Progress Stage */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <Activity size={18} className="text-purple-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Activity size={16} className="text-purple-500" />
             Projects by Progress Stage
           </h3>
           <div className="w-full h-[350px]">
@@ -720,7 +726,7 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
                     <Cell key={`cell-${index}`} fill={entry.color} style={{ cursor: 'pointer' }} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip content={<CustomTooltip />} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -728,9 +734,11 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Delay by Project Phase */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <TrendingUp size={18} className="text-green-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <TrendingUp size={16} className="text-green-500" />
           Delay Analysis by Project Phase
         </h3>
         <div className="w-full h-[350px]">
@@ -747,11 +755,11 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
               }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="phase" angle={-20} textAnchor="end" height={80} tick={{ fontSize: 10 }} />
-              <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+              <XAxis dataKey="phase" angle={-20} textAnchor="end" height={80} tick={{ fontSize: 9 }} />
+              <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Bar yAxisId="left" dataKey="projects" fill="#3b82f6" name="Total Projects" />
               <Bar yAxisId="left" dataKey="delayedCount" fill="#ef4444" name="Delayed Projects" />
               <Line yAxisId="right" type="monotone" dataKey="avgDelay" stroke="#f59e0b" name="Avg Delay (days)" strokeWidth={2} />
@@ -761,9 +769,11 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Progress vs Expenditure Scatter Plot */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Gauge size={18} className="text-purple-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Gauge size={16} className="text-purple-500" />
           Progress vs Expenditure Analysis
         </h3>
         <div className="w-full h-[400px]">
@@ -774,15 +784,15 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
                 dataKey="x" 
                 name="Expenditure %" 
                 domain={[0, 100]} 
-                tick={{ fontSize: 11 }}
-                label={{ value: 'Expenditure (%)', position: 'insideBottom', offset: -5 }}
+                tick={{ fontSize: 10 }}
+                label={{ value: 'Expenditure (%)', position: 'insideBottom', offset: -5, style: { fontSize: 11 } }}
               />
               <YAxis 
                 dataKey="y" 
                 name="Progress %" 
                 domain={[0, 100]} 
-                tick={{ fontSize: 11 }}
-                label={{ value: 'Physical Progress (%)', angle: -90, position: 'insideLeft' }}
+                tick={{ fontSize: 10 }}
+                label={{ value: 'Physical Progress (%)', angle: -90, position: 'insideLeft', style: { fontSize: 11 } }}
               />
               <Tooltip content={<CustomTooltip />} />
               <Scatter 
@@ -811,9 +821,11 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Agency Delay Performance */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Building2 size={18} className="text-indigo-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Building2 size={16} className="text-indigo-500" />
           Agency Delay Performance
         </h3>
         <div className="w-full h-[350px]">
@@ -830,10 +842,10 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
               }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="agency" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <XAxis dataKey="agency" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 9 }} />
+              <YAxis tick={{ fontSize: 10 }} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Bar dataKey="delayedProjects" fill="#ef4444" name="Delayed" />
               <Bar dataKey="onTimeProjects" fill="#10b981" name="On Time" />
             </BarChart>
@@ -843,10 +855,12 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
 
       {/* Severe Delays Table */}
       {timelineMetrics.severeDelays.length > 0 && (
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-bold flex items-center gap-2">
-              <AlertTriangle size={18} className="text-orange-500" />
+            <h3 className="text-sm font-semibold flex items-center gap-2 text-gray-900 dark:text-gray-100">
+              <AlertTriangle size={16} className="text-orange-500" />
               Projects with Severe Delays (&gt;60 days)
             </h3>
             <button
@@ -854,66 +868,66 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
                 `All Severely Delayed Projects (${timelineMetrics.severeDelays.length})`,
                 timelineMetrics.severeDelays
               )}
-              className="px-3 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 transition-colors flex items-center gap-2"
+              className="px-3 py-1 bg-orange-500 text-white rounded-lg text-xs hover:bg-orange-600 transition-colors flex items-center gap-2"
             >
-              <Eye size={14} />
+              <Eye size={12} />
               View All {timelineMetrics.severeDelays.length} Projects
             </button>
           </div>
           
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-xs">
               <thead className={`${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
                 <tr>
-                  <th className="px-4 py-2 text-left">Project</th>
-                  <th className="px-4 py-2 text-center">Delay</th>
-                  <th className="px-4 py-2 text-center">Progress</th>
-                  <th className="px-4 py-2 text-center">Efficiency</th>
-                  <th className="px-4 py-2 text-center">Budget (Cr)</th>
-                  <th className="px-4 py-2 text-center">Risk</th>
-                  <th className="px-4 py-2 text-center">Category</th>
+                  <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Project</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Delay</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Progress</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Efficiency</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Budget (Cr)</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Risk</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Category</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
                 {timelineMetrics.severeDelays.slice(0, 8).map((project, index) => (
                   <tr 
                     key={index} 
-                    className={`hover:${darkMode ? 'bg-gray-700' : 'bg-orange-50'} cursor-pointer transition-colors`}
+                    className={`hover:${darkMode ? 'bg-gray-700' : 'bg-blue-50'} cursor-pointer transition-colors`}
                     onClick={() => onChartClick(project, 'project')}
                   >
-                    <td className="px-4 py-2">
+                    <td className="px-3 py-2">
                       <div>
-                        <p className="font-medium truncate max-w-[250px]" title={project.project}>
+                        <p className="font-medium truncate max-w-[250px] text-gray-900 dark:text-gray-100" title={project.project}>
                           {project.project}
                         </p>
                         <p className="text-xs text-gray-500">{project.location}</p>
                       </div>
                     </td>
-                    <td className="px-4 py-2 text-center">
+                    <td className="px-3 py-2 text-center">
                       <span className="font-bold text-red-600">{project.delay} days</span>
                     </td>
-                    <td className="px-4 py-2 text-center">
+                    <td className="px-3 py-2 text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <div className="w-12 bg-gray-200 rounded-full h-1.5">
+                        <div className="w-12 bg-gray-200 rounded-full h-1">
                           <div 
-                            className="h-1.5 rounded-full bg-blue-500"
+                            className="h-1 rounded-full bg-blue-500"
                             style={{ width: `${Math.min(100, project.progress)}%` }}
                           />
                         </div>
-                        <span className="text-xs">{project.progress}%</span>
+                        <span className="text-xs text-gray-700 dark:text-gray-300">{project.progress}%</span>
                       </div>
                     </td>
-                    <td className="px-4 py-2 text-center">
-                      <span className={`font-medium ${
+                    <td className="px-3 py-2 text-center">
+                      <span className={`font-medium text-xs ${
                         project.efficiency > 70 ? 'text-green-600' :
                         project.efficiency > 50 ? 'text-yellow-600' : 'text-red-600'
                       }`}>
                         {project.efficiency.toFixed(1)}%
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-center">₹{(project.budget / 100).toFixed(2)}</td>
-                    <td className="px-4 py-2 text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                    <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">₹{(project.budget / 100).toFixed(2)}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                         project.riskLevel === 'CRITICAL' ? 'bg-red-100 text-red-700' :
                         project.riskLevel === 'HIGH' ? 'bg-orange-100 text-orange-700' :
                         project.riskLevel === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
@@ -922,8 +936,8 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
                         {project.riskLevel}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-center">
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                    <td className="px-3 py-2 text-center">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                         project.delayCategory === 'Extreme' ? 'bg-purple-100 text-purple-700' :
                         project.delayCategory === 'Critical' ? 'bg-red-100 text-red-700' :
                         project.delayCategory === 'Severe' ? 'bg-orange-100 text-orange-700' :
@@ -941,9 +955,11 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
       )}
 
       {/* Delay by Budget Head Treemap */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Package size={18} className="text-indigo-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Package size={16} className="text-indigo-500" />
           Delay Analysis by Budget Head
         </h3>
         <div className="w-full h-[400px]">
@@ -961,7 +977,7 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
               stroke="#fff"
               fill="#8884d8"
               content={({ root, depth, x, y, width, height, index, name, value, delayRate, projects }) => {
-                const fontSize = width > 50 && height > 30 ? 12 : 10;
+                const fontSize = width > 50 && height > 30 ? 11 : 9;
                 const color = value > 60 ? COLORS.delay.severe :
                             value > 30 ? COLORS.delay.moderate :
                             value > 0 ? COLORS.delay.minor : COLORS.delay.onTime;
@@ -1030,18 +1046,20 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Quick Delay Statistics */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <Zap size={18} className="text-yellow-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Zap size={16} className="text-yellow-500" />
           Quick Delay Statistics
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+          <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Total Delayed</span>
-              <AlertTriangle size={16} className="text-orange-500" />
+              <AlertTriangle size={14} className="text-orange-500" />
             </div>
-            <p className="text-2xl font-bold text-orange-500">
+            <p className="text-xl font-bold text-orange-500">
               {processedData.filter(d => d.delay_days > 0).length}
             </p>
             <p className="text-xs text-gray-500 mt-1">
@@ -1051,12 +1069,12 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
             </p>
           </div>
 
-          <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+          <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Average Delay</span>
-              <Clock size={16} className="text-red-500" />
+              <Clock size={14} className="text-red-500" />
             </div>
-            <p className="text-2xl font-bold text-red-500">
+            <p className="text-xl font-bold text-red-500">
               {processedData.filter(d => d.delay_days > 0).length > 0
                 ? (processedData.filter(d => d.delay_days > 0).reduce((sum, d) => sum + d.delay_days, 0) / 
                    processedData.filter(d => d.delay_days > 0).length).toFixed(1)
@@ -1067,12 +1085,12 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
             </p>
           </div>
 
-          <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+          <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Max Delay</span>
-              <TimerOff size={16} className="text-purple-500" />
+              <TimerOff size={14} className="text-purple-500" />
             </div>
-            <p className="text-2xl font-bold text-purple-500">
+            <p className="text-xl font-bold text-purple-500">
               {Math.max(0, ...processedData.map(d => d.delay_days || 0))} days
             </p>
             <p className="text-xs text-gray-500 mt-1">
@@ -1080,12 +1098,12 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
             </p>
           </div>
 
-          <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+          <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Budget Impact</span>
-              <IndianRupee size={16} className="text-green-500" />
+              <IndianRupee size={14} className="text-green-500" />
             </div>
-            <p className="text-2xl font-bold text-green-500">
+            <p className="text-xl font-bold text-green-500">
               ₹{(processedData.filter(d => d.delay_days > 30)
                 .reduce((sum, d) => sum + (parseFloat(d.sanctioned_amount) || 0), 0) / 100).toFixed(2)} Cr
             </p>
@@ -1097,53 +1115,55 @@ const TimelineDelays = ({ data, darkMode, onChartClick, formatAmount }) => {
       </div>
 
       {/* Delay Trend Indicators */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-          <TrendingDown size={18} className="text-red-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <TrendingDown size={16} className="text-red-500" />
           Delay Trend Indicators
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className={`p-4 rounded-lg border-l-4 ${
+          <div className={`p-3 rounded-lg border-l-4 ${
             darkMode ? 'bg-gray-900' : 'bg-gray-50'
           }`} style={{ borderLeftColor: '#10b981' }}>
             <div className="flex items-center gap-2 mb-2">
-              <ArrowDownRight size={16} className="text-green-500" />
-              <span className="text-sm font-medium">Improving</span>
+              <ArrowDownRight size={14} className="text-green-500" />
+              <span className="text-xs font-medium text-gray-900 dark:text-gray-100">Improving</span>
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-400">
               Projects showing reduced delays in recent months
             </p>
-            <p className="text-lg font-bold text-green-600 mt-2">
+            <p className="text-base font-bold text-green-600 mt-2">
               Monitor Closely
             </p>
           </div>
 
-          <div className={`p-4 rounded-lg border-l-4 ${
+          <div className={`p-3 rounded-lg border-l-4 ${
             darkMode ? 'bg-gray-900' : 'bg-gray-50'
           }`} style={{ borderLeftColor: '#f59e0b' }}>
             <div className="flex items-center gap-2 mb-2">
-              <Activity size={16} className="text-orange-500" />
-              <span className="text-sm font-medium">Stable</span>
+              <Activity size={14} className="text-orange-500" />
+              <span className="text-xs font-medium text-gray-900 dark:text-gray-100">Stable</span>
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-400">
               Projects maintaining consistent delay patterns
             </p>
-            <p className="text-lg font-bold text-orange-600 mt-2">
+            <p className="text-base font-bold text-orange-600 mt-2">
               {processedData.filter(d => d.delay_days > 0 && d.delay_days <= 30).length} Projects
             </p>
           </div>
 
-          <div className={`p-4 rounded-lg border-l-4 ${
+          <div className={`p-3 rounded-lg border-l-4 ${
             darkMode ? 'bg-gray-900' : 'bg-gray-50'
           }`} style={{ borderLeftColor: '#ef4444' }}>
             <div className="flex items-center gap-2 mb-2">
-              <ArrowUpRight size={16} className="text-red-500" />
-              <span className="text-sm font-medium">Worsening</span>
+              <ArrowUpRight size={14} className="text-red-500" />
+              <span className="text-xs font-medium text-gray-900 dark:text-gray-100">Worsening</span>
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-400">
               Projects with increasing delays requiring attention
             </p>
-            <p className="text-lg font-bold text-red-600 mt-2">
+            <p className="text-base font-bold text-red-600 mt-2">
               {processedData.filter(d => d.delay_days > 90).length} Critical
             </p>
           </div>

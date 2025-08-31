@@ -21,12 +21,12 @@ const COLORS = {
     average: '#f59e0b',
     poor: '#ef4444'
   },
-  contractors: ['#f97316', '#3b82f6', '#10b981', '#a855f7', '#ec4899', '#06b6d4', '#f59e0b', '#ef4444'],
+  contractors: ['#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#f59e0b', '#ef4444', '#6366f1'],
   metrics: {
     projects: '#3b82f6',
     budget: '#10b981',
     delay: '#ef4444',
-    efficiency: '#a855f7'
+    efficiency: '#8b5cf6'
   }
 };
 
@@ -81,9 +81,25 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
         contractorProjects[contractor] = [];
       }
       
-      // Add project to contractor's list
-      contractors[contractor].projects.push(item);
-      contractorProjects[contractor].push(item);
+      // Create a new object with calculated fields instead of modifying the original
+      const projectWithCalculations = {
+        ...item,
+        efficiency_score: item.percent_expdr > 0 ? 
+          (item.physical_progress / item.percent_expdr) * 100 : 
+          item.physical_progress,
+        health_score: Math.max(0, 100 - (item.delay_days || 0) / 3.65),
+        risk_level: item.delay_days > 90 || (item.physical_progress < 20 && item.percent_expdr > 50) ? 'CRITICAL' :
+                   item.delay_days > 60 || (item.physical_progress < 40 && item.percent_expdr > 60) ? 'HIGH' :
+                   item.delay_days > 30 || (item.physical_progress < 60 && item.percent_expdr > 70) ? 'MEDIUM' : 'LOW',
+        status: item.physical_progress >= 100 ? 'COMPLETED' :
+               item.physical_progress >= 75 ? 'NEAR_COMPLETION' :
+               item.physical_progress >= 50 ? 'ADVANCED' :
+               item.physical_progress > 0 ? 'IN_PROGRESS' : 'NOT_STARTED'
+      };
+      
+      // Add project to contractor's list with calculated fields
+      contractors[contractor].projects.push(projectWithCalculations);
+      contractorProjects[contractor].push(projectWithCalculations);
       contractors[contractor].totalProjects++;
       contractors[contractor].allocated += (item.sanctioned_amount || 0) / 100; // Convert to crores
       contractors[contractor].spent += (item.total_expdr || 0) / 100;
@@ -94,26 +110,8 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
       if (item.executive_agency) contractors[contractor].agencies.add(item.executive_agency);
       if (item.work_site) contractors[contractor].locations.add(item.work_site);
       
-      // Calculate efficiency score (progress vs expenditure)
-      const efficiency = item.percent_expdr > 0 ? 
-        (item.physical_progress / item.percent_expdr) * 100 : 
-        item.physical_progress;
-      contractors[contractor].totalEfficiency += Math.min(100, efficiency);
-      
-      // Add calculated fields to each project for DataTable
-      item.efficiency_score = efficiency;
-      item.health_score = Math.max(0, 100 - (item.delay_days || 0) / 3.65);
-      
-      // Calculate risk level
-      item.risk_level = item.delay_days > 90 || (item.physical_progress < 20 && item.percent_expdr > 50) ? 'CRITICAL' :
-                       item.delay_days > 60 || (item.physical_progress < 40 && item.percent_expdr > 60) ? 'HIGH' :
-                       item.delay_days > 30 || (item.physical_progress < 60 && item.percent_expdr > 70) ? 'MEDIUM' : 'LOW';
-      
-      // Calculate status
-      item.status = item.physical_progress >= 100 ? 'COMPLETED' :
-                   item.physical_progress >= 75 ? 'NEAR_COMPLETION' :
-                   item.physical_progress >= 50 ? 'ADVANCED' :
-                   item.physical_progress > 0 ? 'IN_PROGRESS' : 'NOT_STARTED';
+      // Use the calculated efficiency score
+      contractors[contractor].totalEfficiency += Math.min(100, projectWithCalculations.efficiency_score);
       
       // Project status counts
       if (item.physical_progress >= 100) contractors[contractor].completed++;
@@ -124,10 +122,10 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
       if (item.delay_days > 0) contractors[contractor].delayed++;
       else if (item.physical_progress > 0) contractors[contractor].onTime++;
       
-      // Risk level counts
-      if (item.risk_level === 'CRITICAL') contractors[contractor].critical++;
-      else if (item.risk_level === 'HIGH') contractors[contractor].high++;
-      else if (item.risk_level === 'MEDIUM') contractors[contractor].medium++;
+      // Risk level counts using calculated risk level
+      if (projectWithCalculations.risk_level === 'CRITICAL') contractors[contractor].critical++;
+      else if (projectWithCalculations.risk_level === 'HIGH') contractors[contractor].high++;
+      else if (projectWithCalculations.risk_level === 'MEDIUM') contractors[contractor].medium++;
       else contractors[contractor].low++;
     });
 
@@ -268,15 +266,15 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className={`p-3 rounded-lg shadow-xl backdrop-blur-sm border ${
-          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-orange-200'
+        <div className={`p-2 rounded-lg shadow-lg backdrop-blur-sm border ${
+          darkMode ? 'bg-gray-900/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-200'
         }`}>
-          <p className="text-sm font-bold mb-2">{label}</p>
+          <p className="text-xs font-semibold mb-1">{label}</p>
           {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></span>
-              <span className="font-semibold">{entry.name}:</span>
-              <span className="font-medium">{entry.value}</span>
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
+              <span className="font-medium">{entry.name}:</span>
+              <span className="font-semibold">{entry.value}</span>
             </div>
           ))}
         </div>
@@ -302,14 +300,14 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
           
           {/* Header */}
           <div className={`px-6 py-4 border-b ${
-            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-orange-500 to-orange-600'
+            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
           }`}>
             <div className="flex justify-between items-center">
               <div>
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                <h2 className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
                   {selectedContractor.name} - Project Portfolio
                 </h2>
-                <div className={`flex flex-wrap gap-4 text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-orange-100'}`}>
+                <div className={`flex flex-wrap gap-4 text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
                   <span>Total Projects: <strong>{selectedContractor.totalProjects}</strong></span>
                   <span>•</span>
                   <span>Completed: <strong>{selectedContractor.completed}</strong></span>
@@ -322,44 +320,44 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
               <button
                 onClick={() => setShowContractorModal(false)}
                 className={`p-2 rounded-lg ${
-                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-700'
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
                 } transition-colors`}
               >
-                <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
+                <X size={18} className={darkMode ? 'text-gray-300' : 'text-white'} />
               </button>
             </div>
           </div>
 
           {/* Stats Summary */}
-          <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'}`}>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <div className={`px-6 py-3 border-b ${darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'}`}>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
               <div className="text-center">
                 <p className="text-xs text-gray-500 uppercase">Avg Progress</p>
-                <p className="text-lg font-bold">{selectedContractor.avgProgress}%</p>
+                <p className="text-base font-bold">{selectedContractor.avgProgress}%</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-gray-500 uppercase">Efficiency</p>
-                <p className="text-lg font-bold">{selectedContractor.avgEfficiency}%</p>
+                <p className="text-base font-bold">{selectedContractor.avgEfficiency}%</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-gray-500 uppercase">On Time</p>
-                <p className="text-lg font-bold text-green-600">{selectedContractor.onTimeRate}%</p>
+                <p className="text-base font-bold text-green-600">{selectedContractor.onTimeRate}%</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-gray-500 uppercase">Delayed</p>
-                <p className="text-lg font-bold text-orange-600">{selectedContractor.delayRate}%</p>
+                <p className="text-base font-bold text-orange-600">{selectedContractor.delayRate}%</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-gray-500 uppercase">Utilization</p>
-                <p className="text-lg font-bold">{selectedContractor.utilization}%</p>
+                <p className="text-base font-bold">{selectedContractor.utilization}%</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-gray-500 uppercase">Agencies</p>
-                <p className="text-lg font-bold">{selectedContractor.agencyCount}</p>
+                <p className="text-base font-bold">{selectedContractor.agencyCount}</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-gray-500 uppercase">Locations</p>
-                <p className="text-lg font-bold">{selectedContractor.locationCount}</p>
+                <p className="text-base font-bold">{selectedContractor.locationCount}</p>
               </div>
             </div>
           </div>
@@ -384,9 +382,11 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
   return (
     <div className="space-y-6">
       {/* Performance Chart */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <Building2 size={20} className="text-blue-500" />
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Building2 size={18} className="text-blue-500" />
           Top Contractors Performance Overview
         </h3>
         <div className="w-full h-[400px]">
@@ -394,14 +394,14 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
             <ComposedChart data={contractorMetrics.performanceChart}>
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
               <XAxis dataKey="contractor" angle={-45} textAnchor="end" height={100} tick={{ fontSize: 10 }} />
-              <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '12px' }} />
               <Bar yAxisId="left" dataKey="projects" fill={COLORS.metrics.projects} name="Projects" />
               <Bar yAxisId="left" dataKey="completed" fill={COLORS.performance.excellent} name="Completed" />
-              <Line yAxisId="right" type="monotone" dataKey="performanceScore" stroke="#f97316" name="Performance Score" strokeWidth={2} />
-              <Line yAxisId="right" type="monotone" dataKey="avgProgress" stroke="#a855f7" name="Avg Progress %" strokeWidth={2} />
+              <Line yAxisId="right" type="monotone" dataKey="performanceScore" stroke="#3b82f6" name="Performance Score" strokeWidth={2} />
+              <Line yAxisId="right" type="monotone" dataKey="avgProgress" stroke="#8b5cf6" name="Avg Progress %" strokeWidth={2} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -409,17 +409,19 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Efficiency Matrix */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <Target size={18} className="text-purple-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Target size={16} className="text-purple-500" />
             Contractor Efficiency Matrix
           </h3>
           <div className="w-full h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="x" name="Avg Progress %" domain={[0, 100]} tick={{ fontSize: 11 }} />
-                <YAxis dataKey="y" name="Avg Efficiency %" domain={[0, 100]} tick={{ fontSize: 11 }} />
+                <XAxis dataKey="x" name="Avg Progress %" domain={[0, 100]} tick={{ fontSize: 10 }} />
+                <YAxis dataKey="y" name="Avg Efficiency %" domain={[0, 100]} tick={{ fontSize: 10 }} />
                 <Tooltip cursor={{ strokeDasharray: '3 3' }} />
                 <Scatter name="Contractors" data={contractorMetrics.efficiencyScores}>
                   {contractorMetrics.efficiencyScores.map((entry, index) => (
@@ -432,19 +434,21 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
         </div>
 
         {/* Budget Distribution */}
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
-          <h3 className="text-base font-bold mb-4 flex items-center gap-2">
-            <IndianRupee size={18} className="text-green-500" />
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        }`}>
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <IndianRupee size={16} className="text-green-500" />
             Budget Distribution (Top 15)
           </h3>
           <div className="w-full h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={contractorMetrics.budgetDistribution}>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                <XAxis dataKey="contractor" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 11 }} />
+                <XAxis dataKey="contractor" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 9 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
                 <Bar dataKey="allocated" fill="#3b82f6" name="Allocated (Cr)" />
                 <Bar dataKey="spent" fill="#10b981" name="Spent (Cr)" />
               </BarChart>
@@ -454,15 +458,17 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
       </div>
 
       {/* All Contractors Table */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg p-6`}>
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold flex items-center gap-2">
-            <Users size={20} className="text-orange-500" />
+          <h3 className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Users size={18} className="text-blue-500" />
             All Contractors ({filteredContractors.length})
           </h3>
           <div className="flex gap-3">
             <div className="relative">
-              <Search size={18} className="absolute left-3 top-2.5 text-gray-400" />
+              <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search contractors..."
@@ -471,11 +477,11 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                className={`pl-10 pr-4 py-2 rounded-lg border text-sm ${
+                className={`pl-9 pr-4 py-2 rounded-lg border text-xs ${
                   darkMode 
                     ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400' 
-                    : 'bg-white border-gray-300 placeholder-gray-500'
-                } focus:ring-2 focus:ring-orange-400 focus:outline-none`}
+                    : 'bg-white border-gray-200 placeholder-gray-500'
+                } focus:ring-2 focus:ring-blue-400 focus:outline-none`}
               />
             </div>
           </div>
@@ -483,92 +489,92 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs">
             <thead className={`${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
               <tr>
-                <th className="px-4 py-3 text-left">
+                <th className="px-3 py-2 text-left">
                   <button
                     onClick={() => handleSort('name')}
-                    className="flex items-center gap-1 font-bold hover:text-orange-500"
+                    className="flex items-center gap-1 font-semibold hover:text-blue-500 text-gray-700 dark:text-gray-300"
                   >
                     Contractor Name
-                    <ArrowUpDown size={14} />
+                    <ArrowUpDown size={12} />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-center">
+                <th className="px-3 py-2 text-center">
                   <button
                     onClick={() => handleSort('totalProjects')}
-                    className="flex items-center gap-1 font-bold hover:text-orange-500 mx-auto"
+                    className="flex items-center gap-1 font-semibold hover:text-blue-500 mx-auto text-gray-700 dark:text-gray-300"
                   >
                     Projects
-                    <ArrowUpDown size={14} />
+                    <ArrowUpDown size={12} />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-center">
+                <th className="px-3 py-2 text-center">
                   <button
                     onClick={() => handleSort('allocated')}
-                    className="flex items-center gap-1 font-bold hover:text-orange-500 mx-auto"
+                    className="flex items-center gap-1 font-semibold hover:text-blue-500 mx-auto text-gray-700 dark:text-gray-300"
                   >
                     Budget (Cr)
-                    <ArrowUpDown size={14} />
+                    <ArrowUpDown size={12} />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-center">
+                <th className="px-3 py-2 text-center">
                   <button
                     onClick={() => handleSort('avgProgress')}
-                    className="flex items-center gap-1 font-bold hover:text-orange-500 mx-auto"
+                    className="flex items-center gap-1 font-semibold hover:text-blue-500 mx-auto text-gray-700 dark:text-gray-300"
                   >
                     Avg Progress
-                    <ArrowUpDown size={14} />
+                    <ArrowUpDown size={12} />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-center">
+                <th className="px-3 py-2 text-center">
                   <button
                     onClick={() => handleSort('completionRate')}
-                    className="flex items-center gap-1 font-bold hover:text-orange-500 mx-auto"
+                    className="flex items-center gap-1 font-semibold hover:text-blue-500 mx-auto text-gray-700 dark:text-gray-300"
                   >
                     Completion Rate
-                    <ArrowUpDown size={14} />
+                    <ArrowUpDown size={12} />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-center">
+                <th className="px-3 py-2 text-center">
                   <button
                     onClick={() => handleSort('onTimeRate')}
-                    className="flex items-center gap-1 font-bold hover:text-orange-500 mx-auto"
+                    className="flex items-center gap-1 font-semibold hover:text-blue-500 mx-auto text-gray-700 dark:text-gray-300"
                   >
                     On Time Rate
-                    <ArrowUpDown size={14} />
+                    <ArrowUpDown size={12} />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-center">
+                <th className="px-3 py-2 text-center">
                   <button
                     onClick={() => handleSort('performanceScore')}
-                    className="flex items-center gap-1 font-bold hover:text-orange-500 mx-auto"
+                    className="flex items-center gap-1 font-semibold hover:text-blue-500 mx-auto text-gray-700 dark:text-gray-300"
                   >
                     Score
-                    <ArrowUpDown size={14} />
+                    <ArrowUpDown size={12} />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-center">Actions</th>
+                <th className="px-3 py-2 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
               {paginatedContractors.map((contractor, index) => (
                 <tr 
                   key={index}
-                  className={`hover:${darkMode ? 'bg-gray-700' : 'bg-orange-50'} cursor-pointer transition-colors`}
+                  className={`hover:${darkMode ? 'bg-gray-700' : 'bg-blue-50'} cursor-pointer transition-colors`}
                 >
-                  <td className="px-4 py-3 font-medium">{contractor.name}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="font-semibold">{contractor.totalProjects}</span>
+                  <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{contractor.name}</td>
+                  <td className="px-3 py-2 text-center">
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">{contractor.totalProjects}</span>
                     <div className="text-xs text-gray-500">
                       {contractor.completed} completed
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center font-semibold">
+                  <td className="px-3 py-2 text-center font-semibold text-gray-900 dark:text-gray-100">
                     ₹{contractor.allocated.toFixed(2)}
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-3 py-2 text-center">
                     <div className="flex items-center justify-center gap-2">
                       <div className="w-12 bg-gray-200 rounded-full h-1.5">
                         <div 
@@ -576,27 +582,27 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
                           style={{ width: `${contractor.avgProgress}%` }}
                         />
                       </div>
-                      <span className="text-xs font-medium">{contractor.avgProgress}%</span>
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{contractor.avgProgress}%</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`font-bold ${
+                  <td className="px-3 py-2 text-center">
+                    <span className={`font-semibold text-xs ${
                       contractor.completionRate > 50 ? 'text-green-600' :
                       contractor.completionRate > 25 ? 'text-yellow-600' : 'text-red-600'
                     }`}>
                       {contractor.completionRate}%
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`font-bold ${
+                  <td className="px-3 py-2 text-center">
+                    <span className={`font-semibold text-xs ${
                       contractor.onTimeRate > 70 ? 'text-green-600' :
                       contractor.onTimeRate > 40 ? 'text-yellow-600' : 'text-red-600'
                     }`}>
                       {contractor.onTimeRate}%
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`font-bold ${
+                  <td className="px-3 py-2 text-center">
+                    <span className={`font-semibold text-xs ${
                       contractor.performanceScore > 70 ? 'text-green-600' :
                       contractor.performanceScore > 50 ? 'text-blue-600' :
                       contractor.performanceScore > 30 ? 'text-yellow-600' : 'text-red-600'
@@ -604,14 +610,14 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
                       {contractor.performanceScore}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-3 py-2 text-center">
                     <button
                       onClick={() => handleContractorClick(contractor)}
-                      className={`px-3 py-1 rounded-lg text-xs flex items-center gap-1 mx-auto ${
-                        darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-orange-100 hover:bg-orange-200'
-                      } transition-colors`}
+                      className={`px-2 py-1 rounded-lg text-xs flex items-center gap-1 mx-auto ${
+                        darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-blue-50 hover:bg-blue-100'
+                      } transition-colors text-blue-600 dark:text-blue-400`}
                     >
-                      <Eye size={14} />
+                      <Eye size={12} />
                       View Projects
                     </button>
                   </td>
@@ -624,31 +630,31 @@ const ContractorAnalytics = ({ data, darkMode, onChartClick, formatAmount }) => 
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="mt-4 flex justify-between items-center">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
+            <div className="text-xs text-gray-600 dark:text-gray-400">
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredContractors.length)} of {filteredContractors.length} contractors
             </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className={`px-3 py-1 rounded ${
+                className={`px-3 py-1 rounded text-xs ${
                   currentPage === 1 
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                    : 'bg-orange-500 text-white hover:bg-orange-600'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
                 }`}
               >
                 Previous
               </button>
-              <span className="px-3 py-1">
+              <span className="px-3 py-1 text-xs">
                 Page {currentPage} of {totalPages}
               </span>
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className={`px-3 py-1 rounded ${
+                className={`px-3 py-1 rounded text-xs ${
                   currentPage === totalPages 
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                    : 'bg-orange-500 text-white hover:bg-orange-600'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
                 }`}
               >
                 Next

@@ -332,24 +332,24 @@ const AISuggestions = ({ metrics, filteredData, darkMode, onClose, onAction }) =
   return (
     <div className={`${
       darkMode ? 'bg-gray-800/90' : 'bg-white/90'
-    } backdrop-blur rounded-xl shadow-lg border ${
-      darkMode ? 'border-gray-700' : 'border-orange-200'
+    } backdrop-blur rounded-2xl shadow-sm border ${
+      darkMode ? 'border-gray-700' : 'border-gray-100'
     } overflow-hidden transition-all duration-300 ${
       expanded ? 'max-h-[800px]' : 'max-h-[400px]'
     }`}>
       {/* Header */}
       <div className={`px-4 py-3 ${
-        darkMode ? 'bg-gray-900' : 'bg-gradient-to-r from-orange-500 to-orange-600'
+        darkMode ? 'bg-gray-900' : 'bg-gradient-to-r from-blue-500 to-blue-600'
       } flex items-center justify-between`}>
         <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-white/20 rounded-lg">
+          <div className="p-1.5 bg-white/20 rounded-xl">
             <Sparkles size={20} className="text-white" />
           </div>
           <h3 className={`font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
             AI-Powered Insights & Recommendations
           </h3>
           <span className={`px-2 py-0.5 rounded-full text-xs ${
-            darkMode ? 'bg-gray-700 text-gray-300' : 'bg-orange-700 text-orange-100'
+            darkMode ? 'bg-gray-700 text-gray-300' : 'bg-blue-700 text-blue-100'
           }`}>
             {suggestions.length} insights
           </span>
@@ -358,7 +358,7 @@ const AISuggestions = ({ metrics, filteredData, darkMode, onClose, onAction }) =
           <button
             onClick={() => setExpanded(!expanded)}
             className={`px-3 py-1 rounded-lg text-sm ${
-              darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-orange-700 hover:bg-orange-800 text-white'
+              darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-blue-700 hover:bg-blue-800 text-white'
             } transition-colors`}
           >
             {expanded ? 'Collapse' : 'Expand'}
@@ -366,7 +366,7 @@ const AISuggestions = ({ metrics, filteredData, darkMode, onClose, onAction }) =
           <button
             onClick={onClose}
             className={`p-1 rounded-lg ${
-              darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-700'
+              darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
             } transition-colors`}
           >
             <X size={18} className={darkMode ? 'text-gray-300' : 'text-white'} />
@@ -379,19 +379,21 @@ const AISuggestions = ({ metrics, filteredData, darkMode, onClose, onAction }) =
         {suggestions.map((suggestion) => (
           <div
             key={suggestion.id}
-            className={`p-4 rounded-lg ${getBgColor(suggestion.color)} border ${
+            className={`p-4 rounded-xl ${getBgColor(suggestion.color)} border ${
               darkMode ? 'border-gray-700' : 'border-gray-200'
             } transition-all hover:shadow-md`}
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-start gap-3">
-                <div className={`p-2 rounded-lg ${
+                <div className={`p-2 rounded-xl ${
                   darkMode ? 'bg-gray-800' : 'bg-white'
                 } shadow-sm`}>
                   <suggestion.icon size={20} className={getIconColor(suggestion.color)} />
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-semibold text-lg mb-1">{suggestion.title}</h4>
+                  <h4 className="font-semibold text-lg mb-1 text-gray-900 dark:text-gray-100">
+                    {suggestion.title}
+                  </h4>
                   <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                     {suggestion.description}
                   </p>
@@ -399,7 +401,7 @@ const AISuggestions = ({ metrics, filteredData, darkMode, onClose, onAction }) =
               </div>
               <button
                 onClick={() => dismissSuggestion(suggestion.id)}
-                className={`p-1 rounded hover:${
+                className={`p-1 rounded-lg hover:${
                   darkMode ? 'bg-gray-700' : 'bg-gray-200'
                 } transition-colors`}
               >
@@ -409,17 +411,17 @@ const AISuggestions = ({ metrics, filteredData, darkMode, onClose, onAction }) =
 
             {/* Insights */}
             {suggestion.insights && suggestion.insights.length > 0 && (
-              <div className={`mb-3 p-3 rounded-lg ${
+              <div className={`mb-3 p-3 rounded-xl ${
                 darkMode ? 'bg-gray-900/50' : 'bg-white/50'
               }`}>
-                <h5 className="text-xs font-semibold uppercase tracking-wider mb-2 text-gray-500">
+                <h5 className="text-xs font-semibold uppercase tracking-wider mb-2 text-gray-500 dark:text-gray-400">
                   Key Insights
                 </h5>
                 <ul className="space-y-1">
                   {suggestion.insights.map((insight, idx) => (
                     <li key={idx} className="flex items-start gap-2">
                       <Info size={14} className="text-gray-400 mt-0.5" />
-                      <span className="text-sm">{insight}</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{insight}</span>
                     </li>
                   ))}
                 </ul>
@@ -428,17 +430,17 @@ const AISuggestions = ({ metrics, filteredData, darkMode, onClose, onAction }) =
 
             {/* Recommendations */}
             {suggestion.recommendations && suggestion.recommendations.length > 0 && (
-              <div className={`mb-3 p-3 rounded-lg ${
+              <div className={`mb-3 p-3 rounded-xl ${
                 darkMode ? 'bg-gray-900/50' : 'bg-white/50'
               }`}>
-                <h5 className="text-xs font-semibold uppercase tracking-wider mb-2 text-gray-500">
+                <h5 className="text-xs font-semibold uppercase tracking-wider mb-2 text-gray-500 dark:text-gray-400">
                   Recommendations
                 </h5>
                 <ul className="space-y-1">
                   {suggestion.recommendations.map((rec, idx) => (
                     <li key={idx} className="flex items-start gap-2">
                       <Lightbulb size={14} className="text-yellow-500 mt-0.5" />
-                      <span className="text-sm">{rec}</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{rec}</span>
                     </li>
                   ))}
                 </ul>
@@ -454,11 +456,11 @@ const AISuggestions = ({ metrics, filteredData, darkMode, onClose, onAction }) =
                     onClick={action.action}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1 ${
                       idx === 0
-                        ? 'bg-orange-500 text-white hover:bg-orange-600'
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm'
                         : darkMode
                         ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    } transition-colors`}
+                    } transition-all`}
                   >
                     {action.label}
                     <ChevronRight size={14} />

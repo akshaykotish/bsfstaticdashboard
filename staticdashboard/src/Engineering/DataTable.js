@@ -125,7 +125,7 @@ const DataTable = ({
         // Check if value is already in lakhs or needs conversion
         const amount = typeof value === 'number' ? value : parseFloat(value) || 0;
         return (
-          <span className="font-semibold">
+          <span className="font-semibold text-gray-900 dark:text-gray-100">
             ₹{amount >= 100 ? `${(amount / 100).toFixed(2)} Cr` : `${amount.toFixed(2)} L`}
           </span>
         );
@@ -136,16 +136,19 @@ const DataTable = ({
           <div className="flex items-center gap-2">
             <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
               <div 
-                className="h-1.5 rounded-full transition-all"
+                className="h-1.5 rounded-full transition-all bg-gradient-to-r"
                 style={{
                   width: `${Math.min(100, Math.max(0, progressValue))}%`,
-                  backgroundColor: progressValue >= 75 ? '#10b981' :
-                                  progressValue >= 50 ? '#3b82f6' :
-                                  progressValue >= 25 ? '#f59e0b' : '#ef4444'
+                  backgroundImage: progressValue >= 75 ? 'linear-gradient(to right, #10b981, #059669)' :
+                                  progressValue >= 50 ? 'linear-gradient(to right, #3b82f6, #2563eb)' :
+                                  progressValue >= 25 ? 'linear-gradient(to right, #f59e0b, #d97706)' : 
+                                  'linear-gradient(to right, #ef4444, #dc2626)'
                 }}
               />
             </div>
-            <span className="text-xs font-medium whitespace-nowrap">{progressValue.toFixed(0)}%</span>
+            <span className="text-xs font-medium whitespace-nowrap text-gray-700 dark:text-gray-300">
+              {progressValue.toFixed(0)}%
+            </span>
           </div>
         );
 
@@ -177,14 +180,14 @@ const DataTable = ({
 
       case 'badge':
         const badgeColors = {
-          CRITICAL: 'bg-red-100 text-red-700 border-red-300',
-          HIGH: 'bg-orange-100 text-orange-700 border-orange-300',
-          MEDIUM: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-          LOW: 'bg-green-100 text-green-700 border-green-300'
+          CRITICAL: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800',
+          HIGH: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800',
+          MEDIUM: 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800',
+          LOW: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800'
         };
         return (
           <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${
-            badgeColors[value] || 'bg-gray-100 text-gray-700'
+            badgeColors[value] || 'bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400'
           }`}>
             {value || 'N/A'}
           </span>
@@ -202,7 +205,9 @@ const DataTable = ({
         return (
           <div className="flex items-center gap-1 justify-center">
             {statusIcons[value] || <Clock size={12} className="text-gray-500" />}
-            <span className="text-xs">{(value || 'UNKNOWN').replace(/_/g, ' ')}</span>
+            <span className="text-xs text-gray-700 dark:text-gray-300">
+              {(value || 'UNKNOWN').replace(/_/g, ' ')}
+            </span>
           </div>
         );
 
@@ -286,11 +291,11 @@ const DataTable = ({
   // Handle empty data
   if (!data || data.length === 0) {
     return (
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} ${!isEmbedded ? 'rounded-xl shadow-lg' : ''} p-8`}>
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} ${!isEmbedded ? 'rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700' : ''} p-8`}>
         <div className="text-center">
           <AlertTriangle size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-lg font-semibold">No Data Available</p>
-          <p className="text-sm text-gray-500 mt-2">No projects found matching your criteria</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">No Data Available</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">No projects found matching your criteria</p>
         </div>
       </div>
     );
@@ -298,14 +303,14 @@ const DataTable = ({
 
   return (
     <div 
-      className={`${darkMode ? 'bg-gray-800' : 'bg-white'} ${!isEmbedded ? 'rounded-xl shadow-lg' : ''} overflow-hidden flex flex-col h-full`}
+      className={`${darkMode ? 'bg-gray-800' : 'bg-white'} ${!isEmbedded ? 'rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700' : ''} overflow-hidden flex flex-col h-full`}
       style={{ maxWidth: isEmbedded ? '100%' : maxWidth }}
     >
-      {/* Table Header - Only show if not embedded in modal */}
+      {/* Table Header - Fixed to remove w-[90vw] that causes overflow */}
       {!isEmbedded && (
-        <div className={`w-[90vw] p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
+        <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'} flex-shrink-0`}>
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <h2 className="text-xl font-bold">Project Data Table</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Project Data Table</h2>
             
             <div className="flex flex-wrap gap-3">
               {/* Search */}
@@ -319,8 +324,8 @@ const DataTable = ({
                   className={`pl-10 pr-4 py-2 rounded-lg border text-sm ${
                     darkMode 
                       ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400' 
-                      : 'bg-white border-gray-300 placeholder-gray-500'
-                  } focus:ring-2 focus:ring-orange-400 focus:outline-none`}
+                      : 'bg-white border-gray-200 placeholder-gray-500'
+                  } focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:outline-none`}
                 />
               </div>
 
@@ -334,8 +339,8 @@ const DataTable = ({
                 className={`px-3 py-2 rounded-lg border text-sm ${
                   darkMode 
                     ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                    : 'bg-white border-gray-300'
-                } focus:ring-2 focus:ring-orange-400 focus:outline-none`}
+                    : 'bg-white border-gray-200'
+                } focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:outline-none`}
               >
                 <option value={10}>10 rows</option>
                 <option value={25}>25 rows</option>
@@ -350,7 +355,7 @@ const DataTable = ({
                   className={`px-3 py-2 rounded-lg border flex items-center gap-2 text-sm ${
                     darkMode 
                       ? 'bg-gray-700 border-gray-600 text-gray-100 hover:bg-gray-600' 
-                      : 'bg-white border-gray-300 hover:bg-gray-50'
+                      : 'bg-white border-gray-200 hover:bg-gray-50'
                   } transition-colors`}
                 >
                   <Filter size={16} />
@@ -358,21 +363,21 @@ const DataTable = ({
                 </button>
                 
                 {showColumnSelector && (
-                  <div className={`absolute right-0 mt-2 w-64 rounded-lg shadow-xl z-50 ${
+                  <div className={`absolute right-0 mt-2 w-64 rounded-xl shadow-xl z-50 ${
                     darkMode ? 'bg-gray-900' : 'bg-white'
                   } border ${darkMode ? 'border-gray-700' : 'border-gray-200'} p-3 max-h-96 overflow-y-auto`}>
                     <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-                      <span className="text-sm font-semibold">Select Columns</span>
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">Select Columns</span>
                       <button
                         onClick={() => setShowColumnSelector(false)}
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                       >
-                        <X size={14} />
+                        <X size={14} className="text-gray-500" />
                       </button>
                     </div>
                     <div className="space-y-2">
                       {columns.map(col => (
-                        <label key={col.key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1 rounded">
+                        <label key={col.key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1 rounded-lg transition-colors">
                           <input
                             type="checkbox"
                             checked={selectedColumns.includes(col.key)}
@@ -383,9 +388,9 @@ const DataTable = ({
                                 setSelectedColumns(selectedColumns.filter(k => k !== col.key));
                               }
                             }}
-                            className="accent-orange-500"
+                            className="accent-blue-500"
                           />
-                          <span className="text-sm">{col.label}</span>
+                          <span className="text-sm text-gray-700 dark:text-gray-300">{col.label}</span>
                         </label>
                       ))}
                     </div>
@@ -396,10 +401,10 @@ const DataTable = ({
               {/* Export */}
               <button
                 onClick={exportTableData}
-                className="px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 flex items-center gap-2 text-sm transition-colors"
+                className="px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:opacity-90 flex items-center gap-2 text-sm transition-all shadow-sm whitespace-nowrap"
               >
                 <Download size={16} />
-                Export
+                <span>Export</span>
               </button>
             </div>
           </div>
@@ -408,7 +413,7 @@ const DataTable = ({
 
       {/* Search bar for embedded mode */}
       {isEmbedded && (
-        <div className={`p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
+        <div className={`p-3 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'} flex-shrink-0`}>
           <div className="flex gap-3">
             <div className="relative flex-1">
               <Search size={16} className="absolute left-3 top-2 text-gray-400" />
@@ -420,15 +425,16 @@ const DataTable = ({
                 className={`pl-9 pr-3 py-1.5 rounded-lg border text-sm w-full ${
                   darkMode 
                     ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400' 
-                    : 'bg-white border-gray-300 placeholder-gray-500'
-                } focus:ring-2 focus:ring-orange-400 focus:outline-none`}
+                    : 'bg-white border-gray-200 placeholder-gray-500'
+                } focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:outline-none`}
               />
             </div>
             <button
               onClick={exportTableData}
-              className="px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm transition-colors"
+              className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:opacity-90 text-sm transition-all shadow-sm flex items-center gap-1 whitespace-nowrap"
             >
               <Download size={14} />
+              <span>Export</span>
             </button>
           </div>
         </div>
@@ -447,7 +453,7 @@ const DataTable = ({
             <tr>
               {compareMode && (
                 <th className="px-3 py-2 text-left">
-                  <input type="checkbox" disabled className="accent-orange-500" />
+                  <input type="checkbox" disabled className="accent-blue-500" />
                 </th>
               )}
               {columns
@@ -462,7 +468,7 @@ const DataTable = ({
                   >
                     <button
                       onClick={() => handleSort(col.key)}
-                      className="flex items-center gap-1 font-bold text-xs uppercase tracking-wider hover:text-orange-500 transition-colors"
+                      className="flex items-center gap-1 font-bold text-xs uppercase tracking-wider text-gray-600 dark:text-gray-400 hover:text-blue-500 transition-colors"
                     >
                       {col.label}
                       {sortConfig.key === col.key && (
@@ -473,7 +479,9 @@ const DataTable = ({
                 ))}
               <th className={`px-3 py-2 text-center sticky right-0 z-20 ${
                 darkMode ? 'bg-gray-900' : 'bg-gray-50'
-              }`}>Actions</th>
+              }`}>
+                <span className="font-bold text-xs uppercase tracking-wider text-gray-600 dark:text-gray-400">Actions</span>
+              </th>
             </tr>
           </thead>
           
@@ -482,9 +490,9 @@ const DataTable = ({
               <React.Fragment key={row.id || row.serial_no || index}>
                 <tr
                   className={`${
-                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-50'
+                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-50'
                   } cursor-pointer transition-colors ${
-                    isProjectSelected(row) ? 'bg-orange-100 dark:bg-orange-900/20' : ''
+                    isProjectSelected(row) ? 'bg-blue-100 dark:bg-blue-900/20' : ''
                   }`}
                   onClick={(e) => handleRowClick(row, e)}
                 >
@@ -494,7 +502,7 @@ const DataTable = ({
                         type="checkbox"
                         checked={isProjectSelected(row)}
                         onChange={() => {}}
-                        className="accent-orange-500"
+                        className="accent-blue-500"
                       />
                     </td>
                   )}
@@ -509,11 +517,11 @@ const DataTable = ({
                       >
                         {col.key === 'scheme_name' ? (
                           <div className="max-w-xs">
-                            <p className="truncate font-medium" title={row[col.key]}>
+                            <p className="truncate font-medium text-gray-900 dark:text-gray-100" title={row[col.key]}>
                               {row[col.key] || 'N/A'}
                             </p>
                             {row.budget_head && (
-                              <p className="text-xs text-gray-500 truncate">{row.budget_head}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{row.budget_head}</p>
                             )}
                           </div>
                         ) : (
@@ -530,7 +538,7 @@ const DataTable = ({
                           e.stopPropagation();
                           handleRowClick(row, { target: document.body });
                         }}
-                        className="p-1 hover:bg-orange-100 dark:hover:bg-orange-900/20 rounded transition-colors"
+                        className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                         title="View Details"
                       >
                         <Eye size={14} className="text-blue-500" />
@@ -540,12 +548,12 @@ const DataTable = ({
                           e.stopPropagation();
                           toggleRowExpansion(row.id || row.serial_no || index);
                         }}
-                        className="p-1 hover:bg-orange-100 dark:hover:bg-orange-900/20 rounded transition-colors"
+                        className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                         title="Expand"
                       >
                         {expandedRows.includes(row.id || row.serial_no || index) ? 
-                          <ChevronUp size={14} /> : 
-                          <ChevronDown size={14} />
+                          <ChevronUp size={14} className="text-gray-600 dark:text-gray-400" /> : 
+                          <ChevronDown size={14} className="text-gray-600 dark:text-gray-400" />
                         }
                       </button>
                     </div>
@@ -559,30 +567,54 @@ const DataTable = ({
                         className={`px-4 py-4 ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div>
-                          <h4 className="font-semibold mb-2 text-orange-600 text-sm">Project Details</h4>
+                          <h4 className="font-semibold mb-2 text-blue-600 dark:text-blue-400 text-sm">Project Details</h4>
                           <div className="space-y-1 text-xs">
-                            <p><span className="font-medium">AA/ES Ref:</span> {row.aa_es_ref || 'N/A'}</p>
-                            <p><span className="font-medium">Date Tender:</span> {formatCellValue(row.date_tender, 'date')}</p>
-                            <p><span className="font-medium">Revised PDC:</span> {formatCellValue(row.revised_pdc, 'date')}</p>
-                            <p><span className="font-medium">Actual Completion:</span> {formatCellValue(row.actual_completion_date, 'date')}</p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">AA/ES Ref:</span> {row.aa_es_ref || 'N/A'}
+                            </p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Date Tender:</span> {formatCellValue(row.date_tender, 'date')}
+                            </p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Revised PDC:</span> {formatCellValue(row.revised_pdc, 'date')}
+                            </p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Actual Completion:</span> {formatCellValue(row.actual_completion_date, 'date')}
+                            </p>
                           </div>
                         </div>
                         <div>
-                          <h4 className="font-semibold mb-2 text-blue-600 text-sm">Financial Details</h4>
+                          <h4 className="font-semibold mb-2 text-green-600 dark:text-green-400 text-sm">Financial Details</h4>
                           <div className="space-y-1 text-xs">
-                            <p><span className="font-medium">Expenditure (31 Mar 25):</span> {formatCellValue(row.expdr_upto_31mar25, 'currency')}</p>
-                            <p><span className="font-medium">Current FY Exp:</span> {formatCellValue(row.expdr_cfy, 'currency')}</p>
-                            <p><span className="font-medium">Remaining:</span> {formatCellValue(row.remaining_amount, 'currency')}</p>
-                            <p><span className="font-medium">Progress Status:</span> {row.progress_status || 'N/A'}</p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Expenditure (31 Mar 25):</span> {formatCellValue(row.expdr_upto_31mar25, 'currency')}
+                            </p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Current FY Exp:</span> {formatCellValue(row.expdr_cfy, 'currency')}
+                            </p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Remaining:</span> {formatCellValue(row.remaining_amount, 'currency')}
+                            </p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Progress Status:</span> {row.progress_status || 'N/A'}
+                            </p>
                           </div>
                         </div>
                         <div>
-                          <h4 className="font-semibold mb-2 text-green-600 text-sm">Performance Metrics</h4>
+                          <h4 className="font-semibold mb-2 text-purple-600 dark:text-purple-400 text-sm">Performance Metrics</h4>
                           <div className="space-y-1 text-xs">
-                            <p><span className="font-medium">Efficiency Score:</span> {formatCellValue(row.efficiency_score, 'percent')}</p>
-                            <p><span className="font-medium">Health Score:</span> {formatCellValue(row.health_score, 'score')}</p>
-                            <p><span className="font-medium">Priority:</span> {row.priority || 'N/A'}</p>
-                            <p><span className="font-medium">Remarks:</span> {row.remarks || 'N/A'}</p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Efficiency Score:</span> {formatCellValue(row.efficiency_score, 'percent')}
+                            </p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Health Score:</span> {formatCellValue(row.health_score, 'score')}
+                            </p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Priority:</span> {row.priority || 'N/A'}
+                            </p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Remarks:</span> {row.remarks || 'N/A'}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -596,7 +628,7 @@ const DataTable = ({
       </div>
 
       {/* Pagination */}
-      <div className={`p-3 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex-shrink-0`}>
+      <div className={`p-3 border-t ${darkMode ? 'border-gray-700' : 'border-gray-100'} flex-shrink-0`}>
         <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
           <div className="text-xs text-gray-600 dark:text-gray-400">
             Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, processedData.length)} of {processedData.length} entries
@@ -608,9 +640,9 @@ const DataTable = ({
               disabled={currentPage === 1}
               className={`px-2 py-1 text-xs rounded-lg ${
                 currentPage === 1
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-orange-500 text-white hover:bg-orange-600'
-              } transition-colors`}
+                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm'
+              } transition-all`}
             >
               First
             </button>
@@ -620,14 +652,14 @@ const DataTable = ({
               disabled={currentPage === 1}
               className={`px-2 py-1 text-xs rounded-lg ${
                 currentPage === 1
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-orange-500 text-white hover:bg-orange-600'
-              } transition-colors`}
+                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm'
+              } transition-all`}
             >
               Prev
             </button>
             
-            <span className="px-2 py-1 text-xs">
+            <span className="px-2 py-1 text-xs text-gray-700 dark:text-gray-300">
               Page {currentPage} of {totalPages || 1}
             </span>
             
@@ -636,9 +668,9 @@ const DataTable = ({
               disabled={currentPage === totalPages || totalPages === 0}
               className={`px-2 py-1 text-xs rounded-lg ${
                 currentPage === totalPages || totalPages === 0
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-orange-500 text-white hover:bg-orange-600'
-              } transition-colors`}
+                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm'
+              } transition-all`}
             >
               Next
             </button>
@@ -648,9 +680,9 @@ const DataTable = ({
               disabled={currentPage === totalPages || totalPages === 0}
               className={`px-2 py-1 text-xs rounded-lg ${
                 currentPage === totalPages || totalPages === 0
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-orange-500 text-white hover:bg-orange-600'
-              } transition-colors`}
+                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm'
+              } transition-all`}
             >
               Last
             </button>
