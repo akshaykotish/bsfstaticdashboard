@@ -1,16 +1,33 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  Briefcase, IndianRupee, CheckCircle, AlertTriangle, Clock, Gauge,
-  TrendingUp, TrendingDown, Activity, Users, Building2, MapPin,
-  Target, Shield, Zap, BarChart3, PieChart, Package, Timer, Award,
-  GitBranch, Layers, Database, CreditCard, FileText, Percent,
-  Calendar, ThermometerSun, Cpu, Heart, AlertCircle, Info,
-  ChevronRight, ChevronDown, ChevronUp, MoreVertical, Eye
+  // Projects Icons
+  Briefcase, FileText, CheckCircle, XCircle, Calendar, Award,
+  
+  // Budget Icons  
+  IndianRupee, CreditCard, Wallet, TrendingUp, TrendingDown, Database,
+  
+  // Progress Icons
+  Activity, PlayCircle, PauseCircle, Timer, Zap, Target,
+  
+  // Health Icons
+  AlertTriangle, Clock, Heart, Shield, Gauge, AlertCircle,
+  
+  // Timeline Icons
+  CalendarDays, CalendarClock, CalendarCheck, CalendarX,
+  
+  // Utility Icons
+  ChevronDown, ChevronUp, ChevronRight, Eye, Download, Info,
+  MoreVertical, X, Maximize2, Filter, RefreshCw, Building2,
+  Users, MapPin, Percent, Package, Cpu, ThermometerSun,
+  GitBranch, Layers, FileText as FileTextIcon, Bell, Search,
+  HelpCircle
 } from 'lucide-react';
+
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar,
-  ResponsiveContainer, XAxis, YAxis, Tooltip, Cell
+  ResponsiveContainer, XAxis, YAxis, Tooltip, Cell, PieChart, Pie
 } from 'recharts';
+import DataTable from './DataTable';
 
 const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) => {
   const [hoveredCard, setHoveredCard] = useState(null);
@@ -18,54 +35,18 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
   const [selectedMetricGroup, setSelectedMetricGroup] = useState('all');
   const [showTrends, setShowTrends] = useState(true);
   const [cardSize, setCardSize] = useState('normal');
-  const [animateValues, setAnimateValues] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showInfoTooltips, setShowInfoTooltips] = useState(true);
+  
+  // States for drill-down functionality
+  const [selectedMetric, setSelectedMetric] = useState(null);
+  const [showDrillDown, setShowDrillDown] = useState(false);
+  const [drillDownData, setDrillDownData] = useState([]);
+  const [drillDownTitle, setDrillDownTitle] = useState('');
 
-  // Calculate organization metrics from actual data
-  const organizationMetrics = useMemo(() => {
-    if (!filteredData || filteredData.length === 0) {
-      return {
-        activeAgencies: 0,
-        totalContractors: 0,
-        totalLocations: 0
-      };
-    }
-
-    // Get unique agencies
-    const uniqueAgencies = new Set(
-      filteredData
-        .map(item => item.executive_agency)
-        .filter(agency => agency && agency !== 'N/A' && agency !== '')
-    );
-
-    // Get unique contractors
-    const uniqueContractors = new Set(
-      filteredData
-        .map(item => item.firm_name)
-        .filter(contractor => contractor && contractor !== 'N/A' && contractor !== '')
-    );
-
-    // Get unique locations
-    const uniqueLocations = new Set(
-      filteredData
-        .map(item => {
-          if (!item.work_site || item.work_site === 'N/A') return null;
-          // Extract the main location (before comma if present)
-          return item.work_site.split(',')[0].trim();
-        })
-        .filter(location => location && location !== '')
-    );
-
-    return {
-      activeAgencies: uniqueAgencies.size,
-      totalContractors: uniqueContractors.size,
-      totalLocations: uniqueLocations.size
-    };
-  }, [filteredData]);
-
-  // Animate values on mount
-  useEffect(() => {
-    setAnimateValues(true);
-  }, []);
+  // Store previous metrics to prevent unnecessary recalculations
+  const prevMetricsRef = useRef({});
+  const [displayMetrics, setDisplayMetrics] = useState({});
 
   // Generate mock trend data for mini charts
   const generateTrendData = (baseValue, variance = 10) => {
@@ -85,317 +66,889 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
     return isNaN(num) ? defaultValue : num;
   };
 
-  // Format currency safely
+  // Format currency
   const formatCurrency = (value) => {
     const num = safeNumber(value, 0);
     return `₹${num.toFixed(2)}Cr`;
   };
 
-  // Enhanced metrics with actual data calculations
-  const enhancedMetrics = useMemo(() => {
-    return {
-      ...metrics,
-      activeAgencies: organizationMetrics.activeAgencies,
-      totalContractors: organizationMetrics.totalContractors,
-      totalLocations: organizationMetrics.totalLocations
-    };
-  }, [metrics, organizationMetrics]);
+  // Calculate all metrics from filteredData - Only recalculate when filteredData changes
+  const calculatedMetrics = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) {
+      return {
+        // Projects Section
+        totalProjects: 0,
+        sanctionedProjects: 0,
+        notSanctioned: 0,
+        tenderNotCalled: 0,
+        underCodalFormality: 0,
+        awarded: 0,
+        
+        // Budget Section
+        totalBudget: 0,
+        totalExpenditure: 0,
+        currentYearExpenditure: 0,
+        allocatedBudget: 0,
+        remainingBudget: 0,
+        periodBudget: 0,
+        periodExpenditure: 0,
+        utilizationRate: 0,
+        
+        // Progress Section
+        tenderProgress: 0,
+        tenderedNotAwarded: 0,
+        awardedNotStarted: 0,
+        progress1To50: 0,
+        progress51To71: 0,
+        progress71To99: 0,
+        completed: 0,
+        recentlyAwarded: 0,
+        awardedThisYear: 0,
+        completedRecently: 0,
+        oldProjects: 0,
+        
+        // Health Section
+        critical: 0,
+        highRisk: 0,
+        delayed: 0,
+        ongoing: 0,
+        notStarted: 0,
+        highBudget: 0,
+        lowHealth: 0,
+        highEfficiency: 0,
+        overdue: 0,
+        nearCompletion: 0,
+        perfectPace: 0,
+        slowPace: 0,
+        badPace: 0,
+        sleepPace: 0,
+        paymentPending: 0,
+        
+        // Timeline Section
+        currentYearProjects: 0,
+        lastQuarterProjects: 0,
+        lastYearProjects: 0,
+        
+        // Keep existing metrics
+        avgProgress: 0,
+        avgEfficiency: 0,
+        avgHealthScore: 0,
+        mediumRisk: 0,
+        lowRisk: 0,
+        onTrack: 0,
+        activeAgencies: 0,
+        totalContractors: 0,
+        totalLocations: 0,
+        completionRate: 0,
+        delayRate: 0,
+        criticalRate: 0
+      };
+    }
 
-  // Main metrics with enhanced details
-  const mainMetrics = useMemo(() => [
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const currentQuarter = Math.floor(currentMonth / 3);
+    
+    // Projects Metrics
+    const totalProjects = filteredData.length;
+    const sanctionedProjects = filteredData.filter(d => d.aa_es_ref && d.aa_es_ref !== '').length;
+    const notSanctioned = filteredData.filter(d => !d.aa_es_ref || d.aa_es_ref === '').length;
+    const tenderNotCalled = filteredData.filter(d => !d.date_tender || d.date_tender === '').length;
+    const underCodalFormality = filteredData.filter(d => !d.date_award || d.date_award === '').length;
+    const awarded = filteredData.filter(d => d.date_award && d.date_award !== '').length;
+    
+    // Budget Metrics
+    const totalBudget = filteredData.reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
+    const totalExpenditure = filteredData.reduce((sum, d) => sum + (d.total_expdr || 0), 0) / 100;
+    const currentYearExpenditure = filteredData.reduce((sum, d) => sum + (d.expdr_cfy || 0), 0) / 100;
+    const allocatedBudget = filteredData
+      .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
+      .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
+    const remainingBudget = (filteredData.reduce((sum, d) => sum + ((d.sanctioned_amount || 0) - (d.total_expdr || 0)), 0)) / 100;
+    
+    // Progress Categories
+    const tenderProgress = filteredData.filter(d => 
+      (!d.date_tender || d.date_tender === '') && d.physical_progress === 0
+    ).length;
+    
+    const tenderedNotAwarded = filteredData.filter(d => 
+      d.date_tender && (!d.date_award || d.date_award === '')
+    ).length;
+    
+    const awardedNotStarted = filteredData.filter(d => 
+      d.date_award && d.physical_progress === 0
+    ).length;
+    
+    const progress1To50 = filteredData.filter(d => 
+      d.physical_progress > 0 && d.physical_progress <= 50
+    ).length;
+    
+    const progress51To71 = filteredData.filter(d => 
+      d.physical_progress > 50 && d.physical_progress <= 71
+    ).length;
+    
+    const progress71To99 = filteredData.filter(d => 
+      d.physical_progress > 71 && d.physical_progress < 100
+    ).length;
+    
+    const completed = filteredData.filter(d => d.physical_progress >= 100).length;
+    
+    // Recent metrics
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    
+    const yearStart = new Date(currentYear, 0, 1);
+    
+    const recentlyAwarded = filteredData.filter(d => {
+      if (!d.date_award) return false;
+      try {
+        const awardDate = new Date(d.date_award);
+        return !isNaN(awardDate.getTime()) && awardDate >= thirtyDaysAgo;
+      } catch {
+        return false;
+      }
+    }).length;
+    
+    const awardedThisYear = filteredData.filter(d => {
+      if (!d.date_award) return false;
+      try {
+        const awardDate = new Date(d.date_award);
+        return !isNaN(awardDate.getTime()) && awardDate >= yearStart;
+      } catch {
+        return false;
+      }
+    }).length;
+    
+    const completedRecently = filteredData.filter(d => {
+      if (!d.actual_completion_date || d.physical_progress < 100) return false;
+      try {
+        const completionDate = new Date(d.actual_completion_date);
+        return !isNaN(completionDate.getTime()) && completionDate >= ninetyDaysAgo;
+      } catch {
+        return false;
+      }
+    }).length;
+    
+    const oldProjects = filteredData.filter(d => {
+      if (!d.date_award) return false;
+      try {
+        const awardDate = new Date(d.date_award);
+        if (isNaN(awardDate.getTime())) return false;
+        const ageInDays = (now - awardDate) / (1000 * 60 * 60 * 24);
+        return ageInDays > 365;
+      } catch {
+        return false;
+      }
+    }).length;
+    
+    // Health Metrics
+    const critical = filteredData.filter(d => d.risk_level === 'CRITICAL').length;
+    const highRisk = filteredData.filter(d => d.risk_level === 'HIGH').length;
+    const mediumRisk = filteredData.filter(d => d.risk_level === 'MEDIUM').length;
+    const lowRisk = filteredData.filter(d => d.risk_level === 'LOW').length;
+    const delayed = filteredData.filter(d => (d.delay_days || 0) > 0).length;
+    const ongoing = filteredData.filter(d => d.physical_progress > 0 && d.physical_progress < 100).length;
+    const notStarted = filteredData.filter(d => d.physical_progress === 0).length;
+    const highBudget = filteredData.filter(d => d.sanctioned_amount > 50000).length;
+    const lowHealth = filteredData.filter(d => (d.health_score || 0) < 50).length;
+    const highEfficiency = filteredData.filter(d => (d.efficiency_score || 0) > 80).length;
+    const overdue = filteredData.filter(d => d.delay_days > 90).length;
+    const nearCompletion = filteredData.filter(d => d.physical_progress >= 75 && d.physical_progress < 100).length;
+    const onTrack = filteredData.filter(d => d.delay_days === 0 && d.physical_progress > 0).length;
+    
+    // Pace categories
+    const perfectPace = filteredData.filter(d => d.health_status === 'PERFECT_PACE').length;
+    const slowPace = filteredData.filter(d => d.health_status === 'SLOW_PACE').length;
+    const badPace = filteredData.filter(d => d.health_status === 'BAD_PACE').length;
+    const sleepPace = filteredData.filter(d => d.health_status === 'SLEEP_PACE').length;
+    const paymentPending = filteredData.filter(d => d.health_status === 'PAYMENT_PENDING').length;
+    
+    // Timeline Metrics
+    const currentYearProjects = filteredData.filter(d => {
+      if (!d.date_award) return false;
+      try {
+        const awardDate = new Date(d.date_award);
+        return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear;
+      } catch {
+        return false;
+      }
+    }).length;
+    
+    const lastQuarterProjects = filteredData.filter(d => {
+      if (!d.date_award) return false;
+      try {
+        const awardDate = new Date(d.date_award);
+        if (isNaN(awardDate.getTime())) return false;
+        const projectQuarter = Math.floor(awardDate.getMonth() / 3);
+        const lastQuarter = currentQuarter === 0 ? 3 : currentQuarter - 1;
+        const checkYear = currentQuarter === 0 ? currentYear - 1 : currentYear;
+        return awardDate.getFullYear() === checkYear && projectQuarter === lastQuarter;
+      } catch {
+        return false;
+      }
+    }).length;
+    
+    const lastYearProjects = filteredData.filter(d => {
+      if (!d.date_award) return false;
+      try {
+        const awardDate = new Date(d.date_award);
+        return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear - 1;
+      } catch {
+        return false;
+      }
+    }).length;
+    
+    // Calculate averages and other metrics
+    const avgProgress = filteredData.reduce((sum, d) => sum + (d.physical_progress || 0), 0) / totalProjects || 0;
+    const avgEfficiency = filteredData.reduce((sum, d) => sum + (d.efficiency_score || 0), 0) / totalProjects || 0;
+    const avgHealthScore = filteredData.reduce((sum, d) => sum + (d.health_score || 0), 0) / totalProjects || 0;
+    
+    // Calculate unique organizations
+    const uniqueAgencies = new Set(filteredData.map(d => d.executive_agency).filter(Boolean));
+    const uniqueContractors = new Set(filteredData.map(d => d.firm_name).filter(Boolean));
+    const uniqueLocations = new Set(filteredData.map(d => d.work_site?.split(',')[0]).filter(Boolean));
+    
+    return {
+      // Projects
+      totalProjects,
+      sanctionedProjects,
+      notSanctioned,
+      tenderNotCalled,
+      underCodalFormality,
+      awarded,
+      
+      // Budget
+      totalBudget,
+      totalExpenditure,
+      currentYearExpenditure,
+      allocatedBudget,
+      remainingBudget,
+      periodBudget: totalBudget,
+      periodExpenditure: totalExpenditure,
+      utilizationRate: totalBudget > 0 ? (totalExpenditure / totalBudget * 100) : 0,
+      
+      // Progress
+      tenderProgress,
+      tenderedNotAwarded,
+      awardedNotStarted,
+      progress1To50,
+      progress51To71,
+      progress71To99,
+      completed,
+      recentlyAwarded,
+      awardedThisYear,
+      completedRecently,
+      oldProjects,
+      
+      // Health
+      critical,
+      highRisk,
+      mediumRisk,
+      lowRisk,
+      delayed,
+      ongoing,
+      notStarted,
+      highBudget,
+      lowHealth,
+      highEfficiency,
+      overdue,
+      nearCompletion,
+      onTrack,
+      perfectPace,
+      slowPace,
+      badPace,
+      sleepPace,
+      paymentPending,
+      
+      // Timeline
+      currentYearProjects,
+      lastQuarterProjects,
+      lastYearProjects,
+      
+      // Other metrics
+      avgProgress: avgProgress.toFixed(1),
+      avgEfficiency: avgEfficiency.toFixed(1),
+      avgHealthScore: avgHealthScore.toFixed(1),
+      activeAgencies: uniqueAgencies.size,
+      totalContractors: uniqueContractors.size,
+      totalLocations: uniqueLocations.size,
+      completionRate: totalProjects > 0 ? (completed / totalProjects * 100).toFixed(1) : 0,
+      delayRate: totalProjects > 0 ? (delayed / totalProjects * 100).toFixed(1) : 0,
+      criticalRate: totalProjects > 0 ? (critical / totalProjects * 100).toFixed(1) : 0
+    };
+  }, [filteredData]);
+
+  // Update display metrics only when calculated metrics actually change
+  useEffect(() => {
+    const hasChanged = Object.keys(calculatedMetrics).some(key => {
+      return prevMetricsRef.current[key] !== calculatedMetrics[key];
+    });
+
+    if (hasChanged) {
+      prevMetricsRef.current = calculatedMetrics;
+      setDisplayMetrics(calculatedMetrics);
+    }
+  }, [calculatedMetrics]);
+
+  // Initialize display metrics on mount
+  useEffect(() => {
+    if (Object.keys(displayMetrics).length === 0) {
+      setDisplayMetrics(calculatedMetrics);
+      prevMetricsRef.current = calculatedMetrics;
+    }
+  }, []);
+
+  // Get filtered data based on metric type
+  const getMetricData = (metricId) => {
+    if (!filteredData || filteredData.length === 0) return [];
+
+    switch (metricId) {
+      // Projects Section
+      case 'total-projects':
+        return filteredData;
+      case 'sanctioned':
+        return filteredData.filter(d => d.aa_es_ref && d.aa_es_ref !== '');
+      case 'not-sanctioned':
+        return filteredData.filter(d => !d.aa_es_ref || d.aa_es_ref === '');
+      case 'tender-not-called':
+        return filteredData.filter(d => !d.date_tender || d.date_tender === '');
+      case 'codal':
+        return filteredData.filter(d => !d.date_award || d.date_award === '');
+      case 'awarded':
+        return filteredData.filter(d => d.date_award && d.date_award !== '');
+        
+      // Progress Section
+      case 'tender-progress':
+        return filteredData.filter(d => (!d.date_tender || d.date_tender === '') && d.physical_progress === 0);
+      case 'tendered-not-awarded':
+        return filteredData.filter(d => d.date_tender && (!d.date_award || d.date_award === ''));
+      case 'awarded-not-started':
+        return filteredData.filter(d => d.date_award && d.physical_progress === 0);
+      case 'progress-1-50':
+        return filteredData.filter(d => d.physical_progress > 0 && d.physical_progress <= 50);
+      case 'progress-51-71':
+        return filteredData.filter(d => d.physical_progress > 50 && d.physical_progress <= 71);
+      case 'progress-71-99':
+        return filteredData.filter(d => d.physical_progress > 71 && d.physical_progress < 100);
+      case 'completed':
+        return filteredData.filter(d => d.physical_progress >= 100);
+        
+      // Health Section
+      case 'critical':
+        return filteredData.filter(d => d.risk_level === 'CRITICAL');
+      case 'delayed':
+        return filteredData.filter(d => (d.delay_days || 0) > 0);
+      case 'ongoing':
+        return filteredData.filter(d => d.physical_progress > 0 && d.physical_progress < 100);
+      case 'notstarted':
+        return filteredData.filter(d => d.physical_progress === 0);
+      case 'overdue':
+        return filteredData.filter(d => d.delay_days > 90);
+      case 'perfect-pace':
+        return filteredData.filter(d => d.health_status === 'PERFECT_PACE');
+      case 'slow-pace':
+        return filteredData.filter(d => d.health_status === 'SLOW_PACE');
+      case 'bad-pace':
+        return filteredData.filter(d => d.health_status === 'BAD_PACE');
+      case 'sleep-pace':
+        return filteredData.filter(d => d.health_status === 'SLEEP_PACE');
+        
+      // Budget Section
+      case 'high-budget':
+        return filteredData.filter(d => d.sanctioned_amount > 50000);
+        
+      default:
+        return filteredData;
+    }
+  };
+
+  // Handle metric click
+  const handleMetricClick = (metric) => {
+    const data = getMetricData(metric.id);
+    
+    setDrillDownData(data);
+    setDrillDownTitle(`${metric.title} - ${metric.value} ${metric.subtitle || ''}`);
+    setSelectedMetric(metric);
+    setShowDrillDown(true);
+    
+    if (onMetricClick) {
+      onMetricClick(metric.id);
+    }
+  };
+
+  // Close drill-down modal
+  const closeDrillDown = () => {
+    setShowDrillDown(false);
+    setSelectedMetric(null);
+    setDrillDownData([]);
+    setDrillDownTitle('');
+  };
+
+  // Define all sections with metrics including info descriptions - USE DISPLAY METRICS
+  const projectsMetrics = [
     {
-      id: 'total',
-      group: 'overview',
+      id: 'total-projects',
+      group: 'projects',
       title: 'Total Projects',
-      value: enhancedMetrics?.totalProjects || 0,
-      subtitle: `${enhancedMetrics?.ongoing || 0} Active`,
+      value: displayMetrics.totalProjects || 0,
+      subtitle: `Budget: ${formatCurrency(displayMetrics.totalBudget || 0)}`,
       icon: Briefcase,
       color: 'blue',
       gradient: 'from-blue-500 to-blue-600',
-      trend: enhancedMetrics?.projectGrowth || 12,
+      trend: 12,
       trendDirection: 'up',
       details: {
-        'Not Started': enhancedMetrics?.notStarted || 0,
-        'Ongoing': enhancedMetrics?.ongoing || 0,
-        'Completed': enhancedMetrics?.completed || 0
+        'Sanctioned': displayMetrics.sanctionedProjects || 0,
+        'Not Sanctioned': displayMetrics.notSanctioned || 0,
+        'Awarded': displayMetrics.awarded || 0,
+        'Total Budget': formatCurrency(displayMetrics.totalBudget || 0)
       },
-      sparkline: generateTrendData(enhancedMetrics?.totalProjects || 0, 5),
+      sparkline: generateTrendData(displayMetrics.totalProjects || 0, 5),
       percentage: 100,
       alert: false,
-      priority: 1
+      priority: 1,
+      infoText: "This shows the total number of projects currently being tracked in the system, along with their combined budget allocation."
     },
     {
-      id: 'budget',
-      title: 'Total Budget',
-      group: 'financial',
-      value: formatCurrency(enhancedMetrics?.totalSanctionedCr),
-      subtitle: `${safeNumber(enhancedMetrics?.utilizationRate, 0).toFixed(1)}% Used`,
-      icon: IndianRupee,
-      color: 'orange',
-      gradient: 'from-orange-500 to-orange-600',
-      trend: enhancedMetrics?.budgetGrowth || 8,
-      trendDirection: 'up',
-      details: {
-        'Sanctioned': formatCurrency(enhancedMetrics?.totalSanctionedCr),
-        'Spent': formatCurrency(enhancedMetrics?.totalExpenditureCr),
-        'Remaining': formatCurrency(enhancedMetrics?.remainingBudgetCr)
-      },
-      sparkline: generateTrendData(safeNumber(enhancedMetrics?.utilizationRate), 10),
-      percentage: safeNumber(enhancedMetrics?.utilizationRate),
-      alert: safeNumber(enhancedMetrics?.utilizationRate) < 50,
-      priority: 2
-    },
-    {
-      id: 'completed',
-      title: 'Completed',
-      group: 'progress',
-      value: enhancedMetrics?.completed || 0,
-      subtitle: `${safeNumber(enhancedMetrics?.completionRate, 0).toFixed(1)}%`,
+      id: 'sanctioned',
+      group: 'projects',
+      title: 'Sanctioned Projects',
+      value: displayMetrics.sanctionedProjects || 0,
+      subtitle: 'AA/ES approved',
       icon: CheckCircle,
       color: 'green',
       gradient: 'from-green-500 to-green-600',
-      trend: enhancedMetrics?.completionGrowth || 15,
-      trendDirection: 'up',
-      details: {
-        'This Month': enhancedMetrics?.completedThisMonth || 0,
-        'This Quarter': enhancedMetrics?.completedThisQuarter || 0,
-        'This Year': enhancedMetrics?.completedThisYear || 0
-      },
-      sparkline: generateTrendData(enhancedMetrics?.completed || 0, 3),
-      percentage: safeNumber(enhancedMetrics?.completionRate),
-      alert: false,
-      priority: 3
+      percentage: safeNumber((displayMetrics.sanctionedProjects / Math.max(1, displayMetrics.totalProjects)) * 100),
+      infoText: "Projects that have received Administrative Approval (AA) and Expenditure Sanction (ES) from the government, meaning they are officially approved for execution."
     },
     {
-      id: 'critical',
-      title: 'Critical',
-      group: 'risk',
-      value: enhancedMetrics?.critical || 0,
-      subtitle: `${safeNumber(enhancedMetrics?.criticalRate, 0).toFixed(1)}%`,
-      icon: AlertTriangle,
+      id: 'not-sanctioned',
+      group: 'projects',
+      title: 'Not Sanctioned',
+      value: displayMetrics.notSanctioned || 0,
+      subtitle: 'AA/ES pending',
+      icon: XCircle,
       color: 'red',
       gradient: 'from-red-500 to-red-600',
-      trend: enhancedMetrics?.criticalGrowth || -5,
-      trendDirection: (enhancedMetrics?.criticalGrowth || 0) > 0 ? 'up' : 'down',
-      alert: true,
-      pulse: (enhancedMetrics?.critical || 0) > 10,
-      details: {
-        'High Risk': enhancedMetrics?.highRisk || 0,
-        'Medium Risk': enhancedMetrics?.mediumRisk || 0,
-        'Low Risk': enhancedMetrics?.lowRisk || 0
-      },
-      sparkline: generateTrendData(enhancedMetrics?.critical || 0, 2),
-      percentage: safeNumber(enhancedMetrics?.criticalRate),
-      priority: 4
+      alert: displayMetrics.notSanctioned > displayMetrics.totalProjects * 0.3,
+      infoText: "Projects waiting for official government approval. These projects cannot proceed until they receive Administrative Approval and Expenditure Sanction."
     },
     {
-      id: 'delayed',
-      title: 'Delayed',
-      group: 'timeline',
-      value: enhancedMetrics?.delayed || 0,
-      subtitle: `${safeNumber(enhancedMetrics?.delayRate, 0).toFixed(1)}%`,
-      icon: Clock,
+      id: 'tender-not-called',
+      group: 'projects',
+      title: 'Tender Yet to Call',
+      value: displayMetrics.tenderNotCalled || 0,
+      subtitle: 'No tender date',
+      icon: Calendar,
       color: 'yellow',
       gradient: 'from-yellow-500 to-yellow-600',
-      trend: enhancedMetrics?.delayGrowth || -3,
-      trendDirection: (enhancedMetrics?.delayGrowth || 0) > 0 ? 'up' : 'down',
-      details: {
-        '< 30 days': enhancedMetrics?.delayedUnder30 || 0,
-        '30-90 days': enhancedMetrics?.delayed30to90 || 0,
-        '> 90 days': enhancedMetrics?.delayedOver90 || 0
-      },
-      sparkline: generateTrendData(enhancedMetrics?.delayed || 0, 4),
-      percentage: safeNumber(enhancedMetrics?.delayRate),
-      alert: safeNumber(enhancedMetrics?.delayRate) > 30,
-      priority: 5
+      infoText: "Projects approved but haven't started the bidding process. The tender is a formal invitation for contractors to submit bids for project execution."
     },
     {
-      id: 'health',
-      title: 'Health Score',
-      group: 'performance',
-      value: safeNumber(enhancedMetrics?.avgHealthScore, 0).toFixed(1),
-      subtitle: 'Overall',
-      icon: Gauge,
-      color: 'purple',
-      gradient: 'from-purple-500 to-purple-600',
-      trend: enhancedMetrics?.healthGrowth || 2,
-      trendDirection: 'up',
-      details: {
-        'Avg Progress': `${safeNumber(enhancedMetrics?.avgProgress, 0).toFixed(1)}%`,
-        'Avg Efficiency': `${safeNumber(enhancedMetrics?.avgEfficiency, 0).toFixed(1)}%`,
-        'On Track': enhancedMetrics?.onTrack || 0
-      },
-      sparkline: generateTrendData(safeNumber(enhancedMetrics?.avgHealthScore), 5),
-      percentage: safeNumber(enhancedMetrics?.avgHealthScore),
-      alert: safeNumber(enhancedMetrics?.avgHealthScore) < 60,
-      priority: 6
+      id: 'codal',
+      group: 'projects',
+      title: 'Under Codal Formality',
+      value: displayMetrics.underCodalFormality || 0,
+      subtitle: 'Award pending',
+      icon: FileText,
+      color: 'orange',
+      gradient: 'from-orange-500 to-orange-600',
+      infoText: "Projects where bidding is complete but the contract hasn't been formally awarded. They are undergoing legal and procedural checks before final contractor selection."
+    },
+    {
+      id: 'awarded',
+      group: 'projects',
+      title: 'Work Awarded',
+      value: displayMetrics.awarded || 0,
+      subtitle: `${safeNumber((displayMetrics.awarded / Math.max(1, displayMetrics.totalProjects)) * 100).toFixed(1)}%`,
+      icon: Award,
+      color: 'teal',
+      gradient: 'from-teal-500 to-teal-600',
+      sparkline: generateTrendData(displayMetrics.awarded || 0, 3),
+      infoText: "Projects where contractors have been officially selected and contracts signed. These projects are ready for or have started physical execution."
     }
-  ], [enhancedMetrics]);
+  ];
 
-  // Additional metrics with actual calculated values
-  const additionalMetrics = useMemo(() => [
-    // Performance Metrics
+  const budgetMetrics = [
     {
-      id: 'efficiency',
-      title: 'Avg Efficiency',
-      group: 'performance',
-      value: `${safeNumber(enhancedMetrics?.avgEfficiency, 0).toFixed(1)}%`,
-      icon: Target,
-      color: 'indigo',
-      gradient: 'from-indigo-500 to-indigo-600',
-      trend: 5,
-      sparkline: generateTrendData(safeNumber(enhancedMetrics?.avgEfficiency), 8)
-    },
-    {
-      id: 'ontrack',
-      title: 'On Track',
-      group: 'performance',
-      value: enhancedMetrics?.onTrack || 0,
-      icon: Activity,
-      color: 'cyan',
-      gradient: 'from-cyan-500 to-cyan-600',
-      trend: 8,
-      sparkline: generateTrendData(enhancedMetrics?.onTrack || 0, 2)
-    },
-    {
-      id: 'avgprogress',
-      title: 'Avg Progress',
-      group: 'performance',
-      value: `${safeNumber(enhancedMetrics?.avgProgress, 0).toFixed(1)}%`,
-      icon: TrendingUp,
-      color: 'emerald',
-      gradient: 'from-emerald-500 to-emerald-600',
-      trend: 3,
-      sparkline: generateTrendData(safeNumber(enhancedMetrics?.avgProgress), 5)
-    },
-    
-    // Organizational Metrics - Using actual calculated values
-    {
-      id: 'agencies',
-      title: 'Active Agencies',
-      group: 'organization',
-      value: enhancedMetrics?.activeAgencies || 0,
-      icon: Building2,
-      color: 'slate',
-      gradient: 'from-slate-500 to-slate-600',
-      trend: 0,
-      details: filteredData && filteredData.length > 0 ? {
-        'Total': enhancedMetrics?.activeAgencies || 0,
-        'With Active Projects': filteredData.filter(p => p.physical_progress > 0 && p.physical_progress < 100)
-          .map(p => p.executive_agency)
-          .filter((v, i, a) => a.indexOf(v) === i).length || 0
-      } : null
-    },
-    {
-      id: 'contractors',
-      title: 'Contractors',
-      group: 'organization',
-      value: enhancedMetrics?.totalContractors || 0,
-      icon: Users,
-      color: 'amber',
-      gradient: 'from-amber-500 to-amber-600',
-      trend: 2,
-      details: filteredData && filteredData.length > 0 ? {
-        'Total': enhancedMetrics?.totalContractors || 0,
-        'Active': filteredData.filter(p => p.physical_progress > 0 && p.physical_progress < 100)
-          .map(p => p.firm_name)
-          .filter((v, i, a) => a.indexOf(v) === i).length || 0
-      } : null
-    },
-    {
-      id: 'locations',
-      title: 'Locations',
-      group: 'organization',
-      value: enhancedMetrics?.totalLocations || 0,
-      icon: MapPin,
-      color: 'rose',
-      gradient: 'from-rose-500 to-rose-600',
-      trend: 1,
-      details: filteredData && filteredData.length > 0 ? {
-        'Total Sites': enhancedMetrics?.totalLocations || 0,
-        'Active Sites': filteredData.filter(p => p.physical_progress > 0 && p.physical_progress < 100)
-          .map(p => p.work_site?.split(',')[0]?.trim())
-          .filter((v, i, a) => v && a.indexOf(v) === i).length || 0
-      } : null
-    },
-    
-    // Financial Metrics
-    {
-      id: 'utilization',
-      title: 'Budget Utilization',
-      group: 'financial',
-      value: `${safeNumber(enhancedMetrics?.utilizationRate, 0).toFixed(1)}%`,
-      icon: Percent,
-      color: 'violet',
-      gradient: 'from-violet-500 to-violet-600',
-      trend: 4,
-      alert: safeNumber(enhancedMetrics?.utilizationRate) < 50
+      id: 'total-budget',
+      group: 'budget',
+      title: 'Total Budget',
+      value: formatCurrency(displayMetrics.totalBudget || 0),
+      subtitle: `${displayMetrics.totalProjects || 0} projects`,
+      icon: IndianRupee,
+      color: 'green',
+      gradient: 'from-green-500 to-green-600',
+      sparkline: generateTrendData(displayMetrics.totalBudget || 0, 100),
+      infoText: "The total amount of money allocated by the government for all projects. This is the maximum that can be spent across all projects."
     },
     {
       id: 'expenditure',
-      title: 'Total Spent',
-      group: 'financial',
-      value: formatCurrency(enhancedMetrics?.totalExpenditureCr),
+      group: 'budget',
+      title: 'Total Expenditure',
+      value: formatCurrency(displayMetrics.totalExpenditure || 0),
+      subtitle: `${safeNumber(displayMetrics.utilizationRate || 0).toFixed(1)}% utilized`,
       icon: CreditCard,
-      color: 'fuchsia',
-      gradient: 'from-fuchsia-500 to-fuchsia-600',
-      trend: 6
+      color: 'blue',
+      gradient: 'from-blue-500 to-blue-600',
+      percentage: displayMetrics.utilizationRate || 0,
+      infoText: "The actual amount of money spent so far on all projects. The percentage shows how much of the total budget has been used."
+    },
+    {
+      id: 'allocated',
+      group: 'budget',
+      title: 'Allocated Budget',
+      value: formatCurrency(displayMetrics.allocatedBudget || 0),
+      subtitle: 'Sanctioned projects',
+      icon: Wallet,
+      color: 'purple',
+      gradient: 'from-purple-500 to-purple-600',
+      infoText: "Budget specifically assigned to projects that have received official approval. This is the portion of total budget ready for use."
+    },
+    {
+      id: 'current-year-budget',
+      group: 'budget',
+      title: 'Current Year Budget',
+      value: formatCurrency(displayMetrics.currentYearExpenditure || 0),
+      subtitle: `FY ${new Date().getFullYear()}`,
+      icon: Calendar,
+      color: 'indigo',
+      gradient: 'from-indigo-500 to-indigo-600',
+      infoText: "Money spent in the current financial year. This helps track yearly spending patterns and budget utilization."
     },
     {
       id: 'remaining',
+      group: 'budget',
       title: 'Remaining Budget',
-      group: 'financial',
-      value: formatCurrency(enhancedMetrics?.remainingBudgetCr),
+      value: formatCurrency(displayMetrics.remainingBudget || 0),
+      subtitle: 'Available',
       icon: Database,
-      color: 'lime',
-      gradient: 'from-lime-500 to-lime-600',
-      trend: -2
-    },
-    
-    // Timeline Metrics
+      color: 'amber',
+      gradient: 'from-amber-500 to-amber-600',
+      infoText: "The amount of money left to be spent. This is the difference between allocated budget and what has been spent so far."
+    }
+  ];
+
+  const progressMetrics = [
     {
-      id: 'avgtime',
-      title: 'Avg Duration',
-      group: 'timeline',
-      value: `${enhancedMetrics?.avgDuration || 0} days`,
-      icon: Timer,
+      id: 'tender-progress',
+      group: 'progress',
+      title: 'Tender Progress',
+      value: displayMetrics.tenderProgress || 0,
+      icon: Activity,
+      color: 'slate',
+      gradient: 'from-slate-500 to-slate-600',
+      infoText: "Projects in the initial stage where the tender (bidding) process is being prepared or is ongoing."
+    },
+    {
+      id: 'tendered-not-awarded',
+      group: 'progress',
+      title: 'Tendered Not Awarded',
+      value: displayMetrics.tenderedNotAwarded || 0,
+      icon: PauseCircle,
+      color: 'yellow',
+      gradient: 'from-yellow-500 to-yellow-600',
+      infoText: "Projects where bidding is complete but no contractor has been selected yet. This could be due to evaluation delays or re-tendering."
+    },
+    {
+      id: 'awarded-not-started',
+      group: 'progress',
+      title: 'Awarded Not Started',
+      value: displayMetrics.awardedNotStarted || 0,
+      icon: PlayCircle,
+      color: 'orange',
+      gradient: 'from-orange-500 to-orange-600',
+      infoText: "Projects where a contractor has been selected but physical work hasn't begun. This could be due to site preparation or material procurement."
+    },
+    {
+      id: 'progress-1-50',
+      group: 'progress',
+      title: 'Progress 1-50%',
+      value: displayMetrics.progress1To50 || 0,
+      icon: Activity,
+      color: 'red',
+      gradient: 'from-red-500 to-orange-500',
+      infoText: "Projects in early to mid-stage of completion. These require monitoring to ensure they stay on track."
+    },
+    {
+      id: 'progress-51-71',
+      group: 'progress',
+      title: 'Progress 51-71%',
+      value: displayMetrics.progress51To71 || 0,
+      icon: Activity,
+      color: 'yellow',
+      gradient: 'from-yellow-500 to-green-500',
+      infoText: "Projects that are more than halfway done. These are progressing well but need attention to ensure timely completion."
+    },
+    {
+      id: 'progress-71-99',
+      group: 'progress',
+      title: 'Progress 71-99%',
+      value: displayMetrics.progress71To99 || 0,
+      icon: Target,
+      color: 'blue',
+      gradient: 'from-blue-500 to-green-500',
+      infoText: "Projects nearing completion. These need final push and quality checks before handover."
+    },
+    {
+      id: 'recently-awarded',
+      group: 'progress',
+      title: 'Recently Awarded',
+      value: displayMetrics.recentlyAwarded || 0,
+      subtitle: 'Last 30 days',
+      icon: Award,
+      color: 'purple',
+      gradient: 'from-purple-500 to-purple-600',
+      infoText: "Projects where contracts were signed in the last 30 days. These are new projects beginning their execution phase."
+    },
+    {
+      id: 'awarded-year',
+      group: 'progress',
+      title: 'Awarded This Year',
+      value: displayMetrics.awardedThisYear || 0,
+      subtitle: new Date().getFullYear(),
+      icon: Calendar,
+      color: 'indigo',
+      gradient: 'from-indigo-500 to-indigo-600',
+      infoText: "All projects that received contractor awards in the current year. Shows the pace of new project initiation."
+    },
+    {
+      id: 'completed-recently',
+      group: 'progress',
+      title: 'Recently Completed',
+      value: displayMetrics.completedRecently || 0,
+      subtitle: 'Last 90 days',
+      icon: CheckCircle,
       color: 'teal',
       gradient: 'from-teal-500 to-teal-600',
-      trend: -1
+      infoText: "Projects finished in the last 90 days. These may be in handover or warranty phase."
     },
     {
-      id: 'notstarted',
-      title: 'Not Started',
-      group: 'timeline',
-      value: enhancedMetrics?.notStarted || 0,
-      icon: Package,
+      id: 'old-projects',
+      group: 'progress',
+      title: 'Old Projects',
+      value: displayMetrics.oldProjects || 0,
+      subtitle: '> 1 year',
+      icon: Clock,
       color: 'gray',
       gradient: 'from-gray-500 to-gray-600',
-      trend: -5,
-      alert: (enhancedMetrics?.notStarted || 0) > 50
+      infoText: "Projects that were started more than a year ago but aren't complete. These may need special attention or intervention."
+    }
+  ];
+
+  const healthMetrics = [
+    {
+      id: 'critical',
+      group: 'health',
+      title: 'Critical',
+      value: displayMetrics.critical || 0,
+      subtitle: `${safeNumber(displayMetrics.criticalRate || 0).toFixed(1)}%`,
+      icon: AlertTriangle,
+      color: 'red',
+      gradient: 'from-red-500 to-red-600',
+      alert: true,
+      pulse: displayMetrics.critical > 10,
+      infoText: "Projects facing severe issues like major delays, budget overruns, or quality problems. These need immediate management attention."
+    },
+    {
+      id: 'delayed',
+      group: 'health',
+      title: 'Delayed',
+      value: displayMetrics.delayed || 0,
+      subtitle: `${safeNumber(displayMetrics.delayRate || 0).toFixed(1)}%`,
+      icon: Clock,
+      color: 'yellow',
+      gradient: 'from-yellow-500 to-yellow-600',
+      infoText: "Projects running behind their planned schedule. The delay could affect project costs and benefits."
+    },
+    {
+      id: 'completed',
+      group: 'health',
+      title: 'Completed',
+      value: displayMetrics.completed || 0,
+      subtitle: `${safeNumber(displayMetrics.completionRate || 0).toFixed(1)}%`,
+      icon: CheckCircle,
+      color: 'green',
+      gradient: 'from-green-500 to-green-600',
+      infoText: "Projects that have finished all work (100% progress). These are ready for handover or already in use."
     },
     {
       id: 'ongoing',
+      group: 'health',
       title: 'Ongoing',
-      group: 'timeline',
-      value: enhancedMetrics?.ongoing || 0,
-      icon: Cpu,
-      color: 'sky',
-      gradient: 'from-sky-500 to-sky-600',
-      trend: 10
+      value: displayMetrics.ongoing || 0,
+      icon: Activity,
+      color: 'blue',
+      gradient: 'from-blue-500 to-blue-600',
+      infoText: "Projects where work has started and is in progress. These are actively being executed at various stages."
+    },
+    {
+      id: 'notstarted',
+      group: 'health',
+      title: 'Not Started',
+      value: displayMetrics.notStarted || 0,
+      icon: Package,
+      color: 'gray',
+      gradient: 'from-gray-500 to-gray-600',
+      infoText: "Projects with zero physical progress. These are in planning or preparation stage."
+    },
+    {
+      id: 'high-budget',
+      group: 'health',
+      title: 'High Budget',
+      value: displayMetrics.highBudget || 0,
+      subtitle: '>₹500L',
+      icon: IndianRupee,
+      color: 'purple',
+      gradient: 'from-purple-500 to-purple-600',
+      infoText: "Projects with budget exceeding ₹500 lakhs (5 crores). These are major projects requiring close monitoring."
+    },
+    {
+      id: 'low-health',
+      group: 'health',
+      title: 'Low Health',
+      value: displayMetrics.lowHealth || 0,
+      subtitle: '<50 score',
+      icon: Heart,
+      color: 'red',
+      gradient: 'from-red-500 to-red-600',
+      infoText: "Projects with poor overall performance based on progress, efficiency, and delays. These need improvement strategies."
+    },
+    {
+      id: 'high-efficiency',
+      group: 'health',
+      title: 'High Efficiency',
+      value: displayMetrics.highEfficiency || 0,
+      subtitle: '>80%',
+      icon: Zap,
+      color: 'emerald',
+      gradient: 'from-emerald-500 to-emerald-600',
+      infoText: "Projects performing excellently with good progress relative to time and money spent. These are model projects."
+    },
+    {
+      id: 'overdue',
+      group: 'health',
+      title: 'Overdue',
+      value: displayMetrics.overdue || 0,
+      subtitle: '>90 days',
+      icon: AlertCircle,
+      color: 'red',
+      gradient: 'from-red-600 to-red-700',
+      alert: true,
+      infoText: "Projects delayed by more than 90 days from their planned completion date. These may face penalties or cost escalation."
+    },
+    {
+      id: 'near-completion',
+      group: 'health',
+      title: 'Near Completion',
+      value: displayMetrics.nearCompletion || 0,
+      subtitle: '75-99%',
+      icon: Target,
+      color: 'cyan',
+      gradient: 'from-cyan-500 to-cyan-600',
+      infoText: "Projects in final stages of completion. These need focused effort to finish on time."
+    },
+    {
+      id: 'perfect-pace',
+      group: 'health',
+      title: 'Perfect Pace',
+      value: displayMetrics.perfectPace || 0,
+      icon: Gauge,
+      color: 'green',
+      gradient: 'from-green-500 to-emerald-600',
+      infoText: "Projects progressing exactly as planned or ahead of schedule. These are performing optimally."
+    },
+    {
+      id: 'slow-pace',
+      group: 'health',
+      title: 'Slow Pace',
+      value: displayMetrics.slowPace || 0,
+      icon: Timer,
+      color: 'yellow',
+      gradient: 'from-yellow-500 to-amber-600',
+      infoText: "Projects progressing slower than planned (75-95% of expected progress). These need minor adjustments."
+    },
+    {
+      id: 'bad-pace',
+      group: 'health',
+      title: 'Bad Pace',
+      value: displayMetrics.badPace || 0,
+      icon: AlertCircle,
+      color: 'orange',
+      gradient: 'from-orange-500 to-red-500',
+      infoText: "Projects significantly behind schedule (50-75% of expected progress). These need corrective action."
+    },
+    {
+      id: 'sleep-pace',
+      group: 'health',
+      title: 'Sleep Pace',
+      value: displayMetrics.sleepPace || 0,
+      icon: PauseCircle,
+      color: 'red',
+      gradient: 'from-red-500 to-red-700',
+      infoText: "Projects moving extremely slowly or stalled (less than 50% of expected progress). These need urgent intervention."
+    },
+    {
+      id: 'payment-pending',
+      group: 'health',
+      title: 'Payment Pending',
+      value: displayMetrics.paymentPending || 0,
+      icon: CreditCard,
+      color: 'amber',
+      gradient: 'from-amber-500 to-orange-600',
+      infoText: "Completed projects where full payment hasn't been made to contractors. This could delay project closure."
     }
-  ], [enhancedMetrics, filteredData]);
+  ];
+
+  const timelineMetrics = [
+    {
+      id: 'current-year',
+      group: 'timeline',
+      title: 'Current Year Projects',
+      value: displayMetrics.currentYearProjects || 0,
+      subtitle: `FY ${new Date().getFullYear()}`,
+      icon: CalendarDays,
+      color: 'indigo',
+      gradient: 'from-indigo-500 to-indigo-600',
+      sparkline: generateTrendData(displayMetrics.currentYearProjects || 0, 5),
+      infoText: "Projects started in the current financial year. Shows the volume of new work undertaken this year."
+    },
+    {
+      id: 'last-quarter',
+      group: 'timeline',
+      title: 'Last Quarter Projects',
+      value: displayMetrics.lastQuarterProjects || 0,
+      subtitle: `Q${Math.max(1, Math.floor((new Date().getMonth()) / 3))}`,
+      icon: CalendarClock,
+      color: 'purple',
+      gradient: 'from-purple-500 to-purple-600',
+      infoText: "Projects initiated in the previous quarter (3-month period). Helps track recent project initiation trends."
+    },
+    {
+      id: 'last-year',
+      group: 'timeline',
+      title: 'Last Year Projects',
+      value: displayMetrics.lastYearProjects || 0,
+      subtitle: `FY ${new Date().getFullYear() - 1}`,
+      icon: CalendarCheck,
+      color: 'cyan',
+      gradient: 'from-cyan-500 to-cyan-600',
+      infoText: "Projects from the previous financial year. These should ideally be nearing completion or completed."
+    }
+  ];
 
   // Group metrics for filtering
   const metricGroups = {
-    all: [...mainMetrics, ...additionalMetrics],
-    overview: [...mainMetrics, ...additionalMetrics].filter(m => m.group === 'overview'),
-    financial: [...mainMetrics, ...additionalMetrics].filter(m => m.group === 'financial'),
-    progress: [...mainMetrics, ...additionalMetrics].filter(m => m.group === 'progress'),
-    risk: [...mainMetrics, ...additionalMetrics].filter(m => m.group === 'risk'),
-    performance: [...mainMetrics, ...additionalMetrics].filter(m => m.group === 'performance'),
-    timeline: [...mainMetrics, ...additionalMetrics].filter(m => m.group === 'timeline'),
-    organization: [...mainMetrics, ...additionalMetrics].filter(m => m.group === 'organization')
+    all: [...projectsMetrics, ...budgetMetrics, ...progressMetrics, ...healthMetrics, ...timelineMetrics],
+    projects: projectsMetrics,
+    budget: budgetMetrics,
+    progress: progressMetrics,
+    health: healthMetrics,
+    timeline: timelineMetrics
   };
 
   const getColorClass = (color) => {
@@ -422,24 +975,25 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
     return colors[color] || 'text-gray-500';
   };
 
+  // MetricCard Component with stable values
   const MetricCard = ({ metric, isMain = true, size = 'normal' }) => {
     const isHovered = hoveredCard === metric.id;
-    const showDetails = isHovered && metric.details;
-    const [localValue, setLocalValue] = useState(0);
+    const showDetailPopup = isHovered && metric.details;
+    const [showInfo, setShowInfo] = useState(false);
+    const cardRef = useRef(null);
+    const [popupPosition, setPopupPosition] = useState({ top: 0, left: 0, width: 0 });
 
-    // Animate value
+    // Calculate popup position when hovering
     useEffect(() => {
-      if (animateValues && typeof metric.value === 'number') {
-        const timer = setTimeout(() => {
-          setLocalValue(metric.value);
-        }, 100);
-        return () => clearTimeout(timer);
+      if (showDetailPopup && cardRef.current) {
+        const rect = cardRef.current.getBoundingClientRect();
+        setPopupPosition({
+          top: rect.bottom + window.scrollY + 8,
+          left: rect.left + window.scrollX,
+          width: rect.width
+        });
       }
-    }, [metric.value, animateValues]);
-
-    const displayValue = animateValues && typeof metric.value === 'number' 
-      ? localValue 
-      : metric.value;
+    }, [showDetailPopup]);
 
     const cardSizes = {
       compact: 'p-3',
@@ -448,180 +1002,383 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
     };
 
     return (
-      <div
-        onClick={() => onMetricClick && onMetricClick(metric.id)}
-        onMouseEnter={() => setHoveredCard(metric.id)}
-        onMouseLeave={() => setHoveredCard(null)}
-        className={`
-          relative rounded-2xl shadow-sm border transition-all duration-300 cursor-pointer
-          ${darkMode 
-            ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' 
-            : 'bg-white border-gray-100 hover:bg-gray-50'
-          }
-          ${cardSizes[size]}
-          hover:shadow-lg hover:scale-102 hover:-translate-y-0.5
-          ${metric.alert ? 'ring-2 ring-red-400 ring-opacity-50' : ''}
-          ${metric.pulse ? 'animate-pulse' : ''}
-        `}
-        style={{ position: 'relative', zIndex: isHovered ? 20 : 1 }}
-      >
-        {/* Gradient Background Effect - Subtle */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${metric.gradient} opacity-[0.03] rounded-2xl pointer-events-none`} />
-        
-        {/* Alert Badge */}
-        {metric.alert && (
-          <div className="absolute -top-1 -right-1 z-10">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-            </span>
-          </div>
-        )}
-        
-        {/* Main Content */}
-        <div className="relative">
-          <div className="flex justify-between items-start mb-3">
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-semibold ${
-                  darkMode ? 'text-gray-400' : 'text-gray-600'
-                }`}>
-                  {metric.title}
-                </span>
-                {metric.group && size !== 'compact' && (
-                  <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${
-                    darkMode ? 'bg-gray-700/50 text-gray-400' : 'bg-gray-100 text-gray-600'
+      <>
+        <div
+          ref={cardRef}
+          onClick={() => handleMetricClick(metric)}
+          onMouseEnter={() => setHoveredCard(metric.id)}
+          onMouseLeave={() => {
+            setHoveredCard(null);
+            setShowInfo(false);
+          }}
+          className={`
+            relative rounded-2xl shadow-sm border transition-all duration-300 cursor-pointer
+            ${darkMode 
+              ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' 
+              : 'bg-white border-gray-100 hover:bg-gray-50'
+            }
+            ${cardSizes[size]}
+            hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5
+            ${metric.alert ? 'ring-2 ring-red-400 ring-opacity-50' : ''}
+            ${metric.pulse ? 'animate-pulse' : ''}
+          `}
+        >
+          <div className={`absolute inset-0 bg-gradient-to-br ${metric.gradient} opacity-[0.03] rounded-2xl pointer-events-none`} />
+          
+          {/* Alert indicator */}
+          {metric.alert && (
+            <div className="absolute -top-1 -right-1 z-10">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+              </span>
+            </div>
+          )}
+          
+          <div className="relative">
+            {/* Main card content */}
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-semibold ${
+                    darkMode ? 'text-gray-400' : 'text-gray-600'
                   }`}>
-                    {metric.group}
+                    {metric.title}
                   </span>
+                  {metric.group && size !== 'compact' && (
+                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${
+                      darkMode ? 'bg-gray-700/50 text-gray-400' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {metric.group}
+                    </span>
+                  )}
+                </div>
+                
+                {showTrends && metric.trend !== undefined && metric.trend !== 0 && size !== 'compact' && (
+                  <div className={`flex items-center gap-1 mt-1 text-xs ${
+                    metric.trendDirection === 'up' 
+                      ? (metric.alert ? 'text-red-500' : 'text-green-500')
+                      : (metric.alert ? 'text-green-500' : 'text-red-500')
+                  }`}>
+                    {metric.trendDirection === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                    <span className="text-[10px]">{Math.abs(metric.trend)}%</span>
+                  </div>
                 )}
               </div>
               
-              {/* Trend Indicator */}
-              {showTrends && metric.trend !== undefined && metric.trend !== 0 && size !== 'compact' && (
-                <div className={`flex items-center gap-1 mt-1 text-xs ${
-                  metric.trendDirection === 'up' 
-                    ? (metric.alert ? 'text-red-500' : 'text-green-500')
-                    : (metric.alert ? 'text-green-500' : 'text-red-500')
-                }`}>
-                  {metric.trendDirection === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                  <span className="text-[10px]">{Math.abs(metric.trend)}%</span>
-                </div>
-              )}
+              {/* Main icon */}
+              <div className={`rounded-xl bg-gradient-to-br ${metric.gradient} shadow-sm ${
+                size === 'compact' ? 'p-2' : 'p-2.5'
+              }`}>
+                <metric.icon size={size === 'compact' ? 14 : isMain ? 18 : 16} className="text-white" />
+              </div>
             </div>
             
-            {/* Icon */}
-            <div className={`rounded-xl bg-gradient-to-br ${metric.gradient} shadow-sm ${
-              size === 'compact' ? 'p-2' : 'p-2.5'
-            }`}>
-              <metric.icon size={size === 'compact' ? 14 : isMain ? 18 : 16} className="text-white" />
+            {/* Value display - now using stable metric.value */}
+            <div className={`${
+              size === 'compact' ? 'text-base' : isMain ? 'text-xl' : 'text-lg'
+            } font-bold ${
+              darkMode ? 'text-gray-100' : 'text-gray-900'
+            } mb-1`}>
+              {metric.value}
             </div>
+            
+            {metric.subtitle && size !== 'compact' && (
+              <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                {metric.subtitle}
+              </div>
+            )}
+            
+            {/* Progress bar */}
+            {metric.percentage !== undefined && size !== 'compact' && (
+              <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                <div 
+                  className={`h-1.5 rounded-full bg-gradient-to-r ${metric.gradient} transition-all duration-500`}
+                  style={{ width: `${Math.min(100, Math.max(0, metric.percentage))}%` }}
+                />
+              </div>
+            )}
+            
+            {/* Sparkline chart */}
+            {metric.sparkline && showTrends && size === 'normal' && (
+              <div className="mt-3 h-8 pointer-events-none opacity-50">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={metric.sparkline}>
+                    <defs>
+                      <linearGradient id={`gradient-${metric.id}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={getColorClass(metric.color).replace('text-', '#')} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={getColorClass(metric.color).replace('text-', '#')} stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <Area 
+                      type="monotone" 
+                      dataKey="value" 
+                      stroke="none"
+                      fill={`url(#gradient-${metric.id})`}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
-          
-          {/* Value Display */}
-          <div className={`${
-            size === 'compact' ? 'text-base' : isMain ? 'text-xl' : 'text-lg'
-          } font-bold ${
-            darkMode ? 'text-gray-100' : 'text-gray-900'
-          } mb-1 transition-all duration-500 ${
-            animateValues ? 'scale-100' : 'scale-95'
-          }`}>
-            {displayValue}
-          </div>
-          
-          {/* Subtitle */}
-          {metric.subtitle && size !== 'compact' && (
-            <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              {metric.subtitle}
-            </div>
+
+          {/* Help Icon */}
+          {showInfoTooltips && metric.infoText && size !== 'compact' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowInfo(!showInfo);
+              }}
+              onMouseEnter={(e) => {
+                e.stopPropagation();
+                setShowInfo(true);
+              }}
+              onMouseLeave={() => setShowInfo(false)}
+              className={`absolute bottom-2 right-2 p-1 rounded-full ${
+                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+              } transition-colors z-20`}
+            >
+              <HelpCircle size={14} className="text-gray-400" />
+            </button>
           )}
           
-          {/* Progress Bar */}
-          {metric.percentage !== undefined && size !== 'compact' && (
-            <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+          {/* Info Tooltip */}
+          {showInfo && metric.infoText && (
+            <>
+              <div className="fixed inset-0 z-[9998] pointer-events-none" />
               <div 
-                className={`h-1.5 rounded-full bg-gradient-to-r ${metric.gradient} transition-all duration-500`}
-                style={{ width: `${Math.min(100, Math.max(0, metric.percentage))}%` }}
-              />
-            </div>
-          )}
-          
-          {/* Mini Sparkline Chart */}
-          {metric.sparkline && showTrends && size === 'normal' && (
-            <div className="mt-3 h-8 pointer-events-none opacity-50">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={metric.sparkline}>
-                  <defs>
-                    <linearGradient id={`gradient-${metric.id}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={getColorClass(metric.color).replace('text-', '#')} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={getColorClass(metric.color).replace('text-', '#')} stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <Area 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="none"
-                    fill={`url(#gradient-${metric.id})`}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+                className={`absolute bottom-10 right-0 w-64 p-3 rounded-xl shadow-2xl ${
+                  darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
+                } border z-[9999]`}
+                style={{ maxWidth: '250px' }}
+              >
+                <div 
+                  className="absolute -bottom-2 right-4 w-0 h-0 border-l-[8px] border-r-[8px] border-t-[8px] border-transparent"
+                  style={{ 
+                    borderTopColor: darkMode ? '#111827' : '#ffffff',
+                    filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.1))'
+                  }}
+                />
+                <p className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'} leading-relaxed`}>
+                  {metric.infoText}
+                </p>
+              </div>
+            </>
           )}
 
-          {/* Hover Details Popup */}
-          {showDetails && (
-            <div 
-              className={`absolute left-0 right-0 mt-2 p-3 rounded-xl shadow-xl ${
-                darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
-              } border z-50`}
-              style={{ 
-                top: '100%',
-                minWidth: '200px'
+          {/* More options button */}
+          {size !== 'compact' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
               }}
+              className={`absolute top-3 right-3 p-1 rounded-lg opacity-0 hover:opacity-100 transition-opacity ${
+                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+              }`}
             >
-              <div className="space-y-2">
-                {Object.entries(metric.details).map(([key, value]) => (
-                  <div key={key} className="flex justify-between items-center text-xs">
-                    <span className={`flex items-center gap-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      <ChevronRight size={10} />
-                      {key}:
-                    </span>
-                    <span className="font-semibold">{value}</span>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Action Button */}
-              <button className={`mt-3 w-full py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1 ${
-                darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'
-              } transition-colors`}>
-                <Eye size={12} />
-                View Details
-              </button>
-            </div>
+              <MoreVertical size={14} className="text-gray-400" />
+            </button>
           )}
         </div>
 
-        {/* More Options */}
-        {size !== 'compact' && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              // Handle more options
+        {/* Detail popup using fixed positioning */}
+        {showDetailPopup && (
+          <div 
+            className={`fixed p-3 rounded-xl shadow-xl ${
+              darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
+            } border z-[99999]`}
+            style={{ 
+              top: `${popupPosition.top}px`,
+              left: `${popupPosition.left}px`,
+              width: `${popupPosition.width}px`,
+              minWidth: '200px'
             }}
-            className={`absolute top-3 right-3 p-1 rounded-lg opacity-0 hover:opacity-100 transition-opacity ${
-              darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-            }`}
           >
-            <MoreVertical size={14} className="text-gray-400" />
-          </button>
+            <div className="space-y-2">
+              {Object.entries(metric.details).map(([key, value]) => (
+                <div key={key} className="flex justify-between items-center text-xs">
+                  <span className={`flex items-center gap-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    <ChevronRight size={10} />
+                    {key}:
+                  </span>
+                  <span className="font-semibold">{value}</span>
+                </div>
+              ))}
+            </div>
+            
+            <button className={`mt-3 w-full py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1 ${
+              darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'
+            } transition-colors`}>
+              <Eye size={12} />
+              View Details
+            </button>
+          </div>
         )}
+      </>
+    );
+  };
+
+  // Drill-down Modal Component
+  const DrillDownModal = () => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+    const filteredDrillDownData = useMemo(() => {
+      let filtered = [...drillDownData];
+      
+      if (searchTerm) {
+        filtered = filtered.filter(item =>
+          Object.values(item || {}).some(value =>
+            value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        );
+      }
+
+      if (sortConfig.key) {
+        filtered.sort((a, b) => {
+          const aVal = a[sortConfig.key] || 0;
+          const bVal = b[sortConfig.key] || 0;
+          
+          if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+          return 0;
+        });
+      }
+
+      return filtered;
+    }, [searchTerm, sortConfig]);
+
+    const handleExport = () => {
+      const csvContent = [
+        Object.keys(drillDownData[0] || {}).join(','),
+        ...drillDownData.map(row =>
+          Object.values(row).map(val => {
+            if (typeof val === 'string' && (val.includes(',') || val.includes('"'))) {
+              return `"${val.replace(/"/g, '""')}"`;
+            }
+            return val || '';
+          }).join(',')
+        )
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${drillDownTitle.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    if (!showDrillDown) return null;
+
+    return (
+      <div className="fixed inset-0 z-[9999] overflow-hidden flex items-center justify-center">
+        <div 
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={closeDrillDown}
+        />
+        
+        <div className={`relative w-[90vw] max-h-[85vh] ${
+          darkMode ? 'bg-gray-900' : 'bg-white'
+        } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
+          
+          <div className={`px-6 py-4 border-b ${
+            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
+          }`}>
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                  {drillDownTitle}
+                </h2>
+                <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
+                  Showing {filteredDrillDownData.length} of {drillDownData.length} projects
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search size={16} className={`absolute left-3 top-2.5 ${darkMode ? 'text-gray-400' : 'text-blue-200'}`} />
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className={`pl-9 pr-3 py-2 rounded-lg text-sm ${
+                      darkMode 
+                        ? 'bg-gray-700 text-gray-100 placeholder-gray-400' 
+                        : 'bg-blue-600/20 text-white placeholder-blue-200'
+                    } focus:outline-none focus:ring-2 focus:ring-white/20`}
+                  />
+                </div>
+                <button
+                  onClick={handleExport}
+                  className={`px-3 py-2 rounded-lg ${
+                    darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-blue-700 hover:bg-blue-800'
+                  } text-white transition-colors flex items-center gap-1 text-sm`}
+                >
+                  <Download size={16} />
+                  Export
+                </button>
+                <button
+                  onClick={closeDrillDown}
+                  className={`p-2 rounded-lg ${
+                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
+                  } transition-colors`}
+                >
+                  <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <span className="text-xs text-gray-500">Total Projects</span>
+                <p className="text-lg font-bold">{drillDownData.length}</p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500">Total Budget</span>
+                <p className="text-lg font-bold">
+                  ₹{(drillDownData.reduce((sum, p) => sum + (p.sanctioned_amount || 0), 0) / 100).toFixed(2)} Cr
+                </p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500">Avg Progress</span>
+                <p className="text-lg font-bold">
+                  {drillDownData.length ? 
+                    (drillDownData.reduce((sum, p) => sum + (p.physical_progress || 0), 0) / drillDownData.length).toFixed(1) : 0}%
+                </p>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500">Critical</span>
+                <p className="text-lg font-bold text-red-600">
+                  {drillDownData.filter(p => p.risk_level === 'CRITICAL').length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto p-6">
+            <DataTable
+              data={filteredDrillDownData}
+              darkMode={darkMode}
+              onRowClick={(row) => {
+                console.log('Row clicked:', row);
+              }}
+              compareMode={false}
+              selectedProjects={[]}
+              isEmbedded={true}
+              maxHeight="600px"
+            />
+          </div>
+        </div>
       </div>
     );
   };
 
   return (
-    <div className="space-y-4" style={{ position: 'relative', zIndex: 1 }}>
+    <div className="space-y-4" style={{ position: 'relative' }}>
       {/* Controls Bar */}
       <div className={`flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl ${
         darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'
@@ -631,7 +1388,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
           <span className={`text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
             View:
           </span>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap">
             {Object.keys(metricGroups).map(group => (
               <button
                 key={group}
@@ -666,6 +1423,20 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
             </select>
           </div>
           
+          {/* Info Tooltips Toggle */}
+          <button
+            onClick={() => setShowInfoTooltips(!showInfoTooltips)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${
+              showInfoTooltips
+                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm'
+                : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title="Toggle information tooltips that explain what each metric means"
+          >
+            <Info size={12} />
+            Help
+          </button>
+          
           {/* Trends Toggle */}
           <button
             onClick={() => setShowTrends(!showTrends)}
@@ -689,83 +1460,357 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
             {expandedView ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             {expandedView ? 'Less' : 'More'}
           </button>
+
+          {/* Details Toggle */}
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${
+              showDetails
+                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm'
+                : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <Eye size={12} />
+            Details
+          </button>
         </div>
       </div>
 
-      {/* Main Metrics - Always Visible */}
-      {selectedMetricGroup === 'all' && (
-        <div className={`grid gap-4 ${
-          cardSize === 'compact' 
-            ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-6' 
-            : cardSize === 'large'
-            ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-            : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
-        }`}>
-          {mainMetrics.map((metric) => (
-            <MetricCard key={metric.id} metric={metric} isMain={true} size={cardSize} />
-          ))}
-        </div>
-      )}
+      {/* Metrics Display */}
+      {selectedMetricGroup === 'all' ? (
+        // Show all sections with headers
+        <div className="space-y-6">
+          {/* Projects Section */}
+          <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
+            darkMode ? 'border-gray-700' : 'border-gray-100'
+          } overflow-hidden`}>
+            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-blue-50 border-blue-100'} border-b flex items-center justify-between`}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                  <Briefcase size={16} className="text-white" />
+                </div>
+                <h3 className="font-semibold">Projects</h3>
+                <span className={`px-2 py-0.5 rounded-full text-xs ${
+                  darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {projectsMetrics.length} metrics
+                </span>
+              </div>
+              {showInfoTooltips && (
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <Info size={12} />
+                  <span>Hover over help icons for explanations</span>
+                </div>
+              )}
+            </div>
+            <div className={`p-4 grid gap-3 ${
+              cardSize === 'compact' 
+                ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-6' 
+                : cardSize === 'large'
+                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
+            }`}>
+              {projectsMetrics.map((metric) => (
+                <MetricCard key={metric.id} metric={metric} isMain={metric.id === 'total-projects'} size={cardSize} />
+              ))}
+            </div>
+          </div>
 
-      {/* Filtered Metrics */}
-      {selectedMetricGroup !== 'all' && (
+          {/* Budget Section */}
+          <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
+            darkMode ? 'border-gray-700' : 'border-gray-100'
+          } overflow-hidden`}>
+            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-green-50 border-green-100'} border-b flex items-center justify-between`}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
+                  <IndianRupee size={16} className="text-white" />
+                </div>
+                <h3 className="font-semibold">Budget</h3>
+                <span className={`px-2 py-0.5 rounded-full text-xs ${
+                  darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {budgetMetrics.length} metrics
+                </span>
+              </div>
+            </div>
+            <div className={`p-4 grid gap-3 ${
+              cardSize === 'compact' 
+                ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-6' 
+                : cardSize === 'large'
+                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+            }`}>
+              {budgetMetrics.map((metric) => (
+                <MetricCard key={metric.id} metric={metric} isMain={metric.id === 'total-budget'} size={cardSize} />
+              ))}
+            </div>
+          </div>
+
+          {/* Progress Section */}
+          <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
+            darkMode ? 'border-gray-700' : 'border-gray-100'
+          } overflow-hidden`}>
+            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-purple-50 border-purple-100'} border-b flex items-center justify-between`}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
+                  <Activity size={16} className="text-white" />
+                </div>
+                <h3 className="font-semibold">Progress</h3>
+                <span className={`px-2 py-0.5 rounded-full text-xs ${
+                  darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {progressMetrics.length} metrics
+                </span>
+              </div>
+            </div>
+            <div className={`p-4 grid gap-3 ${
+              cardSize === 'compact' 
+                ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-6' 
+                : cardSize === 'large'
+                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+            }`}>
+              {progressMetrics.map((metric) => (
+                <MetricCard key={metric.id} metric={metric} isMain={metric.id === 'completed'} size={cardSize} />
+              ))}
+            </div>
+          </div>
+
+          {/* Health Section */}
+          <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
+            darkMode ? 'border-gray-700' : 'border-gray-100'
+          } overflow-hidden`}>
+            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-red-50 border-red-100'} border-b flex items-center justify-between`}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center">
+                  <Heart size={16} className="text-white" />
+                </div>
+                <h3 className="font-semibold">Health</h3>
+                <span className={`px-2 py-0.5 rounded-full text-xs ${
+                  darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {healthMetrics.length} metrics
+                </span>
+              </div>
+            </div>
+            <div className={`p-4 grid gap-3 ${
+              cardSize === 'compact' 
+                ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-6' 
+                : cardSize === 'large'
+                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
+            }`}>
+              {healthMetrics.map((metric) => (
+                <MetricCard key={metric.id} metric={metric} isMain={['critical', 'delayed'].includes(metric.id)} size={cardSize} />
+              ))}
+            </div>
+          </div>
+
+          {/* Timeline Section */}
+          <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
+            darkMode ? 'border-gray-700' : 'border-gray-100'
+          } overflow-hidden`}>
+            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-indigo-50 border-indigo-100'} border-b flex items-center justify-between`}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
+                  <CalendarDays size={16} className="text-white" />
+                </div>
+                <h3 className="font-semibold">Timeline</h3>
+                <span className={`px-2 py-0.5 rounded-full text-xs ${
+                  darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {timelineMetrics.length} metrics
+                </span>
+              </div>
+            </div>
+            <div className={`p-4 grid gap-3 ${
+              cardSize === 'compact' 
+                ? 'grid-cols-3' 
+                : cardSize === 'large'
+                ? 'grid-cols-1'
+                : 'grid-cols-1 md:grid-cols-3'
+            }`}>
+              {timelineMetrics.map((metric) => (
+                <MetricCard key={metric.id} metric={metric} isMain={true} size={cardSize} />
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        // Show single section
         <div className={`grid gap-4 ${
           cardSize === 'compact' 
             ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-6' 
             : cardSize === 'large'
             ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-            : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
+            : selectedMetricGroup === 'timeline'
+            ? 'grid-cols-1 md:grid-cols-3'
+            : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
         }`}>
           {metricGroups[selectedMetricGroup].map((metric) => (
-            <MetricCard key={metric.id} metric={metric} isMain={false} size={cardSize} />
+            <MetricCard 
+              key={metric.id} 
+              metric={metric} 
+              isMain={
+                ['total-projects', 'total-budget', 'critical', 'completed', 'delayed'].includes(metric.id)
+              } 
+              size={cardSize} 
+            />
           ))}
         </div>
       )}
 
-      {/* Additional Metrics - Expandable */}
-      {expandedView && selectedMetricGroup === 'all' && (
-        <div className={`transition-all duration-500 ${
-          expandedView ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'
-        }`}>
-          <div className={`grid gap-3 ${
-            cardSize === 'compact' 
-              ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-6' 
-              : cardSize === 'large'
-              ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-              : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
-          }`}>
-            {additionalMetrics.map((metric) => (
-              <MetricCard key={metric.id} metric={metric} isMain={false} size={cardSize} />
-            ))}
+      {/* Info Banner when tooltips are enabled */}
+      {showInfoTooltips && (
+        <div className={`p-3 rounded-xl flex items-start gap-3 ${
+          darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'
+        } border`}>
+          <Info size={14} className="text-blue-500 mt-0.5 flex-shrink-0" />
+          <div className="text-xs">
+            <p className="font-semibold text-blue-700 dark:text-blue-400 mb-1">
+              Understanding the Metrics
+            </p>
+            <p className={darkMode ? 'text-gray-300' : 'text-gray-600'}>
+              Click on the help icon (?) on each metric card to understand what that metric means in simple terms. 
+              These explanations will help you better interpret the dashboard data and make informed decisions.
+            </p>
           </div>
         </div>
       )}
 
       {/* Summary Stats Bar */}
-      {selectedMetricGroup === 'all' && (
-        <div className={`flex flex-wrap items-center justify-center gap-4 p-3 rounded-xl ${
-          darkMode ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50 border-gray-100'
-        } text-xs border`}>
-          <div className="flex items-center gap-2">
-            <Info size={14} className="text-blue-500" />
-            <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
-              Last Updated: {new Date().toLocaleTimeString()}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Heart size={14} className="text-red-500" />
-            <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
-              System Health: {safeNumber(enhancedMetrics?.avgHealthScore, 0).toFixed(0)}/100
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <AlertCircle size={14} className="text-orange-500" />
-            <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
-              Alerts: {((enhancedMetrics?.critical || 0) + ((enhancedMetrics?.delayed || 0) > 30 ? 1 : 0))}
-            </span>
+      <div className={`flex flex-wrap items-center justify-center gap-4 p-3 rounded-xl ${
+        darkMode ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50 border-gray-100'
+      } text-xs border`}>
+        <div className="flex items-center gap-2">
+          <Info size={14} className="text-blue-500" />
+          <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+            Last Updated: {new Date().toLocaleTimeString()}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Heart size={14} className="text-red-500" />
+          <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+            System Health: {safeNumber(displayMetrics.avgHealthScore || 0, 0).toFixed(0)}/100
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <AlertCircle size={14} className="text-orange-500" />
+          <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+            Alerts: {(displayMetrics.critical || 0) + (displayMetrics.overdue || 0)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Shield size={14} className="text-purple-500" />
+          <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+            Risk: C:{displayMetrics.critical || 0} H:{displayMetrics.highRisk || 0} M:{displayMetrics.mediumRisk || 0} L:{displayMetrics.lowRisk || 0}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Users size={14} className="text-green-500" />
+          <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+            Organizations: {displayMetrics.activeAgencies || 0} agencies, {displayMetrics.totalContractors || 0} contractors
+          </span>
+        </div>
+      </div>
+
+      {/* Metric Explanations Guide */}
+      {expandedView && (
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm border ${
+          darkMode ? 'border-gray-700' : 'border-gray-100'
+        } p-6`}>
+          <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+            <HelpCircle size={20} className="text-blue-500" />
+            Metrics Guide for Decision Makers
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div>
+              <h4 className="font-semibold text-sm mb-2 text-blue-600 dark:text-blue-400">Critical Metrics</h4>
+              <ul className="space-y-2 text-xs">
+                <li className="flex items-start gap-2">
+                  <AlertTriangle size={12} className="text-red-500 mt-0.5" />
+                  <div>
+                    <span className="font-medium">Critical Projects:</span>
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Projects needing immediate attention to avoid failure</span>
+                  </div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Clock size={12} className="text-yellow-500 mt-0.5" />
+                  <div>
+                    <span className="font-medium">Delayed Projects:</span>
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Behind schedule, may incur penalties</span>
+                  </div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <IndianRupee size={12} className="text-green-500 mt-0.5" />
+                  <div>
+                    <span className="font-medium">Budget Utilization:</span>
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> How much allocated money has been spent</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold text-sm mb-2 text-green-600 dark:text-green-400">Performance Indicators</h4>
+              <ul className="space-y-2 text-xs">
+                <li className="flex items-start gap-2">
+                  <Gauge size={12} className="text-green-500 mt-0.5" />
+                  <div>
+                    <span className="font-medium">Perfect Pace:</span>
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Projects proceeding exactly as planned</span>
+                  </div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Target size={12} className="text-blue-500 mt-0.5" />
+                  <div>
+                    <span className="font-medium">Efficiency Score:</span>
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Progress achieved per rupee spent</span>
+                  </div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle size={12} className="text-green-500 mt-0.5" />
+                  <div>
+                    <span className="font-medium">Completion Rate:</span>
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Percentage of projects successfully finished</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold text-sm mb-2 text-purple-600 dark:text-purple-400">Early Warning Signs</h4>
+              <ul className="space-y-2 text-xs">
+                <li className="flex items-start gap-2">
+                  <PauseCircle size={12} className="text-red-500 mt-0.5" />
+                  <div>
+                    <span className="font-medium">Sleep Pace:</span>
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Projects barely moving, need intervention</span>
+                  </div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CreditCard size={12} className="text-amber-500 mt-0.5" />
+                  <div>
+                    <span className="font-medium">Payment Pending:</span>
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Work done but contractors not paid</span>
+                  </div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <AlertCircle size={12} className="text-orange-500 mt-0.5" />
+                  <div>
+                    <span className="font-medium">Overdue:</span>
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Delayed beyond acceptable limits (>90 days)</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Drill-down Modal */}
+      <DrillDownModal />
     </div>
   );
 };

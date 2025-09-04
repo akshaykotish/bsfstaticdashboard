@@ -4,7 +4,11 @@ import {
   Search, Calendar, DollarSign, TrendingUp, AlertTriangle,
   Filter, X, ChevronDown, ChevronUp, Sliders, RotateCcw,
   Building2, Users, MapPin, Clock, Package, Target,
-  Check, ChevronRight, Sparkles, Zap, Info, RefreshCw
+  Check, ChevronRight, Sparkles, Zap, Info, RefreshCw,
+  FileText, Briefcase, Globe, Navigation, Link2, GitBranch,
+  CalendarDays, CalendarClock, CalendarCheck, CalendarX,
+  Activity, Heart, Gauge, PauseCircle, CreditCard, AlertCircle,
+  PlayCircle, Award, Timer, Layers
 } from 'lucide-react';
 
 // Portal component for dropdown
@@ -24,7 +28,7 @@ const DropdownPortal = ({ children }) => {
   );
 };
 
-// Multi-select dropdown component with Portal
+// Multi-select dropdown component with Portal and cascading support
 const MultiSelect = ({ 
   options = [], 
   value = [], 
@@ -32,7 +36,13 @@ const MultiSelect = ({
   placeholder = 'Select...', 
   darkMode = false,
   icon: Icon,
-  maxHeight = '300px'
+  maxHeight = '300px',
+  enableSearch = true,
+  disabled = false,
+  showCounts = false,
+  totalCount = 0,
+  isFiltered = false,
+  customLabels = {}
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,11 +83,12 @@ const MultiSelect = ({
   }, [isOpen]);
 
   const filteredOptions = useMemo(() => {
-    if (!searchTerm) return options;
-    return options.filter(opt => 
-      opt.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [options, searchTerm]);
+    if (!searchTerm || !enableSearch) return options;
+    return options.filter(opt => {
+      const label = customLabels[opt] || opt;
+      return label.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+  }, [options, searchTerm, enableSearch, customLabels]);
 
   const toggleOption = (option) => {
     if (value.includes(option)) {
@@ -98,34 +109,54 @@ const MultiSelect = ({
   const getDisplayText = () => {
     if (value.length === 0) return placeholder;
     if (value.length === options.length) return 'All Selected';
-    if (value.length === 1) return value[0];
+    if (value.length === 1) {
+      return customLabels[value[0]] || value[0];
+    }
     return `${value.length} Selected`;
+  };
+
+  const getOptionLabel = (option) => {
+    return customLabels[option] || option;
   };
 
   return (
     <>
       <button
         ref={buttonRef}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
         className={`w-full px-3 py-2 border rounded-lg flex items-center justify-between transition-all text-sm ${
-          darkMode 
-            ? 'bg-gray-700 border-gray-600 text-gray-100 hover:bg-gray-600' 
-            : 'bg-white border-gray-200 text-gray-700 hover:border-blue-400 hover:bg-gray-50'
-        } ${isOpen ? 'ring-2 ring-blue-400 border-blue-400' : ''}`}
+          disabled
+            ? darkMode 
+              ? 'bg-gray-800 border-gray-700 text-gray-500 cursor-not-allowed' 
+              : 'bg-gray-50 border-gray-300 text-gray-400 cursor-not-allowed'
+            : darkMode 
+              ? 'bg-gray-700 border-gray-600 text-gray-100 hover:bg-gray-600' 
+              : 'bg-white border-gray-200 text-gray-700 hover:border-blue-400 hover:bg-gray-50'
+        } ${isOpen && !disabled ? 'ring-2 ring-blue-400 border-blue-400' : ''}`}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          {Icon && <Icon size={14} className="text-blue-500 flex-shrink-0" />}
+          {Icon && <Icon size={14} className={disabled ? 'text-gray-400' : 'text-blue-500'} />}
           <span className="text-xs truncate">
             {getDisplayText()}
           </span>
+          {showCounts && isFiltered && totalCount > options.length && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+              darkMode ? 'bg-orange-900/30 text-orange-400' : 'bg-orange-100 text-orange-700'
+            }`}>
+              {options.length}/{totalCount}
+            </span>
+          )}
         </div>
         <ChevronDown 
           size={14} 
-          className={`transition-transform flex-shrink-0 ml-2 text-gray-400 ${isOpen ? 'rotate-180' : ''}`} 
+          className={`transition-transform flex-shrink-0 ml-2 ${
+            disabled ? 'text-gray-400' : 'text-gray-400'
+          } ${isOpen ? 'rotate-180' : ''}`} 
         />
       </button>
 
-      {isOpen && (
+      {isOpen && !disabled && (
         <DropdownPortal>
           <div 
             className="fixed inset-0 z-[9998]"
@@ -144,30 +175,32 @@ const MultiSelect = ({
             }}
           >
             {/* Search */}
-            <div className={`p-2 border-b ${
-              darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
-            } sticky top-0 z-10`}>
-              <div className="relative">
-                <Search size={12} className="absolute left-2 top-2.5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className={`w-full pl-7 pr-2 py-1.5 text-xs rounded ${
-                    darkMode 
-                      ? 'bg-gray-700 text-gray-100 placeholder-gray-400' 
-                      : 'bg-white placeholder-gray-500 border border-gray-200'
-                  } focus:outline-none focus:ring-1 focus:ring-blue-400`}
-                  onClick={(e) => e.stopPropagation()}
-                />
+            {enableSearch && (
+              <div className={`p-2 border-b ${
+                darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
+              } sticky top-0 z-10`}>
+                <div className="relative">
+                  <Search size={12} className="absolute left-2 top-2.5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className={`w-full pl-7 pr-2 py-1.5 text-xs rounded ${
+                      darkMode 
+                        ? 'bg-gray-700 text-gray-100 placeholder-gray-400' 
+                        : 'bg-white placeholder-gray-500 border border-gray-200'
+                    } focus:outline-none focus:ring-1 focus:ring-blue-400`}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Quick Actions */}
             <div className={`flex items-center justify-between px-3 py-1.5 border-b ${
               darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-100 bg-gray-50'
-            } sticky top-[46px] z-10`}>
+            } sticky ${enableSearch ? 'top-[46px]' : 'top-0'} z-10`}>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -181,6 +214,11 @@ const MultiSelect = ({
                 darkMode ? 'text-gray-400' : 'text-gray-500'
               }`}>
                 {value.length}/{options.length}
+                {isFiltered && totalCount > options.length && (
+                  <span className="text-orange-500 ml-1">
+                    (filtered)
+                  </span>
+                )}
               </span>
               <button
                 onClick={(e) => {
@@ -208,7 +246,16 @@ const MultiSelect = ({
                 <div className={`px-3 py-4 text-xs text-center ${
                   darkMode ? 'text-gray-400' : 'text-gray-500'
                 }`}>
-                  No options found
+                  {isFiltered && totalCount > 0 ? (
+                    <div>
+                      <p>No options available with current filters</p>
+                      <p className="text-[10px] mt-1 text-orange-500">
+                        Try adjusting other filters
+                      </p>
+                    </div>
+                  ) : (
+                    'No options found'
+                  )}
                 </div>
               ) : (
                 filteredOptions.map(option => (
@@ -230,8 +277,8 @@ const MultiSelect = ({
                     <span className={`text-xs truncate flex-1 ${
                       darkMode ? 'text-gray-200' : 'text-gray-700'
                     } group-hover:${darkMode ? 'text-gray-100' : 'text-gray-900'}`} 
-                    title={option}>
-                      {option}
+                    title={getOptionLabel(option)}>
+                      {getOptionLabel(option)}
                     </span>
                     {value.includes(option) && (
                       <Check size={12} className="text-blue-500 flex-shrink-0" />
@@ -247,7 +294,123 @@ const MultiSelect = ({
   );
 };
 
-// Enhanced Range Slider component with proper min/max filtering
+// Date Range Picker Component
+const DateRangePicker = ({
+  label,
+  icon: Icon,
+  startDate,
+  endDate,
+  onStartDateChange,
+  onEndDateChange,
+  minDate,
+  maxDate,
+  enabled,
+  onToggle,
+  darkMode,
+  placeholder = "Select date range"
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const getDisplayText = () => {
+    if (!enabled) return placeholder;
+    if (startDate && endDate) {
+      return `${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`;
+    } else if (startDate) {
+      return `After ${new Date(startDate).toLocaleDateString()}`;
+    } else if (endDate) {
+      return `Before ${new Date(endDate).toLocaleDateString()}`;
+    }
+    return 'All dates';
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-semibold flex items-center gap-2 text-gray-700 dark:text-gray-300">
+          {Icon && <Icon size={14} className="text-purple-500" />}
+          {label}
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => onToggle(e.target.checked)}
+            className="ml-2 accent-blue-500"
+          />
+        </label>
+        {enabled && (
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className={`px-2 py-1 text-xs rounded-lg ${
+              darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'
+            } transition-colors`}
+          >
+            {isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
+        )}
+      </div>
+
+      {enabled && (
+        <div className={`p-3 rounded-lg ${
+          darkMode ? 'bg-gray-700' : 'bg-gray-50'
+        } ${isOpen ? '' : 'space-y-2'}`}>
+          {!isOpen ? (
+            <div className="text-xs font-medium text-center py-1">
+              {getDisplayText()}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-gray-500 dark:text-gray-400 mb-1 block">From</label>
+                  <input
+                    type="date"
+                    value={startDate || ''}
+                    onChange={(e) => {
+                      onStartDateChange(e.target.value || null);
+                    }}
+                    min={minDate}
+                    max={maxDate}
+                    className={`w-full px-2 py-1 text-xs rounded border ${
+                      darkMode ? 'bg-gray-600 border-gray-500 text-gray-200' : 'bg-white border-gray-200'
+                    } focus:ring-1 focus:ring-blue-400 focus:outline-none`}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-500 dark:text-gray-400 mb-1 block">To</label>
+                  <input
+                    type="date"
+                    value={endDate || ''}
+                    onChange={(e) => {
+                      onEndDateChange(e.target.value || null);
+                    }}
+                    min={startDate || minDate}
+                    max={maxDate}
+                    className={`w-full px-2 py-1 text-xs rounded border ${
+                      darkMode ? 'bg-gray-600 border-gray-500 text-gray-200' : 'bg-white border-gray-200'
+                    } focus:ring-1 focus:ring-blue-400 focus:outline-none`}
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  onStartDateChange(null);
+                  onEndDateChange(null);
+                }}
+                className={`w-full px-2 py-1 text-xs rounded ${
+                  darkMode ? 'bg-gray-600 hover:bg-gray-500 text-gray-200' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                } transition-colors`}
+              >
+                Clear Dates
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Range Slider component
 const RangeSlider = ({ 
   min = 0, 
   max = 100, 
@@ -273,10 +436,8 @@ const RangeSlider = ({
     const updated = [...localValue];
     
     if (index === 0) {
-      // Min slider
       updated[0] = Math.min(numValue, updated[1]);
     } else {
-      // Max slider
       updated[1] = Math.max(numValue, updated[0]);
     }
     
@@ -388,7 +549,6 @@ const RangeSlider = ({
           />
         </div>
         
-        {/* Min slider */}
         <input
           type="range"
           min={min}
@@ -407,7 +567,6 @@ const RangeSlider = ({
           }}
         />
         
-        {/* Max slider */}
         <input
           type="range"
           min={min}
@@ -462,13 +621,18 @@ const RangeSlider = ({
   );
 };
 
+// Main FilterPanel Component
 const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
   const [expandedSections, setExpandedSections] = useState({
     basic: true,
-    advanced: false,
-    sliders: false
+    sliders: false,
+    dates: false
   });
 
+  const [selectedSchemes, setSelectedSchemes] = useState([]);
+  const [showRelatedInfo, setShowRelatedInfo] = useState(false);
+
+  // Filter presets
   const [filterPresets] = useState([
     { 
       name: 'Critical Projects', 
@@ -478,6 +642,55 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
         progressRange: [0, 100],
         amountRange: [0, Infinity],
         delayRange: [0, 365]
+      } 
+    },
+    { 
+      name: 'Perfect Pace Projects', 
+      icon: Zap, 
+      filters: { 
+        healthStatuses: ['PERFECT_PACE']
+      } 
+    },
+    { 
+      name: 'Sleep Pace Projects', 
+      icon: PauseCircle, 
+      filters: { 
+        healthStatuses: ['SLEEP_PACE']
+      } 
+    },
+    { 
+      name: 'Payment Pending', 
+      icon: CreditCard, 
+      filters: { 
+        healthStatuses: ['PAYMENT_PENDING']
+      } 
+    },
+    { 
+      name: 'Not Yet Started', 
+      icon: PlayCircle, 
+      filters: { 
+        progressCategories: ['AWARDED_NOT_STARTED', 'NOT_STARTED']
+      } 
+    },
+    { 
+      name: 'Halfway Complete', 
+      icon: Activity, 
+      filters: { 
+        progressCategories: ['PROGRESS_51_TO_71']
+      } 
+    },
+    { 
+      name: 'Nearly Done', 
+      icon: Target, 
+      filters: { 
+        progressCategories: ['PROGRESS_71_TO_99']
+      } 
+    },
+    { 
+      name: 'Tendered Not Awarded', 
+      icon: FileText, 
+      filters: { 
+        progressCategories: ['TENDERED_NOT_AWARDED']
       } 
     },
     { 
@@ -497,24 +710,6 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
         progressRange: [0, 100],
         delayRange: [0, 365]
       } 
-    },
-    { 
-      name: 'Near Completion', 
-      icon: Target, 
-      filters: { 
-        progressRange: [75, 100],
-        amountRange: [0, Infinity],
-        delayRange: [0, 365]
-      } 
-    },
-    { 
-      name: 'Stalled Projects', 
-      icon: Package, 
-      filters: { 
-        progressRange: [1, 25], 
-        delayRange: [30, 365],
-        amountRange: [0, Infinity]
-      } 
     }
   ]);
 
@@ -528,6 +723,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
   const applyPreset = (preset) => {
     // Reset all filters first
     filters.resetFilters();
+    setSelectedSchemes([]);
     
     // Apply preset filters
     Object.entries(preset.filters).forEach(([key, value]) => {
@@ -535,13 +731,17 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
         case 'riskLevels':
           filters.setSelectedRiskLevels(value);
           break;
+        case 'healthStatuses':
+          filters.setSelectedHealthStatuses(value);
+          break;
+        case 'progressCategories':
+          filters.setSelectedProgressCategories(value);
+          break;
         case 'delayRange':
-          // Ensure max doesn't exceed data max
           const maxDelay = Math.max(...(rawData.map(d => d.delay_days || 0)), 365);
           filters.setDelayRange([value[0], Math.min(value[1], maxDelay)]);
           break;
         case 'amountRange':
-          // Ensure max doesn't exceed data max
           const maxAmount = Math.max(...(rawData.map(d => d.sanctioned_amount || 0)), 100000);
           filters.setAmountRange([value[0], value[1] === Infinity ? maxAmount : Math.min(value[1], maxAmount)]);
           break;
@@ -554,34 +754,99 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
     });
   };
 
+  // Custom labels for user-friendly display
+  const progressCategoryLabels = {
+    'TENDER_PROGRESS': 'Tender in Progress',
+    'TENDERED_NOT_AWARDED': 'Tendered (Not Awarded)',
+    'AWARDED_NOT_STARTED': 'Awarded (Not Started)',
+    'NOT_STARTED': 'Not Started',
+    'PROGRESS_1_TO_50': '1-50% Complete',
+    'PROGRESS_51_TO_71': '51-71% Complete',
+    'PROGRESS_71_TO_99': '71-99% Complete',
+    'COMPLETED': '100% Completed'
+  };
+
+  const healthStatusLabels = {
+    'PERFECT_PACE': 'Perfect Pace',
+    'SLOW_PACE': 'Slow Pace',
+    'BAD_PACE': 'Bad Pace',
+    'SLEEP_PACE': 'Sleep Pace',
+    'PAYMENT_PENDING': 'Payment Pending',
+    'NOT_APPLICABLE': 'Not Applicable'
+  };
+
+  const statusLabels = {
+    'NOT_STARTED': 'Not Started',
+    'INITIAL': 'Initial Stage',
+    'IN_PROGRESS': 'In Progress',
+    'ADVANCED': 'Advanced',
+    'NEAR_COMPLETION': 'Near Completion',
+    'COMPLETED': 'Completed',
+    'TENDER_PROGRESS': 'Tender Progress',
+    'TENDERED': 'Tendered',
+    'UNKNOWN': 'Unknown'
+  };
+
+  const riskLevelLabels = {
+    'CRITICAL': 'Critical Risk',
+    'HIGH': 'High Risk',
+    'MEDIUM': 'Medium Risk',
+    'LOW': 'Low Risk'
+  };
+
   const uniqueValues = useMemo(() => {
+    return filters.availableOptions || {
+      statuses: [],
+      riskLevels: [],
+      budgetHeads: [],
+      agencies: [],
+      frontierHQs: [],
+      sectorHQs: [],
+      contractors: [],
+      locations: [],
+      schemes: [],
+      progressCategories: [],
+      healthStatuses: []
+    };
+  }, [filters.availableOptions]);
+
+  const allOptions = useMemo(() => {
     if (!rawData || rawData.length === 0) {
       return {
         statuses: [],
         riskLevels: [],
         budgetHeads: [],
         agencies: [],
-        frontiers: [],
+        frontierHQs: [],
+        sectorHQs: [],
         contractors: [],
-        locations: []
+        locations: [],
+        schemes: [],
+        progressCategories: [],
+        healthStatuses: []
       };
     }
 
     return {
-      statuses: ['NOT_STARTED', 'INITIAL', 'IN_PROGRESS', 'ADVANCED', 'NEAR_COMPLETION', 'COMPLETED'],
+      statuses: ['NOT_STARTED', 'INITIAL', 'IN_PROGRESS', 'ADVANCED', 'NEAR_COMPLETION', 'COMPLETED', 'TENDER_PROGRESS', 'TENDERED', 'UNKNOWN'],
       riskLevels: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'],
       budgetHeads: [...new Set(rawData.map(d => d.budget_head))].filter(Boolean).sort(),
       agencies: [...new Set(rawData.map(d => d.executive_agency))].filter(Boolean).sort(),
-      frontiers: [...new Set([
-        ...rawData.map(d => d.ftr_hq),
-        ...rawData.map(d => d.shq)
-      ])].filter(Boolean).sort(),
+      frontierHQs: [...new Set(rawData.map(d => d.ftr_hq))].filter(Boolean).sort(),
+      sectorHQs: [...new Set(rawData.map(d => d.shq))].filter(Boolean).sort(),
       contractors: [...new Set(rawData.map(d => d.firm_name))].filter(Boolean).sort(),
-      locations: [...new Set(rawData.map(d => d.work_site?.split(',')[0]))].filter(Boolean).sort()
+      locations: [...new Set(rawData.map(d => d.work_site?.split(',')[0]))].filter(Boolean).sort(),
+      schemes: [...new Set(rawData.map(d => d.scheme_name))].filter(Boolean).sort(),
+      progressCategories: [
+        'TENDER_PROGRESS', 'TENDERED_NOT_AWARDED', 'AWARDED_NOT_STARTED', 'NOT_STARTED',
+        'PROGRESS_1_TO_50', 'PROGRESS_51_TO_71', 'PROGRESS_71_TO_99', 'COMPLETED'
+      ],
+      healthStatuses: [
+        'PERFECT_PACE', 'SLOW_PACE', 'BAD_PACE', 'SLEEP_PACE', 'PAYMENT_PENDING', 'NOT_APPLICABLE'
+      ]
     };
   }, [rawData]);
 
-  // Calculate actual data ranges
   const dataRanges = useMemo(() => {
     if (!rawData || rawData.length === 0) {
       return {
@@ -594,7 +859,9 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
         efficiencyMin: 0,
         efficiencyMax: 100,
         healthMin: 0,
-        healthMax: 100
+        healthMax: 100,
+        expectedProgressMin: 0,
+        expectedProgressMax: 100
       };
     }
 
@@ -603,6 +870,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
     const progress = rawData.map(d => d.physical_progress || 0);
     const efficiency = rawData.map(d => d.efficiency_score || 0);
     const health = rawData.map(d => d.health_score || 0);
+    const expectedProgress = rawData.map(d => d.expected_progress || 0);
 
     return {
       amountMin: Math.min(...amounts),
@@ -614,9 +882,17 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
       efficiencyMin: 0,
       efficiencyMax: 100,
       healthMin: Math.min(...health, 0),
-      healthMax: Math.max(...health, 100)
+      healthMax: Math.max(...health, 100),
+      expectedProgressMin: 0,
+      expectedProgressMax: 100
     };
   }, [rawData]);
+
+  useEffect(() => {
+    if (filters.setSelectedSchemes) {
+      filters.setSelectedSchemes(selectedSchemes);
+    }
+  }, [selectedSchemes, filters]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -625,9 +901,13 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
     if (filters.selectedRiskLevels?.length > 0) count++;
     if (filters.selectedBudgetHeads?.length > 0) count++;
     if (filters.selectedAgencies?.length > 0) count++;
-    if (filters.selectedFrontiers?.length > 0) count++;
+    if (filters.selectedFrontierHQs?.length > 0) count++;
+    if (filters.selectedSectorHQs?.length > 0) count++;
     if (filters.selectedContractors?.length > 0) count++;
     if (filters.selectedLocations?.length > 0) count++;
+    if (filters.selectedProgressCategories?.length > 0) count++;
+    if (filters.selectedHealthStatuses?.length > 0) count++;
+    if (selectedSchemes.length > 0) count++;
     
     // Check if ranges are modified from defaults
     if (filters.progressRange && (filters.progressRange[0] > 0 || filters.progressRange[1] < 100)) count++;
@@ -635,9 +915,34 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
     if (filters.delayRange && (filters.delayRange[0] > 0 || filters.delayRange[1] < dataRanges.delayMax)) count++;
     if (filters.efficiencyRange && (filters.efficiencyRange[0] > 0 || filters.efficiencyRange[1] < 100)) count++;
     if (filters.healthRange && (filters.healthRange[0] > dataRanges.healthMin || filters.healthRange[1] < dataRanges.healthMax)) count++;
+    if (filters.expectedProgressRange && (filters.expectedProgressRange[0] > 0 || filters.expectedProgressRange[1] < 100)) count++;
+    
+    // Count active date filters
+    if (filters.dateFilters) {
+      Object.values(filters.dateFilters).forEach(filter => {
+        if (filter && filter.enabled === true) count++;
+      });
+    }
     
     return count;
-  }, [filters, dataRanges]);
+  }, [filters, dataRanges, selectedSchemes]);
+
+  const handleResetAll = () => {
+    filters.resetFilters();
+    setSelectedSchemes([]);
+  };
+
+  const isCascaded = useMemo(() => {
+    return (
+      uniqueValues.budgetHeads?.length < allOptions.budgetHeads?.length ||
+      uniqueValues.agencies?.length < allOptions.agencies?.length ||
+      uniqueValues.frontierHQs?.length < allOptions.frontierHQs?.length ||
+      uniqueValues.sectorHQs?.length < allOptions.sectorHQs?.length ||
+      uniqueValues.contractors?.length < allOptions.contractors?.length ||
+      uniqueValues.locations?.length < allOptions.locations?.length ||
+      uniqueValues.schemes?.length < allOptions.schemes?.length
+    );
+  }, [uniqueValues, allOptions]);
 
   return (
     <div className={`${
@@ -665,9 +970,26 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
               {activeFilterCount} active
             </span>
           )}
+          {isCascaded && (
+            <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded-full text-xs font-semibold flex items-center gap-1">
+              <Link2 size={10} />
+              Linked
+            </span>
+          )}
         </div>
         
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowRelatedInfo(!showRelatedInfo)}
+            className={`px-2 py-1 rounded-lg text-xs flex items-center gap-1 ${
+              darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+            } transition-all`}
+            title="Show filter relationships"
+          >
+            <GitBranch size={12} />
+            {showRelatedInfo ? 'Hide' : 'Show'} Links
+          </button>
+          
           <div className="relative group">
             <button className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 ${
               darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
@@ -696,7 +1018,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
           </div>
           
           <button
-            onClick={filters.resetFilters}
+            onClick={handleResetAll}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 ${
               darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
             } transition-all`}
@@ -707,13 +1029,38 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
         </div>
       </div>
 
+      {/* Filter Relationships Info */}
+      {showRelatedInfo && isCascaded && (
+        <div className={`px-4 py-3 ${
+          darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'
+        } border-b`}>
+          <div className="flex items-start gap-2">
+            <Info size={14} className="text-blue-500 mt-0.5 flex-shrink-0" />
+            <div className="text-xs space-y-1">
+              <p className="font-semibold text-blue-700 dark:text-blue-400">
+                Smart Filtering Active
+              </p>
+              <p className={darkMode ? 'text-gray-300' : 'text-gray-600'}>
+                Options are automatically filtered based on your selections. When you select a Frontier HQ, 
+                only related Sector HQs and Locations will be shown. This helps you quickly find relevant projects.
+              </p>
+              {filters.selectedFrontierHQs?.length > 0 && (
+                <p className="text-blue-600 dark:text-blue-400">
+                  Currently showing options related to: {filters.selectedFrontierHQs.join(', ')}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search Bar */}
       <div className="p-4 border-b border-gray-100 dark:border-gray-700">
         <div className="relative">
           <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search projects by name, location, agency, or contractor..."
+            placeholder="Search projects by name, location, agency, contractor, frontier HQ, or sector HQ..."
             value={filters.searchTerm}
             onChange={(e) => filters.setSearchTerm(e.target.value)}
             className={`w-full pl-9 pr-4 py-2 text-sm rounded-lg border ${
@@ -733,7 +1080,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
         </div>
       </div>
 
-      {/* Basic Filters Section */}
+      {/* Category Filters Section (MERGED) */}
       <div className="border-b border-gray-100 dark:border-gray-700">
         <button
           onClick={() => toggleSection('basic')}
@@ -744,6 +1091,16 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
           <span className="text-sm font-semibold flex items-center gap-2 text-gray-900 dark:text-gray-100">
             <Sliders size={14} className="text-blue-500" />
             Category Filters
+            {isCascaded && (
+              <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded">
+                Smart
+              </span>
+            )}
+            {(filters.selectedProgressCategories?.length > 0 || filters.selectedHealthStatuses?.length > 0) && (
+              <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
+                Active
+              </span>
+            )}
           </span>
           {expandedSections.basic ? 
             <ChevronUp size={16} className="text-gray-400" /> : 
@@ -753,22 +1110,33 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
         
         {expandedSections.basic && (
           <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 relative bg-gray-50/50 dark:bg-gray-900/20">
+            
+            {/* Physical Progress Category */}
             <MultiSelect
-              options={uniqueValues.statuses}
-              value={filters.selectedStatuses || []}
-              onChange={filters.setSelectedStatuses}
-              placeholder="All Statuses"
+              options={uniqueValues.progressCategories}
+              value={filters.selectedProgressCategories || []}
+              onChange={filters.setSelectedProgressCategories}
+              placeholder="Physical Progress"
               darkMode={darkMode}
-              icon={Package}
+              icon={Activity}
+              customLabels={progressCategoryLabels}
+              showCounts={true}
+              totalCount={allOptions.progressCategories?.length || 0}
+              isFiltered={uniqueValues.progressCategories?.length < allOptions.progressCategories?.length}
             />
-
+            
+            {/* Health Status (Pace) */}
             <MultiSelect
-              options={uniqueValues.riskLevels}
-              value={filters.selectedRiskLevels || []}
-              onChange={filters.setSelectedRiskLevels}
-              placeholder="All Risk Levels"
+              options={uniqueValues.healthStatuses}
+              value={filters.selectedHealthStatuses || []}
+              onChange={filters.setSelectedHealthStatuses}
+              placeholder="Project Health"
               darkMode={darkMode}
-              icon={AlertTriangle}
+              icon={Heart}
+              customLabels={healthStatusLabels}
+              showCounts={true}
+              totalCount={allOptions.healthStatuses?.length || 0}
+              isFiltered={uniqueValues.healthStatuses?.length < allOptions.healthStatuses?.length}
             />
 
             <MultiSelect
@@ -778,6 +1146,73 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
               placeholder="All Budget Heads"
               darkMode={darkMode}
               icon={DollarSign}
+              showCounts={true}
+              totalCount={allOptions.budgetHeads?.length || 0}
+              isFiltered={uniqueValues.budgetHeads?.length < allOptions.budgetHeads?.length}
+            />
+
+            <MultiSelect
+              options={uniqueValues.frontierHQs}
+              value={filters.selectedFrontierHQs || []}
+              onChange={filters.setSelectedFrontierHQs}
+              placeholder="All Frontier HQs"
+              darkMode={darkMode}
+              icon={Globe}
+              showCounts={true}
+              totalCount={allOptions.frontierHQs?.length || 0}
+              isFiltered={uniqueValues.frontierHQs?.length < allOptions.frontierHQs?.length}
+            />
+
+            <MultiSelect
+              options={uniqueValues.sectorHQs}
+              value={filters.selectedSectorHQs || []}
+              onChange={filters.setSelectedSectorHQs}
+              placeholder={filters.selectedFrontierHQs?.length > 0 ? "Related Sector HQs" : "All Sector HQs"}
+              darkMode={darkMode}
+              icon={Navigation}
+              showCounts={true}
+              totalCount={allOptions.sectorHQs?.length || 0}
+              isFiltered={uniqueValues.sectorHQs?.length < allOptions.sectorHQs?.length}
+              disabled={false}
+            />
+
+            <MultiSelect
+              options={uniqueValues.schemes}
+              value={selectedSchemes}
+              onChange={setSelectedSchemes}
+              placeholder="All Schemes"
+              darkMode={darkMode}
+              icon={Briefcase}
+              enableSearch={true}
+              showCounts={true}
+              totalCount={allOptions.schemes?.length || 0}
+              isFiltered={uniqueValues.schemes?.length < allOptions.schemes?.length}
+            />
+
+            <MultiSelect
+              options={uniqueValues.statuses}
+              value={filters.selectedStatuses || []}
+              onChange={filters.setSelectedStatuses}
+              placeholder="All Statuses"
+              darkMode={darkMode}
+              icon={Package}
+              customLabels={statusLabels}
+              showCounts={true}
+              totalCount={allOptions.statuses?.length || 0}
+              isFiltered={uniqueValues.statuses?.length < allOptions.statuses?.length}
+            />
+
+            <MultiSelect
+              options={uniqueValues.riskLevels}
+              value={filters.selectedRiskLevels || []}
+              onChange={filters.setSelectedRiskLevels}
+              placeholder="All Risk Levels"
+              darkMode={darkMode}
+              icon={AlertTriangle}
+              customLabels={riskLevelLabels}
+              showCounts={true}
+              totalCount={allOptions.riskLevels?.length || 0}
+              isFiltered={uniqueValues.riskLevels?.length < allOptions.riskLevels?.length}
             />
 
             <MultiSelect
@@ -787,15 +1222,9 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
               placeholder="All Agencies"
               darkMode={darkMode}
               icon={Building2}
-            />
-
-            <MultiSelect
-              options={uniqueValues.frontiers}
-              value={filters.selectedFrontiers || []}
-              onChange={filters.setSelectedFrontiers}
-              placeholder="All Frontiers"
-              darkMode={darkMode}
-              icon={MapPin}
+              showCounts={true}
+              totalCount={allOptions.agencies?.length || 0}
+              isFiltered={uniqueValues.agencies?.length < allOptions.agencies?.length}
             />
 
             <MultiSelect
@@ -805,16 +1234,279 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
               placeholder="All Contractors"
               darkMode={darkMode}
               icon={Users}
+              showCounts={true}
+              totalCount={allOptions.contractors?.length || 0}
+              isFiltered={uniqueValues.contractors?.length < allOptions.contractors?.length}
             />
 
             <MultiSelect
               options={uniqueValues.locations}
               value={filters.selectedLocations || []}
               onChange={filters.setSelectedLocations}
-              placeholder="All Locations"
+              placeholder={
+                filters.selectedFrontierHQs?.length > 0 || filters.selectedSectorHQs?.length > 0
+                  ? "Related Locations" 
+                  : "All Locations"
+              }
               darkMode={darkMode}
               icon={MapPin}
+              showCounts={true}
+              totalCount={allOptions.locations?.length || 0}
+              isFiltered={uniqueValues.locations?.length < allOptions.locations?.length}
             />
+          </div>
+        )}
+      </div>
+
+      {/* Date Filters Section */}
+      <div className="border-b border-gray-100 dark:border-gray-700">
+        <button
+          onClick={() => toggleSection('dates')}
+          className={`w-full px-4 py-3 flex justify-between items-center hover:${
+            darkMode ? 'bg-gray-700/50' : 'bg-gray-50'
+          } transition-all`}
+        >
+          <span className="text-sm font-semibold flex items-center gap-2 text-gray-900 dark:text-gray-100">
+            <Calendar size={14} className="text-purple-500" />
+            Date Filters
+            {filters.dateFilters && Object.values(filters.dateFilters).some(f => f.enabled) && (
+              <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded">
+                Active
+              </span>
+            )}
+          </span>
+          {expandedSections.dates ? 
+            <ChevronUp size={16} className="text-gray-400" /> : 
+            <ChevronDown size={16} className="text-gray-400" />
+          }
+        </button>
+        
+        {expandedSections.dates && filters.dateFilters && (
+          <div className="p-4 space-y-4 bg-gray-50/50 dark:bg-gray-900/20">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              
+              <DateRangePicker
+                label="Tender Date"
+                icon={CalendarDays}
+                startDate={filters.dateFilters.tenderDate?.start}
+                endDate={filters.dateFilters.tenderDate?.end}
+                onStartDateChange={(date) => {
+                  const updatedFilter = {
+                    enabled: filters.dateFilters.tenderDate?.enabled || true,
+                    start: date,
+                    end: filters.dateFilters.tenderDate?.end
+                  };
+                  filters.setDateFilter('tenderDate', updatedFilter);
+                }}
+                onEndDateChange={(date) => {
+                  const updatedFilter = {
+                    enabled: filters.dateFilters.tenderDate?.enabled || true,
+                    start: filters.dateFilters.tenderDate?.start,
+                    end: date
+                  };
+                  filters.setDateFilter('tenderDate', updatedFilter);
+                }}
+                minDate={filters.dateStatistics?.tenderDate?.min}
+                maxDate={filters.dateStatistics?.tenderDate?.max}
+                enabled={filters.dateFilters.tenderDate?.enabled || false}
+                onToggle={(enabled) => {
+                  const updatedFilter = {
+                    enabled: enabled,
+                    start: filters.dateFilters.tenderDate?.start || null,
+                    end: filters.dateFilters.tenderDate?.end || null
+                  };
+                  filters.setDateFilter('tenderDate', updatedFilter);
+                }}
+                darkMode={darkMode}
+              />
+
+              <DateRangePicker
+                label="Award Date"
+                icon={CalendarCheck}
+                startDate={filters.dateFilters.awardDate?.start}
+                endDate={filters.dateFilters.awardDate?.end}
+                onStartDateChange={(date) => {
+                  const updatedFilter = {
+                    enabled: filters.dateFilters.awardDate?.enabled || true,
+                    start: date,
+                    end: filters.dateFilters.awardDate?.end
+                  };
+                  filters.setDateFilter('awardDate', updatedFilter);
+                }}
+                onEndDateChange={(date) => {
+                  const updatedFilter = {
+                    enabled: filters.dateFilters.awardDate?.enabled || true,
+                    start: filters.dateFilters.awardDate?.start,
+                    end: date
+                  };
+                  filters.setDateFilter('awardDate', updatedFilter);
+                }}
+                minDate={filters.dateStatistics?.awardDate?.min}
+                maxDate={filters.dateStatistics?.awardDate?.max}
+                enabled={filters.dateFilters.awardDate?.enabled || false}
+                onToggle={(enabled) => {
+                  const updatedFilter = {
+                    enabled: enabled,
+                    start: filters.dateFilters.awardDate?.start || null,
+                    end: filters.dateFilters.awardDate?.end || null
+                  };
+                  filters.setDateFilter('awardDate', updatedFilter);
+                }}
+                darkMode={darkMode}
+              />
+
+              <DateRangePicker
+                label="PDC Agreement"
+                icon={CalendarClock}
+                startDate={filters.dateFilters.pdcDate?.start}
+                endDate={filters.dateFilters.pdcDate?.end}
+                onStartDateChange={(date) => {
+                  const updatedFilter = {
+                    enabled: filters.dateFilters.pdcDate?.enabled || true,
+                    start: date,
+                    end: filters.dateFilters.pdcDate?.end
+                  };
+                  filters.setDateFilter('pdcDate', updatedFilter);
+                }}
+                onEndDateChange={(date) => {
+                  const updatedFilter = {
+                    enabled: filters.dateFilters.pdcDate?.enabled || true,
+                    start: filters.dateFilters.pdcDate?.start,
+                    end: date
+                  };
+                  filters.setDateFilter('pdcDate', updatedFilter);
+                }}
+                minDate={filters.dateStatistics?.pdcDate?.min}
+                maxDate={filters.dateStatistics?.pdcDate?.max}
+                enabled={filters.dateFilters.pdcDate?.enabled || false}
+                onToggle={(enabled) => {
+                  const updatedFilter = {
+                    enabled: enabled,
+                    start: filters.dateFilters.pdcDate?.start || null,
+                    end: filters.dateFilters.pdcDate?.end || null
+                  };
+                  filters.setDateFilter('pdcDate', updatedFilter);
+                }}
+                darkMode={darkMode}
+              />
+
+              <DateRangePicker
+                label="Revised PDC"
+                icon={CalendarClock}
+                startDate={filters.dateFilters.revisedPdcDate?.start}
+                endDate={filters.dateFilters.revisedPdcDate?.end}
+                onStartDateChange={(date) => {
+                  const updatedFilter = {
+                    enabled: filters.dateFilters.revisedPdcDate?.enabled || true,
+                    start: date,
+                    end: filters.dateFilters.revisedPdcDate?.end
+                  };
+                  filters.setDateFilter('revisedPdcDate', updatedFilter);
+                }}
+                onEndDateChange={(date) => {
+                  const updatedFilter = {
+                    enabled: filters.dateFilters.revisedPdcDate?.enabled || true,
+                    start: filters.dateFilters.revisedPdcDate?.start,
+                    end: date
+                  };
+                  filters.setDateFilter('revisedPdcDate', updatedFilter);
+                }}
+                minDate={filters.dateStatistics?.revisedPdcDate?.min}
+                maxDate={filters.dateStatistics?.revisedPdcDate?.max}
+                enabled={filters.dateFilters.revisedPdcDate?.enabled || false}
+                onToggle={(enabled) => {
+                  const updatedFilter = {
+                    enabled: enabled,
+                    start: filters.dateFilters.revisedPdcDate?.start || null,
+                    end: filters.dateFilters.revisedPdcDate?.end || null
+                  };
+                  filters.setDateFilter('revisedPdcDate', updatedFilter);
+                }}
+                darkMode={darkMode}
+              />
+
+              <DateRangePicker
+                label="Completion Date"
+                icon={CalendarCheck}
+                startDate={filters.dateFilters.completionDate?.start}
+                endDate={filters.dateFilters.completionDate?.end}
+                onStartDateChange={(date) => {
+                  const updatedFilter = {
+                    enabled: filters.dateFilters.completionDate?.enabled || true,
+                    start: date,
+                    end: filters.dateFilters.completionDate?.end
+                  };
+                  filters.setDateFilter('completionDate', updatedFilter);
+                }}
+                onEndDateChange={(date) => {
+                  const updatedFilter = {
+                    enabled: filters.dateFilters.completionDate?.enabled || true,
+                    start: filters.dateFilters.completionDate?.start,end: date
+                  };
+                  filters.setDateFilter('completionDate', updatedFilter);
+                }}
+                minDate={filters.dateStatistics?.completionDate?.min}
+                maxDate={filters.dateStatistics?.completionDate?.max}
+                enabled={filters.dateFilters.completionDate?.enabled || false}
+                onToggle={(enabled) => {
+                  const updatedFilter = {
+                    enabled: enabled,
+                    start: filters.dateFilters.completionDate?.start || null,
+                    end: filters.dateFilters.completionDate?.end || null
+                  };
+                  filters.setDateFilter('completionDate', updatedFilter);
+                }}
+                darkMode={darkMode}
+              />
+
+              <DateRangePicker
+                label="Acceptance Date"
+                icon={CalendarDays}
+                startDate={filters.dateFilters.acceptanceDate?.start}
+                endDate={filters.dateFilters.acceptanceDate?.end}
+                onStartDateChange={(date) => {
+                  const updatedFilter = {
+                    enabled: filters.dateFilters.acceptanceDate?.enabled || true,
+                    start: date,
+                    end: filters.dateFilters.acceptanceDate?.end
+                  };
+                  filters.setDateFilter('acceptanceDate', updatedFilter);
+                }}
+                onEndDateChange={(date) => {
+                  const updatedFilter = {
+                    enabled: filters.dateFilters.acceptanceDate?.enabled || true,
+                    start: filters.dateFilters.acceptanceDate?.start,
+                    end: date
+                  };
+                  filters.setDateFilter('acceptanceDate', updatedFilter);
+                }}
+                minDate={filters.dateStatistics?.acceptanceDate?.min}
+                maxDate={filters.dateStatistics?.acceptanceDate?.max}
+                enabled={filters.dateFilters.acceptanceDate?.enabled || false}
+                onToggle={(enabled) => {
+                  const updatedFilter = {
+                    enabled: enabled,
+                    start: filters.dateFilters.acceptanceDate?.start || null,
+                    end: filters.dateFilters.acceptanceDate?.end || null
+                  };
+                  filters.setDateFilter('acceptanceDate', updatedFilter);
+                }}
+                darkMode={darkMode}
+              />
+            </div>
+
+            {/* Clear all dates button */}
+            {Object.values(filters.dateFilters).some(f => f.enabled) && (
+              <button
+                onClick={() => filters.clearAllDateFilters()}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 ${
+                  darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                } transition-all`}
+              >
+                <X size={12} />
+                Clear All Date Filters
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -846,7 +1538,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
                 step={1}
                 value={filters.progressRange || [0, 100]}
                 onChange={filters.setProgressRange}
-                label="Progress Range"
+                label="Physical Progress Range"
                 icon={TrendingUp}
                 color="blue"
                 darkMode={darkMode}
@@ -902,11 +1594,25 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
                 value={filters.healthRange || [dataRanges.healthMin, dataRanges.healthMax]}
                 onChange={filters.setHealthRange}
                 label="Health Score Range"
-                icon={AlertTriangle}
+                icon={Heart}
                 color="purple"
                 darkMode={darkMode}
                 formatValue={(v) => `${v}`}
                 unit=""
+              />
+
+              <RangeSlider
+                min={dataRanges.expectedProgressMin}
+                max={dataRanges.expectedProgressMax}
+                step={1}
+                value={filters.expectedProgressRange || [0, 100]}
+                onChange={filters.setExpectedProgressRange}
+                label="Expected Progress Range"
+                icon={Timer}
+                color="orange"
+                darkMode={darkMode}
+                formatValue={(v) => `${v}%`}
+                unit="%"
               />
             </div>
           </div>
@@ -920,6 +1626,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
         } flex items-center justify-between`}>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold text-gray-500">Active:</span>
+            
             {filters.searchTerm && (
               <span className="px-2 py-0.5 bg-white dark:bg-gray-700 text-xs rounded-full flex items-center gap-1 shadow-sm">
                 <Search size={10} />
@@ -929,39 +1636,125 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
                 </button>
               </span>
             )}
-            {filters.selectedStatuses?.length > 0 && (
-              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded-full">
-                {filters.selectedStatuses.length} Status
+            
+            {/* Physical Progress Categories */}
+            {filters.selectedProgressCategories?.length > 0 && (
+              <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-xs rounded-full">
+                {filters.selectedProgressCategories.length} Progress Stage{filters.selectedProgressCategories.length > 1 ? 's' : ''}
               </span>
             )}
+            
+            {/* Health Statuses */}
+            {filters.selectedHealthStatuses?.length > 0 && (
+              <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded-full">
+                {filters.selectedHealthStatuses.length} Health Status{filters.selectedHealthStatuses.length > 1 ? 'es' : ''}
+              </span>
+            )}
+            
+            {/* Date filter badges */}
+            {filters.dateFilters && Object.entries(filters.dateFilters).map(([key, filter]) => {
+              if (!filter.enabled) return null;
+              const label = key.replace(/([A-Z])/g, ' $1').trim();
+              return (
+                <span key={key} className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded-full">
+                  {label}
+                </span>
+              );
+            })}
+            
+            {selectedSchemes.length > 0 && (
+              <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-xs rounded-full">
+                {selectedSchemes.length} Scheme{selectedSchemes.length > 1 ? 's' : ''}
+              </span>
+            )}
+            
+            {filters.selectedBudgetHeads?.length > 0 && (
+              <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full">
+                {filters.selectedBudgetHeads.length} Budget Head{filters.selectedBudgetHeads.length > 1 ? 's' : ''}
+              </span>
+            )}
+            
+            {filters.selectedFrontierHQs?.length > 0 && (
+              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded-full">
+                {filters.selectedFrontierHQs.length} Frontier HQ{filters.selectedFrontierHQs.length > 1 ? 's' : ''}
+              </span>
+            )}
+            
+            {filters.selectedSectorHQs?.length > 0 && (
+              <span className="px-2 py-0.5 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 text-xs rounded-full">
+                {filters.selectedSectorHQs.length} Sector HQ{filters.selectedSectorHQs.length > 1 ? 's' : ''}
+              </span>
+            )}
+            
+            {filters.selectedStatuses?.length > 0 && (
+              <span className="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs rounded-full">
+                {filters.selectedStatuses.length} Status{filters.selectedStatuses.length > 1 ? 'es' : ''}
+              </span>
+            )}
+            
             {filters.selectedRiskLevels?.length > 0 && (
               <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded-full">
-                {filters.selectedRiskLevels.length} Risk
+                {filters.selectedRiskLevels.length} Risk Level{filters.selectedRiskLevels.length > 1 ? 's' : ''}
               </span>
             )}
+            
             {filters.selectedAgencies?.length > 0 && (
-              <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded-full">
-                {filters.selectedAgencies.length} Agency
+              <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-xs rounded-full">
+                {filters.selectedAgencies.length} Agenc{filters.selectedAgencies.length > 1 ? 'ies' : 'y'}
               </span>
             )}
-            {(filters.progressRange && (filters.progressRange[0] > 0 || filters.progressRange[1] < 100)) && (
-              <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full">
+            
+            {filters.selectedContractors?.length > 0 && (
+              <span className="px-2 py-0.5 bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400 text-xs rounded-full">
+                {filters.selectedContractors.length} Contractor{filters.selectedContractors.length > 1 ? 's' : ''}
+              </span>
+            )}
+            
+            {filters.selectedLocations?.length > 0 && (
+              <span className="px-2 py-0.5 bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 text-xs rounded-full">
+                {filters.selectedLocations.length} Location{filters.selectedLocations.length > 1 ? 's' : ''}
+              </span>
+            )}
+            
+            {filters.progressRange && (filters.progressRange[0] > 0 || filters.progressRange[1] < 100) && (
+              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded-full">
                 Progress: {filters.progressRange[0]}-{filters.progressRange[1]}%
               </span>
             )}
-            {(filters.amountRange && (filters.amountRange[0] > dataRanges.amountMin || filters.amountRange[1] < dataRanges.amountMax)) && (
-              <span className="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs rounded-full">
-                Budget filtered
+            
+            {filters.amountRange && (filters.amountRange[0] > dataRanges.amountMin || filters.amountRange[1] < dataRanges.amountMax) && (
+              <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full">
+                Budget: ₹{(filters.amountRange[0]/100).toFixed(0)}-{(filters.amountRange[1]/100).toFixed(0)}L
               </span>
             )}
-            {(filters.delayRange && (filters.delayRange[0] > 0 || filters.delayRange[1] < dataRanges.delayMax)) && (
-              <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-xs rounded-full">
+            
+            {filters.delayRange && (filters.delayRange[0] > 0 || filters.delayRange[1] < dataRanges.delayMax) && (
+              <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded-full">
                 Delay: {filters.delayRange[0]}-{filters.delayRange[1]} days
               </span>
             )}
+            
+            {filters.efficiencyRange && (filters.efficiencyRange[0] > 0 || filters.efficiencyRange[1] < 100) && (
+              <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-xs rounded-full">
+                Efficiency: {filters.efficiencyRange[0]}-{filters.efficiencyRange[1]}%
+              </span>
+            )}
+            
+            {filters.healthRange && (filters.healthRange[0] > dataRanges.healthMin || filters.healthRange[1] < dataRanges.healthMax) && (
+              <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded-full">
+                Health: {filters.healthRange[0]}-{filters.healthRange[1]}
+              </span>
+            )}
+            
+            {filters.expectedProgressRange && (filters.expectedProgressRange[0] > 0 || filters.expectedProgressRange[1] < 100) && (
+              <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-xs rounded-full">
+                Expected: {filters.expectedProgressRange[0]}-{filters.expectedProgressRange[1]}%
+              </span>
+            )}
           </div>
+          
           <button
-            onClick={filters.resetFilters}
+            onClick={handleResetAll}
             className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
           >
             <X size={12} />

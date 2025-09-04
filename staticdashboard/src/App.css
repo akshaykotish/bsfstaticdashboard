@@ -530,3 +530,16 @@
     height: 14px;
   }
 }
+
+.metric-tooltip {
+      position: fixed !important;
+      z-index: 999999 !important;
+      pointer-events: auto !important;
+    }
+    
+.metric-tooltip-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 999998;
+      pointer-events: none;
+    }

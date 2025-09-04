@@ -1,6 +1,176 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 // Helper functions for data processing
+
+// NEW: Calculate expected progress based on time elapsed
+const calculateExpectedProgress = (row) => {
+  // If no date_award, can't calculate expected progress
+  if (!row.date_award || row.date_award === '' || row.date_award === 'N/A') {
+    return 0;
+  }
+
+  try {
+    const awardDate = new Date(row.date_award);
+    if (isNaN(awardDate.getTime())) return 0;
+
+    const today = new Date();
+    
+    // Get PDC date (use revised if available, otherwise original)
+    let pdcDate = null;
+    if (row.revised_pdc && row.revised_pdc !== '' && row.revised_pdc !== 'N/A') {
+      pdcDate = new Date(row.revised_pdc);
+    } else if (row.pdc_agreement && row.pdc_agreement !== '' && row.pdc_agreement !== 'N/A') {
+      pdcDate = new Date(row.pdc_agreement);
+    }
+    
+    // If no PDC date or invalid, use time_allowed_days
+    if (!pdcDate || isNaN(pdcDate.getTime())) {
+      if (row.time_allowed_days && row.time_allowed_days > 0) {
+        pdcDate = new Date(awardDate);
+        pdcDate.setDate(pdcDate.getDate() + parseInt(row.time_allowed_days));
+      } else {
+        // Default to 365 days if no timeline info
+        pdcDate = new Date(awardDate);
+        pdcDate.setFullYear(pdcDate.getFullYear() + 1);
+      }
+    }
+
+    // Calculate total project duration in months
+    const totalDurationMs = pdcDate - awardDate;
+    const totalMonths = totalDurationMs / (1000 * 60 * 60 * 24 * 30.44); // Average days per month
+    
+    // Calculate elapsed time in months
+    const elapsedMs = today - awardDate;
+    const elapsedMonths = elapsedMs / (1000 * 60 * 60 * 24 * 30.44);
+    
+    // If project should be completed by now
+    if (today >= pdcDate) {
+      return 100;
+    }
+    
+    // Calculate expected progress (100% / total months * elapsed months)
+    if (totalMonths > 0) {
+      const monthlyProgress = 100 / totalMonths;
+      const expectedProgress = monthlyProgress * elapsedMonths;
+      return Math.min(100, Math.max(0, expectedProgress));
+    }
+    
+    return 0;
+  } catch (err) {
+    console.warn('Error calculating expected progress:', err);
+    return 0;
+  }
+};
+
+// NEW: Enhanced health calculation based on pace
+const calculateHealthScore = (row) => {
+  const actualProgress = parseFloat(row.physical_progress) || 0;
+  const expectedProgress = calculateExpectedProgress(row);
+  
+  // Special case: Payment Pending (completed but not fully paid)
+  if (actualProgress >= 100 && row.percent_expdr < 100) {
+    return 'PAYMENT_PENDING';
+  }
+  
+  // If project hasn't started yet and no award date
+  if (!row.date_award || row.date_award === '' || row.date_award === 'N/A') {
+    return 'NOT_APPLICABLE';
+  }
+  
+  // Calculate progress difference
+  const progressDiff = actualProgress - expectedProgress;
+  const progressRatio = expectedProgress > 0 ? (actualProgress / expectedProgress) : 0;
+  
+  // Categorize based on pace
+  if (progressRatio >= 0.95) {
+    return 'PERFECT_PACE'; // Within 5% of expected or ahead
+  } else if (progressRatio >= 0.75) {
+    return 'SLOW_PACE'; // 75-95% of expected progress
+  } else if (progressRatio >= 0.50) {
+    return 'BAD_PACE'; // 50-75% of expected progress
+  } else if (actualProgress > 0) {
+    return 'SLEEP_PACE'; // Less than 50% of expected but started
+  } else if (expectedProgress > 10) {
+    return 'SLEEP_PACE'; // Should have started by now but hasn't
+  } else {
+    return 'SLOW_PACE'; // Recently awarded, give some buffer
+  }
+};
+
+// NEW: Convert health status to numeric score for averaging
+const getHealthScoreNumeric = (healthStatus) => {
+  const scores = {
+    'PERFECT_PACE': 100,
+    'SLOW_PACE': 75,
+    'BAD_PACE': 50,
+    'SLEEP_PACE': 25,
+    'PAYMENT_PENDING': 90,
+    'NOT_APPLICABLE': null
+  };
+  return scores[healthStatus] ?? 50;
+};
+
+// NEW: Enhanced physical progress categorization
+const determineProgressStatus = (row) => {
+  const progress = parseFloat(row.physical_progress) || 0;
+  
+  // Check tender and award status first
+  if (!row.date_tender || row.date_tender === '' || row.date_tender === 'N/A') {
+    return 'TENDER_PROGRESS';
+  }
+  
+  if (row.date_tender && (!row.date_award || row.date_award === '' || row.date_award === 'N/A')) {
+    return 'TENDERED_NOT_AWARDED';
+  }
+  
+  if (row.date_award && progress === 0) {
+    return 'AWARDED_NOT_STARTED';
+  }
+  
+  // Progress-based categories
+  if (progress === 0) {
+    return 'NOT_STARTED';
+  } else if (progress > 0 && progress <= 50) {
+    return 'PROGRESS_1_TO_50';
+  } else if (progress > 50 && progress <= 71) {
+    return 'PROGRESS_51_TO_71';
+  } else if (progress > 71 && progress < 100) {
+    return 'PROGRESS_71_TO_99';
+  } else if (progress >= 100) {
+    return 'COMPLETED';
+  }
+  
+  return 'UNKNOWN';
+};
+
+// Enhanced risk calculation based on new health scores
+const calculateRiskLevel = (row) => {
+  const progress = parseFloat(row.physical_progress) || 0;
+  const healthStatus = row.health_status || calculateHealthScore(row);
+  const delay = calculateDelay(row);
+  const efficiency = calculateEfficiency(row);
+  
+  // Critical risk conditions
+  if (healthStatus === 'SLEEP_PACE' && delay > 90) return 'CRITICAL';
+  if (healthStatus === 'BAD_PACE' && delay > 180) return 'CRITICAL';
+  if (progress < 25 && delay > 120) return 'CRITICAL';
+  if (efficiency < 30 && delay > 60) return 'CRITICAL';
+  
+  // High risk conditions
+  if (healthStatus === 'SLEEP_PACE') return 'HIGH';
+  if (healthStatus === 'BAD_PACE' && delay > 90) return 'HIGH';
+  if (delay > 90 || efficiency < 50) return 'HIGH';
+  
+  // Medium risk conditions
+  if (healthStatus === 'BAD_PACE') return 'MEDIUM';
+  if (healthStatus === 'SLOW_PACE' && delay > 30) return 'MEDIUM';
+  if (delay > 30 || efficiency < 70) return 'MEDIUM';
+  
+  // Low risk
+  return 'LOW';
+};
+
+// Keep existing helper functions
 const calculateEfficiency = (row) => {
   const progress = parseFloat(row.physical_progress) || 0;
   const expdr = parseFloat(row.percent_expdr) || 0;
@@ -17,17 +187,6 @@ const calculateDelay = (row) => {
   return Math.max(0, diffDays);
 };
 
-const calculateRiskLevel = (row) => {
-  const progress = parseFloat(row.physical_progress) || 0;
-  const delay = calculateDelay(row);
-  const efficiency = calculateEfficiency(row);
-  
-  if (delay > 180 || (progress < 30 && delay > 90) || efficiency < 30) return 'CRITICAL';
-  if (delay > 90 || (progress < 50 && delay > 30) || efficiency < 50) return 'HIGH';
-  if (delay > 30 || progress < 70 || efficiency < 70) return 'MEDIUM';
-  return 'LOW';
-};
-
 const determinePriority = (row) => {
   const amount = parseFloat(row.sanctioned_amount) || 0;
   const progress = parseFloat(row.physical_progress) || 0;
@@ -38,20 +197,21 @@ const determinePriority = (row) => {
   return 'LOW';
 };
 
-const calculateHealthScore = (row) => {
-  const progress = parseFloat(row.physical_progress) || 0;
-  const efficiency = calculateEfficiency(row);
-  const delayPenalty = Math.min(30, calculateDelay(row) / 6);
-  return Math.max(0, (progress * 0.4 + efficiency * 0.4 - delayPenalty + 20));
-};
-
-const determineStatus = (progress) => {
-  if (progress >= 100) return 'COMPLETED';
-  if (progress > 75) return 'NEAR_COMPLETION';
-  if (progress > 50) return 'ADVANCED';
-  if (progress > 25) return 'IN_PROGRESS';
-  if (progress > 0) return 'INITIAL';
-  return 'NOT_STARTED';
+// Updated determineStatus to use new progress categories
+const determineStatus = (progressStatus) => {
+  const statusMap = {
+    'TENDER_PROGRESS': 'TENDER_PROGRESS',
+    'TENDERED_NOT_AWARDED': 'TENDERED',
+    'AWARDED_NOT_STARTED': 'NOT_STARTED',
+    'NOT_STARTED': 'NOT_STARTED',
+    'PROGRESS_1_TO_50': 'IN_PROGRESS',
+    'PROGRESS_51_TO_71': 'ADVANCED',
+    'PROGRESS_71_TO_99': 'NEAR_COMPLETION',
+    'COMPLETED': 'COMPLETED',
+    'UNKNOWN': 'UNKNOWN'
+  };
+  
+  return statusMap[progressStatus] || 'UNKNOWN';
 };
 
 const calculateQualityScore = (row) => {
@@ -146,14 +306,27 @@ export const useData = () => {
           aa_es_pending_with: safeString(cleanRow.aa_es_pending_with || '')
         };
 
-        // Calculate derived fields
+        // Calculate derived fields with new logic
         processedRow.remaining_amount = processedRow.sanctioned_amount - processedRow.total_expdr;
         processedRow.efficiency_score = calculateEfficiency(processedRow);
         processedRow.delay_days = calculateDelay(processedRow);
+        
+        // NEW: Calculate expected progress
+        processedRow.expected_progress = calculateExpectedProgress(processedRow);
+        
+        // NEW: Calculate health status (pace-based)
+        processedRow.health_status = calculateHealthScore(processedRow);
+        processedRow.health_score = getHealthScoreNumeric(processedRow.health_status);
+        
+        // NEW: Determine progress status
+        processedRow.progress_category = determineProgressStatus(processedRow);
+        
+        // Calculate risk with new health logic
         processedRow.risk_level = calculateRiskLevel(processedRow);
         processedRow.priority = determinePriority(processedRow);
-        processedRow.health_score = calculateHealthScore(processedRow);
-        processedRow.status = determineStatus(processedRow.physical_progress);
+        
+        // Map progress category to status for compatibility
+        processedRow.status = determineStatus(processedRow.progress_category);
         
         processedRow.budget_variance = processedRow.sanctioned_amount > 0 
           ? ((processedRow.total_expdr - processedRow.sanctioned_amount) / processedRow.sanctioned_amount * 100).toFixed(2)
@@ -234,6 +407,13 @@ export const useData = () => {
       const processedData = processData(result.data);
       console.log(`Processed ${processedData.length} records`);
       
+      // Log health status distribution for debugging
+      const healthDistribution = processedData.reduce((acc, item) => {
+        acc[item.health_status] = (acc[item.health_status] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('Health Status Distribution:', healthDistribution);
+      
       // Calculate data statistics
       const stats = {
         totalRecords: processedData.length,
@@ -251,7 +431,8 @@ export const useData = () => {
           latest: new Date()
         },
         completenessScore: calculateDataCompleteness(processedData),
-        lastUpdate: new Date()
+        lastUpdate: new Date(),
+        healthDistribution
       };
       
       if (!isMountedRef.current) {
@@ -449,6 +630,44 @@ export const useData = () => {
       return timeline;
     };
     
+    // NEW: Aggregate by health status
+    const aggregateByHealthStatus = (data) => {
+      const healthGroups = {
+        'PERFECT_PACE': { count: 0, projects: [] },
+        'SLOW_PACE': { count: 0, projects: [] },
+        'BAD_PACE': { count: 0, projects: [] },
+        'SLEEP_PACE': { count: 0, projects: [] },
+        'PAYMENT_PENDING': { count: 0, projects: [] },
+        'NOT_APPLICABLE': { count: 0, projects: [] }
+      };
+      
+      data.forEach(item => {
+        const status = item.health_status || 'NOT_APPLICABLE';
+        if (healthGroups[status]) {
+          healthGroups[status].count++;
+          healthGroups[status].projects.push(item.id);
+        }
+      });
+      
+      return healthGroups;
+    };
+    
+    // NEW: Aggregate by progress category
+    const aggregateByProgressCategory = (data) => {
+      const categories = {};
+      
+      data.forEach(item => {
+        const category = item.progress_category || 'UNKNOWN';
+        if (!categories[category]) {
+          categories[category] = { count: 0, projects: [] };
+        }
+        categories[category].count++;
+        categories[category].projects.push(item.id);
+      });
+      
+      return categories;
+    };
+    
     return {
       byAgency: aggregateByField(rawData, 'executive_agency'),
       byBudgetHead: aggregateByField(rawData, 'budget_head'),
@@ -456,7 +675,9 @@ export const useData = () => {
       byStatus: aggregateByField(rawData, 'status'),
       byLocation: aggregateByLocation(rawData),
       byContractor: aggregateByField(rawData, 'firm_name'),
-      timeline: generateTimelineStats(rawData)
+      timeline: generateTimelineStats(rawData),
+      byHealthStatus: aggregateByHealthStatus(rawData),
+      byProgressCategory: aggregateByProgressCategory(rawData)
     };
   }, [rawData]);
 

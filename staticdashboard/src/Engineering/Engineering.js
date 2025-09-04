@@ -7,7 +7,7 @@ import {
   ChevronDown, Eye, Maximize2, Minimize2, Grid3x3,
   Search, Database, BarChart3, Users, MapPin,
   Calendar, Building2, Target, Shield, GitBranch,
-  FileText, Menu, Home, LogOut, HelpCircle
+  FileText, Menu, Home, LogOut, HelpCircle, Link2, Info
 } from 'lucide-react';
 import { useData } from './useData';
 import { useFilters } from './useFilters';
@@ -66,6 +66,9 @@ const Engineering = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
+  
+  // NEW: State for showing filter relationships
+  const [showFilterInfo, setShowFilterInfo] = useState(false);
 
   // Custom hooks for data and filters
   const { rawData, loading, error, refetch, lastUpdate, dataStats } = useData();
@@ -96,6 +99,22 @@ const Engineering = () => {
 
   // Get filtered data from filters
   const filteredData = filters.filteredData || [];
+
+  // NEW: Get filter relationships for display
+  const filterRelationships = useMemo(() => {
+    if (!filters.getRelatedMappings) return null;
+    return filters.getRelatedMappings();
+  }, [filters]);
+
+  // NEW: Check if cascading is active
+  const isCascadingActive = useMemo(() => {
+    return (
+      filters.selectedFrontierHQs?.length > 0 ||
+      filters.selectedSectorHQs?.length > 0 ||
+      filters.selectedAgencies?.length > 0 ||
+      filters.selectedBudgetHeads?.length > 0
+    );
+  }, [filters.selectedFrontierHQs, filters.selectedSectorHQs, filters.selectedAgencies, filters.selectedBudgetHeads]);
 
   // Calculate metrics with proper amount handling and organization counts
   const metrics = useMemo(() => {
@@ -853,6 +872,78 @@ const Engineering = () => {
     </div>
   );
 
+  // NEW: Filter Info Panel Component
+  const FilterInfoPanel = () => {
+    if (!showFilterInfo || !isCascadingActive) return null;
+
+    return (
+      <div className={`fixed bottom-20 left-4 z-30 max-w-sm ${
+        darkMode ? 'bg-gray-800' : 'bg-white'
+      } rounded-xl shadow-2xl p-4 border ${
+        darkMode ? 'border-gray-700' : 'border-blue-200'
+      }`}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold flex items-center gap-2">
+            <Link2 size={14} className="text-blue-500" />
+            Filter Relationships
+          </h3>
+          <button
+            onClick={() => setShowFilterInfo(false)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X size={14} />
+          </button>
+        </div>
+        
+        <div className="space-y-2 text-xs">
+          {filters.selectedFrontierHQs?.length > 0 && (
+            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+              <p className="font-semibold text-blue-700 dark:text-blue-400">
+                Frontier: {filters.selectedFrontierHQs.join(', ')}
+              </p>
+              {filterRelationships?.frontierToSectors && (
+                <p className="text-gray-600 dark:text-gray-400 mt-1">
+                  → Showing {filters.selectedFrontierHQs.map(f => 
+                    filterRelationships.frontierToSectors[f]?.length || 0
+                  ).reduce((a, b) => a + b, 0)} related sectors
+                </p>
+              )}
+              {filterRelationships?.frontierToLocations && (
+                <p className="text-gray-600 dark:text-gray-400">
+                  → Showing {filters.selectedFrontierHQs.map(f => 
+                    filterRelationships.frontierToLocations[f]?.length || 0
+                  ).reduce((a, b) => a + b, 0)} related locations
+                </p>
+              )}
+            </div>
+          )}
+          
+          {filters.selectedAgencies?.length > 0 && (
+            <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
+              <p className="font-semibold text-purple-700 dark:text-purple-400">
+                Agency: {filters.selectedAgencies[0]}
+                {filters.selectedAgencies.length > 1 && ` +${filters.selectedAgencies.length - 1}`}
+              </p>
+              {filterRelationships?.agencyToBudgets && (
+                <p className="text-gray-600 dark:text-gray-400 mt-1">
+                  → Related to {filters.selectedAgencies.map(a => 
+                    filterRelationships.agencyToBudgets[a]?.length || 0
+                  ).reduce((a, b) => a + b, 0)} budget heads
+                </p>
+              )}
+            </div>
+          )}
+          
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-gray-500 dark:text-gray-400">
+              Smart filtering automatically shows only related options when you select filters.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Loading State
   if (loading) {
     return (
@@ -926,6 +1017,15 @@ const Engineering = () => {
                     <span>{formatAmount(metrics.totalSanctionedCr * 100)}</span>
                     <span>•</span>
                     <span>{new Date().toLocaleString()}</span>
+                    {isCascadingActive && (
+                      <>
+                        <span>•</span>
+                        <span className="flex items-center gap-1 text-orange-500">
+                          <Link2 size={12} />
+                          Smart Filters Active
+                        </span>
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -947,6 +1047,21 @@ const Engineering = () => {
                     </button>
                   ))}
                 </div>
+
+                {/* NEW: Filter Info Toggle */}
+                {isCascadingActive && (
+                  <button
+                    onClick={() => setShowFilterInfo(!showFilterInfo)}
+                    className={`px-4 py-2 text-sm rounded-lg transition-all flex items-center gap-2 ${
+                      showFilterInfo 
+                        ? 'bg-orange-500 text-white' 
+                        : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    <Link2 size={16} />
+                    Filter Links
+                  </button>
+                )}
 
                 {/* Compare Mode */}
                 <button
@@ -999,14 +1114,40 @@ const Engineering = () => {
             </div>
           </div>
 
-          {/* Filter Panel */}
+          {/* NEW: Cascading Filter Info Banner */}
+          {isCascadingActive && filters.availableOptions && (
+            <div className={`${
+              darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'
+            } rounded-xl p-3 border flex items-center gap-3`}>
+              <Info size={16} className="text-blue-500 flex-shrink-0" />
+              <div className="flex-1 text-sm">
+                <span className="font-semibold text-blue-700 dark:text-blue-400">
+                  Smart Filtering Active:
+                </span>
+                <span className={darkMode ? 'text-gray-300 ml-2' : 'text-gray-600 ml-2'}>
+                  {filters.selectedFrontierHQs?.length > 0 && (
+                    <>Showing options related to {filters.selectedFrontierHQs.join(', ')} frontier HQ{filters.selectedFrontierHQs.length > 1 ? 's' : ''}. </>
+                  )}
+                  {filters.availableOptions.sectorHQs?.length} sectors, {filters.availableOptions.locations?.length} locations available.
+                </span>
+              </div>
+              <button
+                onClick={() => filters.resetFilters()}
+                className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+              >
+                Clear Filters
+              </button>
+            </div>
+          )}
+
+          {/* Filter Panel with cascading support */}
           <FilterPanel filters={filters} darkMode={darkMode} rawData={rawData} />
 
-          {/* Metrics Cards - PASS filteredData PROP HERE */}
+          {/* Metrics Cards */}
           <MetricsCards 
             metrics={metrics} 
             darkMode={darkMode}
-            filteredData={filteredData}  // THIS IS THE KEY ADDITION
+            filteredData={filteredData}
             onMetricClick={(type) => {
               handleDrillDown(type);
               addNotification(`Filtered by ${type}`, 'info');
@@ -1114,6 +1255,17 @@ const Engineering = () => {
                               </span>
                             )}
                           </div>
+                          {isCascadingActive && (
+                            <div className="mt-1 flex items-center gap-2 text-[10px] text-gray-400">
+                              <span>{project.ftr_hq}</span>
+                              {project.shq && (
+                                <>
+                                  <span>•</span>
+                                  <span>{project.shq}</span>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                   </div>
@@ -1122,7 +1274,7 @@ const Engineering = () => {
             </div>
           )}
 
-          {/* Project Detail Modal - With Animation */}
+          {/* Project Detail Modal */}
           {modalOpen && selectedProject && (
             <>
               <div 
@@ -1153,10 +1305,13 @@ const Engineering = () => {
           {/* Drill-down Modal */}
           <DrillDownModal />
 
+          {/* Filter Info Panel */}
+          <FilterInfoPanel />
+
           {/* Quick Actions Panel */}
           <QuickActionsPanel />
 
-          {/* Comparison Panel - Full Width at Bottom */}
+          {/* Comparison Panel */}
           {compareMode && selectedProjects.length > 0 && (
             <div className={`fixed bottom-4 left-4 right-4 max-w-[1920px] mx-auto z-30 ${
               darkMode ? 'bg-gray-800' : 'bg-white'
