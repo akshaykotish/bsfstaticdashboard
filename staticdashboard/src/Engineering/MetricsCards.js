@@ -29,7 +29,7 @@ import {
 } from 'recharts';
 import DataTable from './DataTable';
 
-const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) => {
+const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onProjectSelect }) => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [expandedView, setExpandedView] = useState(false);
   const [selectedMetricGroup, setSelectedMetricGroup] = useState('all');
@@ -402,7 +402,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
     }
   }, []);
 
-  // Get filtered data based on metric type
+  // Get filtered data based on metric type - ENHANCED VERSION
   const getMetricData = (metricId) => {
     if (!filteredData || filteredData.length === 0) return [];
 
@@ -436,10 +436,60 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
         return filteredData.filter(d => d.physical_progress > 71 && d.physical_progress < 100);
       case 'completed':
         return filteredData.filter(d => d.physical_progress >= 100);
+      case 'recently-awarded':
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        return filteredData.filter(d => {
+          if (!d.date_award) return false;
+          try {
+            const awardDate = new Date(d.date_award);
+            return !isNaN(awardDate.getTime()) && awardDate >= thirtyDaysAgo;
+          } catch {
+            return false;
+          }
+        });
+      case 'awarded-year':
+        const yearStart = new Date(new Date().getFullYear(), 0, 1);
+        return filteredData.filter(d => {
+          if (!d.date_award) return false;
+          try {
+            const awardDate = new Date(d.date_award);
+            return !isNaN(awardDate.getTime()) && awardDate >= yearStart;
+          } catch {
+            return false;
+          }
+        });
+      case 'completed-recently':
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        return filteredData.filter(d => {
+          if (!d.actual_completion_date || d.physical_progress < 100) return false;
+          try {
+            const completionDate = new Date(d.actual_completion_date);
+            return !isNaN(completionDate.getTime()) && completionDate >= ninetyDaysAgo;
+          } catch {
+            return false;
+          }
+        });
+      case 'old-projects':
+        const now = new Date();
+        return filteredData.filter(d => {
+          if (!d.date_award) return false;
+          try {
+            const awardDate = new Date(d.date_award);
+            if (isNaN(awardDate.getTime())) return false;
+            const ageInDays = (now - awardDate) / (1000 * 60 * 60 * 24);
+            return ageInDays > 365;
+          } catch {
+            return false;
+          }
+        });
         
       // Health Section
       case 'critical':
         return filteredData.filter(d => d.risk_level === 'CRITICAL');
+      case 'high-risk':
+        return filteredData.filter(d => d.risk_level === 'HIGH');
       case 'delayed':
         return filteredData.filter(d => (d.delay_days || 0) > 0);
       case 'ongoing':
@@ -448,6 +498,8 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
         return filteredData.filter(d => d.physical_progress === 0);
       case 'overdue':
         return filteredData.filter(d => d.delay_days > 90);
+      case 'near-completion':
+        return filteredData.filter(d => d.physical_progress >= 75 && d.physical_progress < 100);
       case 'perfect-pace':
         return filteredData.filter(d => d.health_status === 'PERFECT_PACE');
       case 'slow-pace':
@@ -456,28 +508,81 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
         return filteredData.filter(d => d.health_status === 'BAD_PACE');
       case 'sleep-pace':
         return filteredData.filter(d => d.health_status === 'SLEEP_PACE');
+      case 'payment-pending':
+        return filteredData.filter(d => d.health_status === 'PAYMENT_PENDING');
+      case 'low-health':
+        return filteredData.filter(d => (d.health_score || 0) < 50);
+      case 'high-efficiency':
+        return filteredData.filter(d => (d.efficiency_score || 0) > 80);
         
       // Budget Section
+      case 'total-budget':
+        return filteredData;
+      case 'expenditure':
+        return filteredData.filter(d => (d.total_expdr || 0) > 0);
+      case 'allocated':
+        return filteredData.filter(d => d.aa_es_ref && d.aa_es_ref !== '');
+      case 'current-year-budget':
+        return filteredData.filter(d => (d.expdr_cfy || 0) > 0);
+      case 'remaining':
+        return filteredData.filter(d => ((d.sanctioned_amount || 0) - (d.total_expdr || 0)) > 0);
       case 'high-budget':
         return filteredData.filter(d => d.sanctioned_amount > 50000);
+        
+      // Timeline Section
+      case 'current-year':
+        const currentYear = new Date().getFullYear();
+        return filteredData.filter(d => {
+          if (!d.date_award) return false;
+          try {
+            const awardDate = new Date(d.date_award);
+            return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear;
+          } catch {
+            return false;
+          }
+        });
+      case 'last-quarter':
+        const currentMonth = new Date().getMonth();
+        const currentQuarter = Math.floor(currentMonth / 3);
+        const lastQuarter = currentQuarter === 0 ? 3 : currentQuarter - 1;
+        const checkYear = currentQuarter === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear();
+        return filteredData.filter(d => {
+          if (!d.date_award) return false;
+          try {
+            const awardDate = new Date(d.date_award);
+            if (isNaN(awardDate.getTime())) return false;
+            const projectQuarter = Math.floor(awardDate.getMonth() / 3);
+            return awardDate.getFullYear() === checkYear && projectQuarter === lastQuarter;
+          } catch {
+            return false;
+          }
+        });
+      case 'last-year':
+        const lastYear = new Date().getFullYear() - 1;
+        return filteredData.filter(d => {
+          if (!d.date_award) return false;
+          try {
+            const awardDate = new Date(d.date_award);
+            return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === lastYear;
+          } catch {
+            return false;
+          }
+        });
         
       default:
         return filteredData;
     }
   };
 
-  // Handle metric click
+  // Handle metric click - ENHANCED VERSION
   const handleMetricClick = (metric) => {
     const data = getMetricData(metric.id);
     
+    // Set the drill-down data
     setDrillDownData(data);
     setDrillDownTitle(`${metric.title} - ${metric.value} ${metric.subtitle || ''}`);
     setSelectedMetric(metric);
     setShowDrillDown(true);
-    
-    if (onMetricClick) {
-      onMetricClick(metric.id);
-    }
   };
 
   // Close drill-down modal
@@ -1218,58 +1323,8 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
     );
   };
 
-  // Drill-down Modal Component
+  // Drill-down Modal Component - NOW USING DataTable
   const DrillDownModal = () => {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-
-    const filteredDrillDownData = useMemo(() => {
-      let filtered = [...drillDownData];
-      
-      if (searchTerm) {
-        filtered = filtered.filter(item =>
-          Object.values(item || {}).some(value =>
-            value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-          )
-        );
-      }
-
-      if (sortConfig.key) {
-        filtered.sort((a, b) => {
-          const aVal = a[sortConfig.key] || 0;
-          const bVal = b[sortConfig.key] || 0;
-          
-          if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-          if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-          return 0;
-        });
-      }
-
-      return filtered;
-    }, [searchTerm, sortConfig]);
-
-    const handleExport = () => {
-      const csvContent = [
-        Object.keys(drillDownData[0] || {}).join(','),
-        ...drillDownData.map(row =>
-          Object.values(row).map(val => {
-            if (typeof val === 'string' && (val.includes(',') || val.includes('"'))) {
-              return `"${val.replace(/"/g, '""')}"`;
-            }
-            return val || '';
-          }).join(',')
-        )
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${drillDownTitle.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    };
-
     if (!showDrillDown) return null;
 
     return (
@@ -1279,7 +1334,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
           onClick={closeDrillDown}
         />
         
-        <div className={`relative w-[90vw] max-h-[85vh] ${
+        <div className={`relative w-[95vw] max-w-[1600px] h-[85vh] ${
           darkMode ? 'bg-gray-900' : 'bg-white'
         } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
           
@@ -1292,33 +1347,10 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
                   {drillDownTitle}
                 </h2>
                 <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
-                  Showing {filteredDrillDownData.length} of {drillDownData.length} projects
+                  Showing {drillDownData.length} projects
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search size={16} className={`absolute left-3 top-2.5 ${darkMode ? 'text-gray-400' : 'text-blue-200'}`} />
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`pl-9 pr-3 py-2 rounded-lg text-sm ${
-                      darkMode 
-                        ? 'bg-gray-700 text-gray-100 placeholder-gray-400' 
-                        : 'bg-blue-600/20 text-white placeholder-blue-200'
-                    } focus:outline-none focus:ring-2 focus:ring-white/20`}
-                  />
-                </div>
-                <button
-                  onClick={handleExport}
-                  className={`px-3 py-2 rounded-lg ${
-                    darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-blue-700 hover:bg-blue-800'
-                  } text-white transition-colors flex items-center gap-1 text-sm`}
-                >
-                  <Download size={16} />
-                  Export
-                </button>
                 <button
                   onClick={closeDrillDown}
                   className={`p-2 rounded-lg ${
@@ -1331,45 +1363,27 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
             </div>
           </div>
 
-          <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <span className="text-xs text-gray-500">Total Projects</span>
-                <p className="text-lg font-bold">{drillDownData.length}</p>
-              </div>
-              <div>
-                <span className="text-xs text-gray-500">Total Budget</span>
-                <p className="text-lg font-bold">
-                  ₹{(drillDownData.reduce((sum, p) => sum + (p.sanctioned_amount || 0), 0) / 100).toFixed(2)} Cr
-                </p>
-              </div>
-              <div>
-                <span className="text-xs text-gray-500">Avg Progress</span>
-                <p className="text-lg font-bold">
-                  {drillDownData.length ? 
-                    (drillDownData.reduce((sum, p) => sum + (p.physical_progress || 0), 0) / drillDownData.length).toFixed(1) : 0}%
-                </p>
-              </div>
-              <div>
-                <span className="text-xs text-gray-500">Critical</span>
-                <p className="text-lg font-bold text-red-600">
-                  {drillDownData.filter(p => p.risk_level === 'CRITICAL').length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-auto p-6">
+          {/* Use DataTable component for the table display */}
+          <div className="flex-1 overflow-hidden">
             <DataTable
-              data={filteredDrillDownData}
+              data={drillDownData}
               darkMode={darkMode}
               onRowClick={(row) => {
-                console.log('Row clicked:', row);
+                // Close drill-down modal first
+                closeDrillDown();
+                
+                // Then trigger project selection if handler exists
+                if (onProjectSelect) {
+                  onProjectSelect(row);
+                } else if (onMetricClick) {
+                  onMetricClick('project', row);
+                }
               }}
-              compareMode={false}
+              compareMode={true}
               selectedProjects={[]}
-              isEmbedded={true}
-              maxHeight="600px"
+              isEmbedded={false}
+              maxHeight="calc(85vh - 200px)"
+              maxWidth="100%"
             />
           </div>
         </div>
@@ -1499,7 +1513,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
               {showInfoTooltips && (
                 <div className="flex items-center gap-2 text-xs text-gray-500">
                   <Info size={12} />
-                  <span>Hover over help icons for explanations</span>
+                  <span>Click on metrics to view detailed data</span>
                 </div>
               )}
             </div>
@@ -1671,8 +1685,8 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
               Understanding the Metrics
             </p>
             <p className={darkMode ? 'text-gray-300' : 'text-gray-600'}>
-              Click on the help icon (?) on each metric card to understand what that metric means in simple terms. 
-              These explanations will help you better interpret the dashboard data and make informed decisions.
+              Click on any metric card to view detailed project data. Hover over the help icon (?) on each card for explanations. 
+              The table view provides sorting, filtering, and export capabilities for comprehensive data analysis.
             </p>
           </div>
         </div>
@@ -1800,7 +1814,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [] }) =
                   <AlertCircle size={12} className="text-orange-500 mt-0.5" />
                   <div>
                     <span className="font-medium">Overdue:</span>
-                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Delayed beyond acceptable limits (>90 days)</span>
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Delayed beyond acceptable limits (&lt;90 days)</span>
                   </div>
                 </li>
               </ul>

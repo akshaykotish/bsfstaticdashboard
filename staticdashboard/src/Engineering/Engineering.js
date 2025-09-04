@@ -23,20 +23,15 @@ import { calculateMetrics, exportData, printReport } from './utils';
 const formatAmount = (value) => {
   if (value === null || value === undefined || isNaN(value)) return '₹0';
   
-  // Value is already in lakhs from CSV
   const absValue = Math.abs(value);
   
   if (absValue >= 10000) {
-    // Convert to crores (1 crore = 100 lakhs)
     return `₹${(value / 100).toFixed(2)} Cr`;
   } else if (absValue >= 100) {
-    // Keep in lakhs for values >= 1 crore (100 lakhs)
     return `₹${value.toFixed(2)} L`;
   } else if (absValue >= 1) {
-    // For smaller lakh values
     return `₹${value.toFixed(2)} L`;
   } else if (absValue >= 0.01) {
-    // Convert to thousands (1 lakh = 100 thousands)
     return `₹${(value * 100).toFixed(2)} K`;
   } else {
     return `₹${(value * 100).toFixed(2)} K`;
@@ -58,16 +53,11 @@ const Engineering = () => {
   const [viewMode, setViewMode] = useState('dashboard');
   const [refreshInterval, setRefreshInterval] = useState(null);
   const [notifications, setNotifications] = useState([]);
-  const [drillDownData, setDrillDownData] = useState(null);
-  const [showDrillDownModal, setShowDrillDownModal] = useState(false);
-  const [drillDownAnimating, setDrillDownAnimating] = useState(false);
   const [layoutMode, setLayoutMode] = useState('default');
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
-  
-  // NEW: State for showing filter relationships
   const [showFilterInfo, setShowFilterInfo] = useState(false);
 
   // Custom hooks for data and filters
@@ -100,13 +90,13 @@ const Engineering = () => {
   // Get filtered data from filters
   const filteredData = filters.filteredData || [];
 
-  // NEW: Get filter relationships for display
+  // Get filter relationships for display
   const filterRelationships = useMemo(() => {
     if (!filters.getRelatedMappings) return null;
     return filters.getRelatedMappings();
   }, [filters]);
 
-  // NEW: Check if cascading is active
+  // Check if cascading is active
   const isCascadingActive = useMemo(() => {
     return (
       filters.selectedFrontierHQs?.length > 0 ||
@@ -116,7 +106,7 @@ const Engineering = () => {
     );
   }, [filters.selectedFrontierHQs, filters.selectedSectorHQs, filters.selectedAgencies, filters.selectedBudgetHeads]);
 
-  // Calculate metrics with proper amount handling and organization counts
+  // Calculate metrics with proper amount handling
   const metrics = useMemo(() => {
     if (!filteredData || filteredData.length === 0) {
       return {
@@ -154,7 +144,6 @@ const Engineering = () => {
     }
 
     const total = filteredData.length;
-    // All amounts in CSV are in lakhs, convert to crores for display
     const totalSanctioned = filteredData.reduce((sum, item) => sum + (item.sanctioned_amount || 0), 0) / 100;
     const totalExpenditure = filteredData.reduce((sum, item) => sum + (item.total_expdr || 0), 0) / 100;
     const avgProgress = filteredData.reduce((sum, item) => sum + (item.physical_progress || 0), 0) / total;
@@ -360,7 +349,6 @@ const Engineering = () => {
         return prev;
       });
     } else {
-      // Ensure all required fields are present
       const projectWithDefaults = {
         ...project,
         serial_no: project.serial_no || 'N/A',
@@ -384,61 +372,59 @@ const Engineering = () => {
       
       console.log('Engineering: Setting selected project and opening modal', projectWithDefaults);
       setSelectedProject(projectWithDefaults);
-      setModalOpen(true);  // Open modal immediately
-      setModalAnimating(true);  // Set animation state after
+      setModalOpen(true);
+      setModalAnimating(true);
     }
   }, [compareMode]);
 
-  const handleDrillDown = useCallback((type, data) => {
+  // Handler for drill-down from MetricsCards
+  const handleDrillDown = useCallback((typeOrId, dataOrFilter) => {
     let drillData = [];
-    switch(type) {
-      case 'critical':
-        drillData = filteredData.filter(d => d.risk_level === 'CRITICAL');
-        break;
-      case 'delayed':
-        drillData = filteredData.filter(d => d.delay_days > 0);
-        break;
-      case 'completed':
-        drillData = filteredData.filter(d => d.physical_progress >= 100);
-        break;
-      case 'agencies':
-        drillData = filteredData.filter(d => d.executive_agency);
-        break;
-      case 'contractors':
-        drillData = filteredData.filter(d => d.firm_name);
-        break;
-      case 'locations':
-        drillData = filteredData.filter(d => d.work_site);
-        break;
-      case 'agency':
-        drillData = filteredData.filter(d => d.executive_agency === data);
-        break;
-      case 'contractor':
-        drillData = filteredData.filter(d => d.firm_name === data);
-        break;
-      case 'location':
-        drillData = filteredData.filter(d => d.work_site?.includes(data));
-        break;
-      case 'budget':
-        drillData = filteredData.filter(d => d.budget_head === data);
-        break;
-      default:
-        drillData = filteredData;
+    
+    // If data is already provided (from MetricsCards), use it directly
+    if (Array.isArray(dataOrFilter)) {
+      drillData = dataOrFilter;
+    } else {
+      // Otherwise filter based on type
+      switch(typeOrId) {
+        case 'critical':
+          drillData = filteredData.filter(d => d.risk_level === 'CRITICAL');
+          break;
+        case 'delayed':
+          drillData = filteredData.filter(d => (d.delay_days || 0) > 0);
+          break;
+        case 'completed':
+          drillData = filteredData.filter(d => d.physical_progress >= 100);
+          break;
+        case 'ongoing':
+          drillData = filteredData.filter(d => d.physical_progress > 0 && d.physical_progress < 100);
+          break;
+        case 'notstarted':
+        case 'not-started':
+          drillData = filteredData.filter(d => d.physical_progress === 0);
+          break;
+        case 'high-risk':
+          drillData = filteredData.filter(d => d.risk_level === 'HIGH');
+          break;
+        case 'overdue':
+          drillData = filteredData.filter(d => d.delay_days > 90);
+          break;
+        case 'near-completion':
+          drillData = filteredData.filter(d => d.physical_progress >= 75 && d.physical_progress < 100);
+          break;
+        default:
+          drillData = filteredData;
+      }
     }
-    setDrillDownData({ type, data: drillData, filter: data });
-    setDrillDownAnimating(true);
-    setTimeout(() => {
-      setShowDrillDownModal(true);
-    }, 10);
-  }, [filteredData]);
-
-  const closeDrillDownModal = useCallback(() => {
-    setShowDrillDownModal(false);
-    setTimeout(() => {
-      setDrillDownAnimating(false);
-      setDrillDownData(null);
-    }, 300);
-  }, []);
+    
+    // Instead of opening a drill-down modal, switch to table view with the filtered data
+    if (typeOrId && drillData.length > 0) {
+      // Apply a quick filter based on the drill-down type
+      filters.setQuickFilter(typeOrId);
+      setViewMode('table');
+      addNotification(`Showing ${drillData.length} projects`, 'info');
+    }
+  }, [filteredData, filters]);
 
   const closeProjectModal = useCallback(() => {
     setModalOpen(false);
@@ -548,28 +534,13 @@ const Engineering = () => {
             body { padding: 10px; }
             .no-print { display: none; }
           }
-          .header-info {
-            background: #f9f9f9;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-          }
-          .footer {
-            margin-top: 50px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-            text-align: center;
-            color: #666;
-          }
         </style>
       </head>
       <body>
-        <div class="header-info">
-          <h1>Engineering Analytics Report</h1>
-          <p><strong>Report Type:</strong> ${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Analysis</p>
-          <p><strong>Generated on:</strong> ${new Date().toLocaleString()}</p>
-          <p><strong>Total Records:</strong> ${filteredData.length} projects</p>
-        </div>
+        <h1>Engineering Analytics Report</h1>
+        <p><strong>Report Type:</strong> ${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Analysis</p>
+        <p><strong>Generated on:</strong> ${new Date().toLocaleString()}</p>
+        <p><strong>Total Records:</strong> ${filteredData.length} projects</p>
         
         <h2>Executive Summary</h2>
         <div class="metrics-grid">
@@ -589,39 +560,11 @@ const Engineering = () => {
             <div class="metric-label">Critical Projects</div>
             <div class="metric-value">${metrics.critical}</div>
           </div>
-          <div class="metric-card">
-            <div class="metric-label">Delayed Projects</div>
-            <div class="metric-value">${metrics.delayed}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Average Progress</div>
-            <div class="metric-value">${metrics.avgProgress}%</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Average Efficiency</div>
-            <div class="metric-value">${metrics.avgEfficiency}%</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Budget Utilization</div>
-            <div class="metric-value">${metrics.utilizationRate}%</div>
-          </div>
         </div>
         
         <div class="page-break"></div>
         
-        <h2>${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Analysis Details</h2>
-    `;
-    
-    // Add specific content based on report type
-    if (data && typeof data === 'object') {
-      htmlContent += '<div style="margin-top: 20px;">';
-      htmlContent += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-      htmlContent += '</div>';
-    }
-    
-    // Add top projects table
-    htmlContent += `
-        <h2>Top Projects (by Budget)</h2>
+        <h2>Project Details</h2>
         <table>
           <thead>
             <tr>
@@ -632,42 +575,26 @@ const Engineering = () => {
               <th>Budget</th>
               <th>Progress (%)</th>
               <th>Risk Level</th>
-              <th>Delay (days)</th>
             </tr>
           </thead>
           <tbody>
-    `;
-    
-    filteredData
-      .sort((a, b) => b.sanctioned_amount - a.sanctioned_amount)
-      .slice(0, 20)
-      .forEach(project => {
-        htmlContent += `
-          <tr>
-            <td>${project.serial_no}</td>
-            <td>${project.scheme_name}</td>
-            <td>${project.work_site}</td>
-            <td>${project.executive_agency}</td>
-            <td>${formatAmount(project.sanctioned_amount)}</td>
-            <td>${project.physical_progress}%</td>
-            <td style="color: ${
-              project.risk_level === 'CRITICAL' ? 'red' :
-              project.risk_level === 'HIGH' ? 'orange' :
-              project.risk_level === 'MEDIUM' ? 'yellow' : 'green'
-            }">${project.risk_level}</td>
-            <td>${project.delay_days}</td>
-          </tr>
-        `;
-      });
-    
-    htmlContent += `
+            ${filteredData.slice(0, 50).map(project => `
+              <tr>
+                <td>${project.serial_no}</td>
+                <td>${project.scheme_name}</td>
+                <td>${project.work_site}</td>
+                <td>${project.executive_agency}</td>
+                <td>${formatAmount(project.sanctioned_amount)}</td>
+                <td>${project.physical_progress}%</td>
+                <td>${project.risk_level}</td>
+              </tr>
+            `).join('')}
           </tbody>
         </table>
         
-        <div class="footer">
-          <p>End of Report - Total Records: ${filteredData.length}</p>
-          <p>© 2025 Engineering Analytics Dashboard</p>
-        </div>
+        <p style="margin-top: 50px; text-align: center; color: #666;">
+          End of Report - Total Records: ${filteredData.length}
+        </p>
       </body>
       </html>
     `;
@@ -719,119 +646,7 @@ const Engineering = () => {
     }
   }, [metrics]);
 
-  const markNotificationAsRead = useCallback((id) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
-  }, []);
-
-  const clearAllNotifications = useCallback(() => {
-    setNotifications([]);
-    addNotification('All notifications cleared', 'info');
-  }, []);
-
   // Component Functions
-  const DrillDownModal = () => {
-    if (!drillDownAnimating || !drillDownData) return null;
-
-    return (
-      <div className={`fixed inset-0 z-[9999] overflow-hidden flex items-center justify-center transition-all duration-300 ${
-        showDrillDownModal ? 'opacity-100' : 'opacity-0'
-      }`}>
-        <div 
-          className={`absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
-            showDrillDownModal ? 'opacity-100' : 'opacity-0'
-          }`}
-          onClick={closeDrillDownModal}
-        />
-        
-        <div className={`relative w-[90vw] max-h-[85vh] ${
-          darkMode ? 'bg-gray-900' : 'bg-white'
-        } rounded-2xl shadow-2xl flex flex-col overflow-hidden transform transition-all duration-300 ${
-          showDrillDownModal ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
-        }`}>
-          
-          <div className={`px-6 py-4 border-b ${
-            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
-          }`}>
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
-                  Drill-down View: {drillDownData.type.charAt(0).toUpperCase() + drillDownData.type.slice(1)}
-                </h2>
-                {drillDownData.filter && (
-                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
-                    Filter: {drillDownData.filter}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const drillData = drillDownData.data;
-                    exportData(drillData, 'csv');
-                    addNotification('Data exported', 'success');
-                  }}
-                  className={`px-3 py-1 rounded ${
-                    darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-blue-700 hover:bg-blue-800'
-                  } text-white transition-colors`}
-                >
-                  <Download size={16} />
-                </button>
-                <button
-                  onClick={closeDrillDownModal}
-                  className={`p-2 rounded-lg ${
-                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
-                  } transition-colors`}
-                >
-                  <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <span className="text-xs text-gray-500">Total Projects</span>
-                <p className="text-lg font-bold">{drillDownData.data.length}</p>
-              </div>
-              <div>
-                <span className="text-xs text-gray-500">Total Budget</span>
-                <p className="text-lg font-bold">
-                  {formatAmount(drillDownData.data.reduce((sum, p) => sum + (p.sanctioned_amount || 0), 0))}
-                </p>
-              </div>
-              <div>
-                <span className="text-xs text-gray-500">Avg Progress</span>
-                <p className="text-lg font-bold">
-                  {drillDownData.data.length ? 
-                    (drillDownData.data.reduce((sum, p) => sum + p.physical_progress, 0) / drillDownData.data.length).toFixed(1) : 0}%
-                </p>
-              </div>
-              <div>
-                <span className="text-xs text-gray-500">Critical</span>
-                <p className="text-lg font-bold text-red-600">
-                  {drillDownData.data.filter(p => p.risk_level === 'CRITICAL').length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="z-[9998] flex-1 overflow-auto p-6">
-            <DataTable
-              data={drillDownData.data}
-              darkMode={darkMode}
-              onRowClick={handleProjectSelect}
-              compareMode={false}
-              selectedProjects={[]}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const QuickActionsPanel = () => (
     <div className={`fixed bottom-4 right-4 z-40 ${
       showQuickActions ? 'block' : 'hidden'
@@ -844,13 +659,19 @@ const Engineering = () => {
         <h3 className="text-sm font-bold mb-3">Quick Actions</h3>
         <div className="space-y-2">
           <button
-            onClick={() => handleDrillDown('critical')}
+            onClick={() => {
+              filters.setQuickFilter('critical');
+              setViewMode('table');
+            }}
             className="w-full px-3 py-2 text-sm bg-red-500 text-white rounded hover:bg-red-600"
           >
             View Critical Projects
           </button>
           <button
-            onClick={() => handleDrillDown('delayed')}
+            onClick={() => {
+              filters.setQuickFilter('delayed');
+              setViewMode('table');
+            }}
             className="w-full px-3 py-2 text-sm bg-orange-500 text-white rounded hover:bg-orange-600"
           >
             View Delayed Projects
@@ -872,7 +693,6 @@ const Engineering = () => {
     </div>
   );
 
-  // NEW: Filter Info Panel Component
   const FilterInfoPanel = () => {
     if (!showFilterInfo || !isCascadingActive) return null;
 
@@ -908,13 +728,6 @@ const Engineering = () => {
                   ).reduce((a, b) => a + b, 0)} related sectors
                 </p>
               )}
-              {filterRelationships?.frontierToLocations && (
-                <p className="text-gray-600 dark:text-gray-400">
-                  → Showing {filters.selectedFrontierHQs.map(f => 
-                    filterRelationships.frontierToLocations[f]?.length || 0
-                  ).reduce((a, b) => a + b, 0)} related locations
-                </p>
-              )}
             </div>
           )}
           
@@ -924,13 +737,6 @@ const Engineering = () => {
                 Agency: {filters.selectedAgencies[0]}
                 {filters.selectedAgencies.length > 1 && ` +${filters.selectedAgencies.length - 1}`}
               </p>
-              {filterRelationships?.agencyToBudgets && (
-                <p className="text-gray-600 dark:text-gray-400 mt-1">
-                  → Related to {filters.selectedAgencies.map(a => 
-                    filterRelationships.agencyToBudgets[a]?.length || 0
-                  ).reduce((a, b) => a + b, 0)} budget heads
-                </p>
-              )}
             </div>
           )}
           
@@ -984,7 +790,7 @@ const Engineering = () => {
     );
   }
 
-  // Main Render with proper z-index layering
+  // Main Render
   return (
     <div className={`min-h-screen transition-colors duration-300 relative z-0 ${
       darkMode 
@@ -1048,7 +854,7 @@ const Engineering = () => {
                   ))}
                 </div>
 
-                {/* NEW: Filter Info Toggle */}
+                {/* Filter Info Toggle */}
                 {isCascadingActive && (
                   <button
                     onClick={() => setShowFilterInfo(!showFilterInfo)}
@@ -1114,7 +920,7 @@ const Engineering = () => {
             </div>
           </div>
 
-          {/* NEW: Cascading Filter Info Banner */}
+          {/* Cascading Filter Info Banner */}
           {isCascadingActive && filters.availableOptions && (
             <div className={`${
               darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'
@@ -1140,7 +946,7 @@ const Engineering = () => {
             </div>
           )}
 
-          {/* Filter Panel with cascading support */}
+          {/* Filter Panel */}
           <FilterPanel filters={filters} darkMode={darkMode} rawData={rawData} />
 
           {/* Metrics Cards */}
@@ -1148,10 +954,8 @@ const Engineering = () => {
             metrics={metrics} 
             darkMode={darkMode}
             filteredData={filteredData}
-            onMetricClick={(type) => {
-              handleDrillDown(type);
-              addNotification(`Filtered by ${type}`, 'info');
-            }}
+            onMetricClick={handleDrillDown}
+            onProjectSelect={handleProjectSelect}
           />
 
           {/* Main Content Based on View Mode */}
@@ -1175,16 +979,14 @@ const Engineering = () => {
           )}
 
           {viewMode === 'table' && (
-            <div className="flex items-center justify-center relative z-20">
-              <div className="w-full">
-                <DataTable
-                  data={filteredData}
-                  darkMode={darkMode}
-                  onRowClick={handleProjectSelect}
-                  compareMode={compareMode}
-                  selectedProjects={selectedProjects}
-                />
-              </div>
+            <div className="w-full">
+              <DataTable
+                data={filteredData}
+                darkMode={darkMode}
+                onRowClick={handleProjectSelect}
+                compareMode={compareMode}
+                selectedProjects={selectedProjects}
+              />
             </div>
           )}
 
@@ -1255,17 +1057,6 @@ const Engineering = () => {
                               </span>
                             )}
                           </div>
-                          {isCascadingActive && (
-                            <div className="mt-1 flex items-center gap-2 text-[10px] text-gray-400">
-                              <span>{project.ftr_hq}</span>
-                              {project.shq && (
-                                <>
-                                  <span>•</span>
-                                  <span>{project.shq}</span>
-                                </>
-                              )}
-                            </div>
-                          )}
                         </div>
                       ))}
                   </div>
@@ -1279,20 +1070,14 @@ const Engineering = () => {
             <>
               <div 
                 className="fixed inset-0 z-[100000] bg-black/50 backdrop-blur-sm animate-fadeIn"
-                onClick={() => {
-                  setModalOpen(false);
-                  setSelectedProject(null);
-                }}
+                onClick={closeProjectModal}
               />
               <div className="fixed inset-0 z-[100001] overflow-y-auto animate-fadeIn">
                 <div className="flex min-h-full items-center justify-center p-4">
                   <div className="animate-modalZoomIn">
                     <Modal
                       isOpen={modalOpen}
-                      onClose={() => {
-                        setModalOpen(false);
-                        setSelectedProject(null);
-                      }}
+                      onClose={closeProjectModal}
                       project={selectedProject}
                       darkMode={darkMode}
                     />
@@ -1301,9 +1086,6 @@ const Engineering = () => {
               </div>
             </>
           )}
-
-          {/* Drill-down Modal */}
-          <DrillDownModal />
 
           {/* Filter Info Panel */}
           <FilterInfoPanel />
@@ -1374,42 +1156,18 @@ const Engineering = () => {
       {/* Custom CSS for animations */}
       <style jsx>{`
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         
-        @keyframes fadeOut {
-          from {
-            opacity: 1;
-          }
-          to {
-            opacity: 0;
-          }
-        }
-        
-        @keyframes modalSlideIn {
+        @keyframes modalZoomIn {
           from {
             opacity: 0;
-            transform: scale(0.95) translateY(20px);
+            transform: scale(0.9);
           }
           to {
             opacity: 1;
-            transform: scale(1) translateY(0);
-          }
-        }
-        
-        @keyframes modalSlideOut {
-          from {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
-          to {
-            opacity: 0;
-            transform: scale(0.95) translateY(20px);
+            transform: scale(1);
           }
         }
         
@@ -1428,16 +1186,8 @@ const Engineering = () => {
           animation: fadeIn 0.3s ease-out forwards;
         }
         
-        .animate-fadeOut {
-          animation: fadeOut 0.3s ease-out forwards;
-        }
-        
-        .animate-modalSlideIn {
-          animation: modalSlideIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-        }
-        
-        .animate-modalSlideOut {
-          animation: modalSlideOut 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        .animate-modalZoomIn {
+          animation: modalZoomIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
         }
         
         .animate-slide-up {
