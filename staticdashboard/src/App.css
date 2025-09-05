@@ -543,3 +543,124 @@
       z-index: 999998;
       pointer-events: none;
     }
+
+    /* Modal Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* Responsive Modal Animations */
+@media (max-width: 640px) {
+  .animate-slideUp {
+    animation: slideUp 0.2s ease-out;
+  }
+}
+
+/* Print Styles for Modal */
+@media print {
+  /* Hide modal chrome when printing */
+  .fixed {
+    position: static !important;
+  }
+  
+  /* Hide backdrop */
+  .bg-black\/60 {
+    display: none !important;
+  }
+  
+  /* Make modal container full width for print */
+  .max-w-\[900px\] {
+    max-width: 100% !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  
+  /* Hide modal header */
+  .border-b {
+    display: none !important;
+  }
+  
+  /* Make content area printable */
+  .overflow-auto {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  
+  /* Ensure report prints at A4 size */
+  .max-w-\[794px\] {
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+  }
+}
+
+/* Smooth Scrolling */
+.overflow-auto {
+  scroll-behavior: smooth;
+}
+
+/* Custom Scrollbar Styles */
+.overflow-auto::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.overflow-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 4px;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+/* Dark Mode Scrollbar */
+.dark .overflow-auto::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.5);
+}
+
+.dark .overflow-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 85, 99, 0.7);
+}
+
+/* Responsive Report Container */
+@media (max-width: 900px) {
+  .max-w-\[794px\] {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* Prevent Horizontal Scroll */
+.overflow-auto > * {
+  overflow-x: hidden;
+}
