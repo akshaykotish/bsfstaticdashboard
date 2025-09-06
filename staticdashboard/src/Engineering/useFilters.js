@@ -42,6 +42,17 @@ export const useFilters = () => {
   // Store raw data for filtering
   const [rawData, setRawData] = useState([]);
 
+  // Debug logging for schemes
+  useEffect(() => {
+    if (selectedSchemes.length > 0) {
+      console.log('[useFilters] Schemes selected:', selectedSchemes);
+      console.log('[useFilters] Raw data sample:', rawData.slice(0, 3).map(d => ({
+        scheme_name: d.scheme_name,
+        id: d.id
+      })));
+    }
+  }, [selectedSchemes, rawData]);
+
   // Helper function to parse dates safely
   const parseDate = useCallback((dateString) => {
     if (!dateString || dateString === '' || dateString === 'N/A') return null;
@@ -201,10 +212,21 @@ export const useFilters = () => {
         });
       }
 
+      // FIXED: Enhanced scheme filtering with better matching
       if (selectedSchemes.length > 0 && !exceptFilters.includes('scheme')) {
-        filtered = filtered.filter(item => 
-          item.scheme_name && selectedSchemes.includes(item.scheme_name)
-        );
+        console.log('[applyFiltersExcept] Filtering by schemes:', selectedSchemes);
+        const beforeCount = filtered.length;
+        filtered = filtered.filter(item => {
+          if (!item.scheme_name) return false;
+          // Trim and normalize the scheme name for comparison
+          const normalizedItemScheme = item.scheme_name.trim();
+          const isIncluded = selectedSchemes.some(scheme => {
+            const normalizedSelectedScheme = scheme.trim();
+            return normalizedItemScheme === normalizedSelectedScheme;
+          });
+          return isIncluded;
+        });
+        console.log(`[applyFiltersExcept] Scheme filter: ${beforeCount} -> ${filtered.length} items`);
       }
 
       // NEW: Progress categories filter
@@ -333,7 +355,8 @@ export const useFilters = () => {
         .filter(Boolean)
         .sort(),
       
-      schemes: [...new Set(schemeFiltered.map(d => d.scheme_name))]
+      // FIXED: Ensure scheme names are properly extracted and trimmed
+      schemes: [...new Set(schemeFiltered.map(d => d.scheme_name?.trim()))]
         .filter(Boolean)
         .sort(),
       
@@ -481,6 +504,7 @@ export const useFilters = () => {
   // Filter function updated for multi-select including frontier and sector HQs
   const applyFilters = useCallback((data) => {
     let filtered = [...data];
+    console.log('[applyFilters] Starting with', filtered.length, 'items');
 
     // Text search - also search in scheme names
     if (searchTerm) {
@@ -496,42 +520,75 @@ export const useFilters = () => {
         item.shq?.toLowerCase().includes(searchLower) ||
         item.remarks?.toLowerCase().includes(searchLower)
       );
+      console.log('[applyFilters] After search:', filtered.length, 'items');
     }
 
-    // Scheme name filter
+    // FIXED: Enhanced scheme name filter with debugging
     if (selectedSchemes.length > 0) {
-      filtered = filtered.filter(item => 
-        item.scheme_name && selectedSchemes.includes(item.scheme_name)
+      console.log('[applyFilters] Filtering by schemes:', selectedSchemes);
+      const beforeCount = filtered.length;
+      
+      // Create normalized scheme set for faster lookup
+      const normalizedSelectedSchemes = new Set(
+        selectedSchemes.map(s => s?.trim())
       );
+      
+      filtered = filtered.filter(item => {
+        if (!item.scheme_name) {
+          console.log('[applyFilters] Item has no scheme_name:', item.serial_no);
+          return false;
+        }
+        const normalizedItemScheme = item.scheme_name.trim();
+        const isIncluded = normalizedSelectedSchemes.has(normalizedItemScheme);
+        
+        if (!isIncluded && selectedSchemes.length <= 3) {
+          // Log details for first few schemes to debug
+          console.log('[applyFilters] Scheme not matched:', {
+            itemScheme: normalizedItemScheme,
+            selectedSchemes: Array.from(normalizedSelectedSchemes)
+          });
+        }
+        
+        return isIncluded;
+      });
+      
+      console.log(`[applyFilters] Scheme filter: ${beforeCount} -> ${filtered.length} items`);
     }
 
     // Multi-select filters - only apply if selections made
     if (selectedStatuses.length > 0) {
       filtered = filtered.filter(item => selectedStatuses.includes(item.status));
+      console.log('[applyFilters] After status filter:', filtered.length, 'items');
     }
 
     if (selectedRiskLevels.length > 0) {
       filtered = filtered.filter(item => selectedRiskLevels.includes(item.risk_level));
+      console.log('[applyFilters] After risk filter:', filtered.length, 'items');
     }
 
     if (selectedBudgetHeads.length > 0) {
       filtered = filtered.filter(item => selectedBudgetHeads.includes(item.budget_head));
+      console.log('[applyFilters] After budget head filter:', filtered.length, 'items');
     }
 
     if (selectedAgencies.length > 0) {
       filtered = filtered.filter(item => selectedAgencies.includes(item.executive_agency));
+      console.log('[applyFilters] After agency filter:', filtered.length, 'items');
     }
 
     if (selectedFrontierHQs.length > 0) {
       filtered = filtered.filter(item => selectedFrontierHQs.includes(item.ftr_hq));
+      console.log('[applyFilters] After frontier HQ filter:', filtered.length, 'items');
     }
 
     if (selectedSectorHQs.length > 0) {
       filtered = filtered.filter(item => selectedSectorHQs.includes(item.shq));
+      console.log('[applyFilters] After sector HQ filter:', filtered.length, 'items');
     }
 
     if (selectedContractors.length > 0) {
       filtered = filtered.filter(item => selectedContractors.includes(item.firm_name));
+      console.log('[applyFilters] After contractor filter:', filtered.length, 'items');
     }
 
     if (selectedLocations.length > 0) {
@@ -541,16 +598,19 @@ export const useFilters = () => {
           location?.toLowerCase().includes(selected.toLowerCase())
         );
       });
+      console.log('[applyFilters] After location filter:', filtered.length, 'items');
     }
 
     // NEW: Progress category filter
     if (selectedProgressCategories.length > 0) {
       filtered = filtered.filter(item => selectedProgressCategories.includes(item.progress_category));
+      console.log('[applyFilters] After progress category filter:', filtered.length, 'items');
     }
 
     // NEW: Health status filter
     if (selectedHealthStatuses.length > 0) {
       filtered = filtered.filter(item => selectedHealthStatuses.includes(item.health_status));
+      console.log('[applyFilters] After health status filter:', filtered.length, 'items');
     }
 
     // Range filters
@@ -622,6 +682,7 @@ export const useFilters = () => {
       );
     }
 
+    console.log('[applyFilters] Final result:', filtered.length, 'items');
     return filtered;
   }, [
     searchTerm, 
@@ -648,11 +709,20 @@ export const useFilters = () => {
 
   // Get filtered data
   const filteredData = useMemo(() => {
-    return applyFilters(rawData);
+    const result = applyFilters(rawData);
+    console.log('[filteredData] Computed:', result.length, 'items from', rawData.length, 'raw items');
+    return result;
   }, [rawData, applyFilters]);
+
+  // ENHANCED: Wrapped setSelectedSchemes to add logging
+  const wrappedSetSelectedSchemes = useCallback((newSchemes) => {
+    console.log('[useFilters] setSelectedSchemes called with:', newSchemes);
+    setSelectedSchemes(newSchemes);
+  }, []);
 
   // Reset all filters
   const resetFilters = useCallback(() => {
+    console.log('[useFilters] Resetting all filters');
     setSearchTerm('');
     setSelectedSchemes([]);
     setSelectedStatuses([]);
@@ -727,6 +797,7 @@ export const useFilters = () => {
 
   // Load filter state
   const loadFilterState = useCallback((state) => {
+    console.log('[useFilters] Loading filter state:', state);
     if (state.searchTerm !== undefined) setSearchTerm(state.searchTerm);
     if (state.selectedSchemes !== undefined) setSelectedSchemes(state.selectedSchemes);
     if (state.selectedStatuses !== undefined) setSelectedStatuses(state.selectedStatuses);
@@ -754,6 +825,7 @@ export const useFilters = () => {
 
   // Quick filter presets - Updated with new health and progress filters
   const setQuickFilter = useCallback((type) => {
+    console.log('[useFilters] Setting quick filter:', type);
     resetFilters();
     const today = new Date();
     const thirtyDaysAgo = new Date();
@@ -884,11 +956,14 @@ export const useFilters = () => {
   }, []);
 
   const toggleScheme = useCallback((scheme) => {
-    setSelectedSchemes(prev =>
-      prev.includes(scheme)
+    console.log('[useFilters] toggleScheme called with:', scheme);
+    setSelectedSchemes(prev => {
+      const newSchemes = prev.includes(scheme)
         ? prev.filter(s => s !== scheme)
-        : [...prev, scheme]
-    );
+        : [...prev, scheme];
+      console.log('[useFilters] toggleScheme updating from', prev, 'to', newSchemes);
+      return newSchemes;
+    });
   }, []);
 
   const toggleAgency = useCallback((agency) => {
@@ -968,12 +1043,14 @@ export const useFilters = () => {
 
   const selectAllSchemes = useCallback(() => {
     if (rawData && rawData.length > 0) {
-      const allSchemes = [...new Set(rawData.map(d => d.scheme_name))].filter(Boolean);
+      const allSchemes = [...new Set(rawData.map(d => d.scheme_name?.trim()))].filter(Boolean);
+      console.log('[useFilters] selectAllSchemes:', allSchemes);
       setSelectedSchemes(allSchemes);
     }
   }, [rawData]);
 
   const clearAllSchemes = useCallback(() => {
+    console.log('[useFilters] clearAllSchemes');
     setSelectedSchemes([]);
   }, []);
 
@@ -1233,7 +1310,7 @@ export const useFilters = () => {
     searchTerm,
     setSearchTerm,
     selectedSchemes,
-    setSelectedSchemes,
+    setSelectedSchemes: wrappedSetSelectedSchemes, // Use wrapped version with logging
     selectedStatuses,
     setSelectedStatuses,
     selectedRiskLevels,

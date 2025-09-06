@@ -19,6 +19,11 @@ import Modal from './Modal';
 import AISuggestions from './AISuggestions';
 import TabView from './TabView';
 import { calculateMetrics, exportData, printReport } from './utils';
+// Import statements for icons
+import { 
+  Sparkles, PauseCircle, PlayCircle, CreditCard, Zap
+} from 'lucide-react';
+
 
 // Cookie utility functions
 const setCookie = (name, value, days = 365) => {
@@ -288,6 +293,129 @@ const Engineering = () => {
     };
   }, [filteredData]);
 
+  // Filter presets
+  const [filterPresets] = useState([
+    { 
+      name: 'Critical Projects', 
+      icon: AlertTriangle, 
+      filters: { 
+        riskLevels: ['CRITICAL'],
+        progressRange: [0, 100],
+        amountRange: [0, Infinity],
+        delayRange: [0, 365]
+      } 
+    },
+    { 
+      name: 'Perfect Pace Projects', 
+      icon: Zap, 
+      filters: { 
+        healthStatuses: ['PERFECT_PACE']
+      } 
+    },
+    { 
+      name: 'Sleep Pace Projects', 
+      icon: PauseCircle, 
+      filters: { 
+        healthStatuses: ['SLEEP_PACE']
+      } 
+    },
+    { 
+      name: 'Payment Pending', 
+      icon: CreditCard, 
+      filters: { 
+        healthStatuses: ['PAYMENT_PENDING']
+      } 
+    },
+    { 
+      name: 'Not Yet Started', 
+      icon: PlayCircle, 
+      filters: { 
+        progressCategories: ['AWARDED_NOT_STARTED', 'NOT_STARTED']
+      } 
+    },
+    { 
+      name: 'Halfway Complete', 
+      icon: Activity, 
+      filters: { 
+        progressCategories: ['PROGRESS_51_TO_71']
+      } 
+    },
+    { 
+      name: 'Nearly Done', 
+      icon: Target, 
+      filters: { 
+        progressCategories: ['PROGRESS_71_TO_99']
+      } 
+    },
+    { 
+      name: 'Tendered Not Awarded', 
+      icon: FileText, 
+      filters: { 
+        progressCategories: ['TENDERED_NOT_AWARDED']
+      } 
+    },
+    { 
+      name: 'Delayed > 90 days', 
+      icon: Clock, 
+      filters: { 
+        delayRange: [90, 365],
+        progressRange: [0, 100],
+        amountRange: [0, Infinity]
+      } 
+    },
+    { 
+      name: 'High Budget (>500L)', 
+      icon: DollarSign, 
+      filters: { 
+        amountRange: [50000, Infinity],
+        progressRange: [0, 100],
+        delayRange: [0, 365]
+      } 
+    }
+  ]);
+
+  // Data range calculations
+  const dataRanges = useMemo(() => {
+    if (!rawData || rawData.length === 0) {
+      return {
+        amountMin: 0,
+        amountMax: 100000,
+        delayMin: 0,
+        delayMax: 365,
+        progressMin: 0,
+        progressMax: 100,
+        efficiencyMin: 0,
+        efficiencyMax: 100,
+        healthMin: 0,
+        healthMax: 100,
+        expectedProgressMin: 0,
+        expectedProgressMax: 100
+      };
+    }
+
+    const amounts = rawData.map(d => d.sanctioned_amount || 0);
+    const delays = rawData.map(d => d.delay_days || 0);
+    const progress = rawData.map(d => d.physical_progress || 0);
+    const efficiency = rawData.map(d => d.efficiency_score || 0);
+    const health = rawData.map(d => d.health_score || 0);
+    const expectedProgress = rawData.map(d => d.expected_progress || 0);
+
+    return {
+      amountMin: Math.min(...amounts),
+      amountMax: Math.max(...amounts, 100000),
+      delayMin: 0,
+      delayMax: Math.max(...delays, 365),
+      progressMin: 0,
+      progressMax: 100,
+      efficiencyMin: 0,
+      efficiencyMax: 100,
+      healthMin: Math.min(...health, 0),
+      healthMax: Math.max(...health, 100),
+      expectedProgressMin: 0,
+      expectedProgressMax: 100
+    };
+  }, [rawData]);
+
   // Auto-refresh functionality
   useEffect(() => {
     if (refreshInterval) {
@@ -355,6 +483,39 @@ const Engineering = () => {
     }
 
     return insights;
+  };
+
+  const applyPreset = (preset) => {
+    // Reset all filters first
+    filters.resetFilters();
+    
+    // Apply preset filters
+    Object.entries(preset.filters).forEach(([key, value]) => {
+      switch(key) {
+        case 'riskLevels':
+          filters.setSelectedRiskLevels(value);
+          break;
+        case 'healthStatuses':
+          filters.setSelectedHealthStatuses(value);
+          break;
+        case 'progressCategories':
+          filters.setSelectedProgressCategories(value);
+          break;
+        case 'delayRange':
+          const maxDelay = Math.max(...(rawData.map(d => d.delay_days || 0)), 365);
+          filters.setDelayRange([value[0], Math.min(value[1], maxDelay)]);
+          break;
+        case 'amountRange':
+          const maxAmount = Math.max(...(rawData.map(d => d.sanctioned_amount || 0)), 100000);
+          filters.setAmountRange([value[0], value[1] === Infinity ? maxAmount : Math.min(value[1], maxAmount)]);
+          break;
+        case 'progressRange':
+          filters.setProgressRange(value);
+          break;
+        default:
+          break;
+      }
+    });
   };
 
   // Handler Functions
@@ -680,12 +841,42 @@ const Engineering = () => {
     }
   }, [metrics]);
 
-  // Handler for TabView filter changes
-  const handleTabViewFilterChange = useCallback((type, value) => {
-    console.log('TabView filter changed:', type, value);
-    // The TabView component already updates the filters directly
-    // This is just for any additional handling if needed
-  }, []);
+  const handleResetAll = () => {
+    filters.resetFilters();
+  };
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.searchTerm) count++;
+    if (filters.selectedStatuses?.length > 0) count++;
+    if (filters.selectedRiskLevels?.length > 0) count++;
+    if (filters.selectedBudgetHeads?.length > 0) count++;
+    if (filters.selectedAgencies?.length > 0) count++;
+    if (filters.selectedFrontierHQs?.length > 0) count++;
+    if (filters.selectedSectorHQs?.length > 0) count++;
+    if (filters.selectedContractors?.length > 0) count++;
+    if (filters.selectedLocations?.length > 0) count++;
+    if (filters.selectedProgressCategories?.length > 0) count++;
+    if (filters.selectedHealthStatuses?.length > 0) count++;
+    if (filters.selectedSchemes?.length > 0) count++;
+    
+    // Check if ranges are modified from defaults
+    if (filters.progressRange && (filters.progressRange[0] > 0 || filters.progressRange[1] < 100)) count++;
+    if (filters.amountRange && (filters.amountRange[0] > dataRanges.amountMin || filters.amountRange[1] < dataRanges.amountMax)) count++;
+    if (filters.delayRange && (filters.delayRange[0] > 0 || filters.delayRange[1] < dataRanges.delayMax)) count++;
+    if (filters.efficiencyRange && (filters.efficiencyRange[0] > 0 || filters.efficiencyRange[1] < 100)) count++;
+    if (filters.healthRange && (filters.healthRange[0] > dataRanges.healthMin || filters.healthRange[1] < dataRanges.healthMax)) count++;
+    if (filters.expectedProgressRange && (filters.expectedProgressRange[0] > 0 || filters.expectedProgressRange[1] < 100)) count++;
+    
+    // Count active date filters
+    if (filters.dateFilters) {
+      Object.values(filters.dateFilters).forEach(filter => {
+        if (filter && filter.enabled === true) count++;
+      });
+    }
+    
+    return count;
+  }, [filters, dataRanges]);
 
   // Component Functions
   const QuickActionsPanel = () => (
@@ -800,7 +991,6 @@ const Engineering = () => {
             filters={filters}
             darkMode={darkMode}
             rawData={rawData}
-            onFilterChange={handleTabViewFilterChange}
           />
 
           {/* Metrics Cards */}
@@ -1113,6 +1303,34 @@ const Engineering = () => {
                   Export
                 </button>
 
+                {/* Quick Filters Dropdown */}
+                <div className="relative group">
+                  <button className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1 ${
+                    darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
+                  } transition-all`}>
+                    <Sparkles size={14} />
+                    Quick Filters
+                    <ChevronDown size={14} />
+                  </button>
+                  <div className={`absolute top-full mt-2 right-0 w-56 rounded-lg shadow-xl z-50 ${
+                    darkMode ? 'bg-gray-800' : 'bg-white'
+                  } border ${darkMode ? 'border-gray-700' : 'border-gray-200'}
+                  opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all`}>
+                    {filterPresets.map((preset, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => applyPreset(preset)}
+                        className={`w-full px-3 py-2.5 text-left text-xs hover:${
+                          darkMode ? 'bg-gray-700' : 'bg-blue-50'
+                        } transition-colors flex items-center gap-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}
+                      >
+                        <preset.icon size={12} className="text-blue-500" />
+                        {preset.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Dark Mode Toggle */}
                 <button
                   onClick={() => setDarkMode(!darkMode)}
@@ -1153,8 +1371,9 @@ const Engineering = () => {
           )}
 
           {/* Filter Panel */}
-          <FilterPanel filters={filters} darkMode={darkMode} rawData={rawData} />
-        
+          {viewMode !== 'fastfilter' && (
+            <FilterPanel filters={filters} darkMode={darkMode} rawData={rawData} />
+          )}
 
           {/* Main Content */}
           {renderMainContent()}
@@ -1186,6 +1405,75 @@ const Engineering = () => {
 
           {/* Quick Actions Panel */}
           <QuickActionsPanel />
+
+          {/* Active Filters Summary */}
+          {activeFilterCount > 0 && viewMode !== 'fastfilter' && (
+            <div className={`fixed bottom-4 left-4 right-4 max-w-[1920px] mx-auto z-20 ${
+              darkMode ? 'bg-gray-800/95' : 'bg-white/95'
+            } backdrop-blur rounded-xl shadow-lg p-3 border ${
+              darkMode ? 'border-gray-700' : 'border-gray-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-gray-500">Active:</span>
+                  
+                  {filters.searchTerm && (
+                    <span className="px-2 py-0.5 bg-white dark:bg-gray-700 text-xs rounded-full flex items-center gap-1 shadow-sm">
+                      <Search size={10} />
+                      "{filters.searchTerm}"
+                      <button onClick={() => filters.setSearchTerm('')} className="ml-1">
+                        <X size={10} />
+                      </button>
+                    </span>
+                  )}
+                  
+                  {filters.selectedSchemes?.length > 0 && (
+                    <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-xs rounded-full">
+                      {filters.selectedSchemes.length} Scheme{filters.selectedSchemes.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                  
+                  {filters.selectedProgressCategories?.length > 0 && (
+                    <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded-full">
+                      {filters.selectedProgressCategories.length} Progress Stage{filters.selectedProgressCategories.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                  
+                  {filters.selectedHealthStatuses?.length > 0 && (
+                    <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded-full">
+                      {filters.selectedHealthStatuses.length} Health Status{filters.selectedHealthStatuses.length > 1 ? 'es' : ''}
+                    </span>
+                  )}
+                  
+                  {filters.selectedBudgetHeads?.length > 0 && (
+                    <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full">
+                      {filters.selectedBudgetHeads.length} Budget Head{filters.selectedBudgetHeads.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                  
+                  {filters.selectedFrontierHQs?.length > 0 && (
+                    <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded-full">
+                      {filters.selectedFrontierHQs.length} Frontier HQ{filters.selectedFrontierHQs.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                  
+                  {filters.selectedSectorHQs?.length > 0 && (
+                    <span className="px-2 py-0.5 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 text-xs rounded-full">
+                      {filters.selectedSectorHQs.length} Sector HQ{filters.selectedSectorHQs.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+                
+                <button
+                  onClick={handleResetAll}
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                >
+                  <X size={12} />
+                  Clear All
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Comparison Panel */}
           {compareMode && selectedProjects.length > 0 && (
@@ -1291,5 +1579,6 @@ const Engineering = () => {
     </div>
   );
 };
+
 
 export default Engineering;

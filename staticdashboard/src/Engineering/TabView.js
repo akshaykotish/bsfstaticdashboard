@@ -266,6 +266,13 @@ const TabView = ({ filters, darkMode, rawData = [] }) => {
 
   const hasActiveFilters = filters.hasActiveFilters ? filters.hasActiveFilters() : false;
 
+  // Debug log to verify filters object
+  console.log('[TabView] Filters object:', {
+    hasSetSelectedSchemes: typeof filters.setSelectedSchemes === 'function',
+    selectedSchemes: filters.selectedSchemes,
+    availableSchemes: availableOptions.schemes?.slice(0, 3)
+  });
+
   return (
     <div className="space-y-3">
       {/* Header */}
@@ -355,29 +362,67 @@ const TabView = ({ filters, darkMode, rawData = [] }) => {
           totalCount={allOptions.frontierHQs.length}
         />
 
-        {/* Schemes - This will now work because we're using filters directly */}
+        {/* Schemes - FIXED IMPLEMENTATION */}
         <FilterRow
           title="Schemes"
           icon={Briefcase}
           items={availableOptions.schemes}
           selectedItems={filters.selectedSchemes || []}
           onToggle={(item) => {
-            const current = filters.selectedSchemes || [];
-
-            if (current.includes(item)) {
-              filters.setSelectedSchemes(current.filter(i => i !== item));
-            } else {
-              filters.setSelectedSchemes([...current, item]);
-                console.log(current, item, filters.setSelectedSchemes);
+            console.log('[TabView] Scheme toggle clicked:', item);
+            console.log('[TabView] Current selected schemes:', filters.selectedSchemes);
+            
+            if (!filters.setSelectedSchemes || typeof filters.setSelectedSchemes !== 'function') {
+              console.error('[TabView] setSelectedSchemes is not a function!');
+              return;
             }
-            console.log(filters, item);
+            
+            const current = filters.selectedSchemes || [];
+            const newSelection = current.includes(item) 
+              ? current.filter(i => i !== item)
+              : [...current, item];
+            
+            console.log('[TabView] New selection will be:', newSelection);
+            filters.setSelectedSchemes(newSelection);
           }}
-          onClearAll={() => filters.setSelectedSchemes([])}
-          onSelectAll={() => filters.setSelectedSchemes(availableOptions.schemes)}
+          onClearAll={() => {
+            console.log('[TabView] Clear all schemes clicked');
+            if (filters.setSelectedSchemes) {
+              filters.setSelectedSchemes([]);
+            }
+          }}
+          onSelectAll={() => {
+            console.log('[TabView] Select all schemes clicked');
+            if (filters.setSelectedSchemes) {
+              filters.setSelectedSchemes(availableOptions.schemes);
+            }
+          }}
           showCounts={true}
           itemCounts={counts.schemes}
           isFiltered={availableOptions.schemes.length < allOptions.schemes.length}
           totalCount={allOptions.schemes.length}
+        />
+
+        {/* Sector HQs */}
+        <FilterRow
+          title="Sector HQs"
+          icon={Globe}
+          items={availableOptions.sectorHQs}
+          selectedItems={filters.selectedSectorHQs || []}
+          onToggle={(item) => {
+            const current = filters.selectedSectorHQs || [];
+            if (current.includes(item)) {
+              filters.setSelectedSectorHQs(current.filter(i => i !== item));
+            } else {
+              filters.setSelectedSectorHQs([...current, item]);
+            }
+          }}
+          onClearAll={() => filters.setSelectedSectorHQs([])}
+          onSelectAll={() => filters.setSelectedSectorHQs(availableOptions.sectorHQs)}
+          showCounts={true}
+          itemCounts={counts.sectorHQs}
+          isFiltered={availableOptions.sectorHQs.length < allOptions.sectorHQs.length}
+          totalCount={allOptions.sectorHQs.length}
         />
 
         {/* Progress Categories */}
