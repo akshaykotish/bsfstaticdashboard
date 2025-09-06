@@ -77,30 +77,7 @@ const ReportModal = ({ isOpen, onClose, projectData, darkMode }) => {
           maxHeight: 'calc(100vh - 2rem)',
         }}
       >
-        {/* Modal Header with Close Button */}
-        <div className={`flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'} flex-shrink-0`}>
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="p-1.5 sm:p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex-shrink-0">
-              <FileText size={16} className="sm:w-5 sm:h-5 text-white" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-sm sm:text-lg font-bold text-gray-900 dark:text-gray-100 truncate">
-                Project Report
-              </h2>
-              <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
-                S.No: {projectData?.serial_no || 'N/A'}
-              </p>
-            </div>
-          </div>
-          
-          <button
-            onClick={onClose}
-            className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg sm:rounded-xl transition-colors group flex-shrink-0"
-            aria-label="Close modal"
-          >
-            <X size={18} className="sm:w-5 sm:h-5 text-gray-500 group-hover:text-gray-900 dark:group-hover:text-gray-100" />
-          </button>
-        </div>
+
         
         {/* Modal Body with Report Component - Scrollable */}
         <div 
@@ -129,6 +106,7 @@ const ReportModal = ({ isOpen, onClose, projectData, darkMode }) => {
                 projectData={projectData} 
                 darkMode={darkMode} 
                 isInModal={true} 
+                onclose={onClose}
               />
             </div>
           </div>

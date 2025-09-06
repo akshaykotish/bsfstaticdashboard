@@ -7,7 +7,7 @@ import {
   ChevronDown, Eye, Maximize2, Minimize2, Grid3x3,
   Search, Database, BarChart3, Users, MapPin,
   Calendar, Building2, Target, Shield, GitBranch,
-  FileText, Menu, Home, LogOut, HelpCircle, Link2, Info
+  FileText, Menu, Home, LogOut, HelpCircle, Link2, Info, Layers
 } from 'lucide-react';
 import { useData } from './useData';
 import { useFilters } from './useFilters';
@@ -17,7 +17,26 @@ import ChartTabs from './ChartTabs';
 import DataTable from './DataTable';
 import Modal from './Modal';
 import AISuggestions from './AISuggestions';
+import TabView from './TabView';
 import { calculateMetrics, exportData, printReport } from './utils';
+
+// Cookie utility functions
+const setCookie = (name, value, days = 365) => {
+  const expires = new Date();
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+};
+
+const getCookie = (name) => {
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for(let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+};
 
 // Helper function to format currency amounts properly
 const formatAmount = (value) => {
@@ -40,7 +59,10 @@ const formatAmount = (value) => {
 
 const Engineering = () => {
   // State Management
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = getCookie('engineering_darkMode');
+    return saved === 'true';
+  });
   const [showNotifications, setShowNotifications] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -50,7 +72,10 @@ const Engineering = () => {
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [savedFilters, setSavedFilters] = useState([]);
   const [showAISuggestions, setShowAISuggestions] = useState(true);
-  const [viewMode, setViewMode] = useState('dashboard');
+  const [viewMode, setViewMode] = useState(() => {
+    const saved = getCookie('engineering_viewMode');
+    return saved || 'dashboard';
+  });
   const [refreshInterval, setRefreshInterval] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [layoutMode, setLayoutMode] = useState('default');
@@ -63,6 +88,15 @@ const Engineering = () => {
   // Custom hooks for data and filters
   const { rawData, loading, error, refetch, lastUpdate, dataStats } = useData();
   const filters = useFilters();
+
+  // Save preferences to cookies when they change
+  useEffect(() => {
+    setCookie('engineering_darkMode', darkMode.toString());
+  }, [darkMode]);
+
+  useEffect(() => {
+    setCookie('engineering_viewMode', viewMode);
+  }, [viewMode]);
 
   // Initialize filters with raw data
   useEffect(() => {
@@ -646,6 +680,13 @@ const Engineering = () => {
     }
   }, [metrics]);
 
+  // Handler for TabView filter changes
+  const handleTabViewFilterChange = useCallback((type, value) => {
+    console.log('TabView filter changed:', type, value);
+    // The TabView component already updates the filters directly
+    // This is just for any additional handling if needed
+  }, []);
+
   // Component Functions
   const QuickActionsPanel = () => (
     <div className={`fixed bottom-4 right-4 z-40 ${
@@ -750,6 +791,170 @@ const Engineering = () => {
     );
   };
 
+  const renderMainContent = () => {
+    if (viewMode === 'fastfilter') {
+      return (
+        <>
+          {/* Tab View for Fast Filtering */}
+          <TabView
+            filters={filters}
+            darkMode={darkMode}
+            rawData={rawData}
+            onFilterChange={handleTabViewFilterChange}
+          />
+
+          {/* Metrics Cards */}
+          <MetricsCards 
+            metrics={metrics} 
+            darkMode={darkMode}
+            filteredData={filteredData}
+            onMetricClick={handleDrillDown}
+            onProjectSelect={handleProjectSelect}
+          />
+
+          {/* Chart Tabs */}
+          <ChartTabs
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            filteredData={filteredData}
+            rawData={rawData}
+            darkMode={darkMode}
+            compareMode={compareMode}
+            selectedProjects={selectedProjects}
+            onProjectSelect={handleProjectSelect}
+            onDrillDown={handleDrillDown}
+            filters={filters}
+            setModalProject={setSelectedProject}
+            setModalOpen={setModalOpen}
+            onExportReport={handleExportReport}
+            onPrintReport={handlePrintReport}
+          />
+        </>
+      );
+    }
+
+    // Default content for other view modes
+    return (
+      <>
+        {/* Metrics Cards */}
+        <MetricsCards 
+          metrics={metrics} 
+          darkMode={darkMode}
+          filteredData={filteredData}
+          onMetricClick={handleDrillDown}
+          onProjectSelect={handleProjectSelect}
+        />
+
+        {/* Main Content Based on View Mode */}
+        {viewMode === 'dashboard' && (
+          <ChartTabs
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            filteredData={filteredData}
+            rawData={rawData}
+            darkMode={darkMode}
+            compareMode={compareMode}
+            selectedProjects={selectedProjects}
+            onProjectSelect={handleProjectSelect}
+            onDrillDown={handleDrillDown}
+            filters={filters}
+            setModalProject={setSelectedProject}
+            setModalOpen={setModalOpen}
+            onExportReport={handleExportReport}
+            onPrintReport={handlePrintReport}
+          />
+        )}
+
+        {viewMode === 'table' && (
+          <div className="w-full">
+            <DataTable
+              data={filteredData}
+              darkMode={darkMode}
+              onRowClick={handleProjectSelect}
+              compareMode={compareMode}
+              selectedProjects={selectedProjects}
+            />
+          </div>
+        )}
+
+        {viewMode === 'kanban' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+            {['NOT_STARTED', 'IN_PROGRESS', 'ADVANCED', 'COMPLETED'].map(status => (
+              <div key={status} className={`${
+                darkMode ? 'bg-gray-800' : 'bg-white'
+              } rounded-2xl shadow-sm p-4 border ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                <h3 className="font-semibold mb-3 text-sm uppercase tracking-wider flex items-center justify-between">
+                  {status.replace('_', ' ')}
+                  <span className={`px-2 py-1 rounded-full text-xs ${
+                    darkMode ? 'bg-gray-700' : 'bg-gray-100'
+                  }`}>
+                    {filteredData.filter(p => {
+                      if (status === 'NOT_STARTED') return p.physical_progress === 0;
+                      if (status === 'IN_PROGRESS') return p.physical_progress > 0 && p.physical_progress <= 50;
+                      if (status === 'ADVANCED') return p.physical_progress > 50 && p.physical_progress < 100;
+                      if (status === 'COMPLETED') return p.physical_progress >= 100;
+                      return false;
+                    }).length}
+                  </span>
+                </h3>
+                <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                  {filteredData
+                    .filter(p => {
+                      if (status === 'NOT_STARTED') return p.physical_progress === 0;
+                      if (status === 'IN_PROGRESS') return p.physical_progress > 0 && p.physical_progress <= 50;
+                      if (status === 'ADVANCED') return p.physical_progress > 50 && p.physical_progress < 100;
+                      if (status === 'COMPLETED') return p.physical_progress >= 100;
+                      return false;
+                    })
+                    .slice(0, 20)
+                    .map(project => (
+                      <div
+                        key={project.id}
+                        onClick={() => handleProjectSelect(project)}
+                        className={`p-3 rounded-lg cursor-pointer transition-all ${
+                          darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'
+                        } ${selectedProjects.find(p => p.id === project.id) ? 'ring-2 ring-blue-500' : ''}`}
+                      >
+                        <p className="text-sm font-semibold mb-1 truncate">
+                          {project.scheme_name}
+                        </p>
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>{formatAmount(project.sanctioned_amount)}</span>
+                          <span className={`px-2 py-0.5 rounded-full ${
+                            project.risk_level === 'CRITICAL' ? 'bg-red-100 text-red-700' :
+                            project.risk_level === 'HIGH' ? 'bg-orange-100 text-orange-700' :
+                            project.risk_level === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-green-100 text-green-700'
+                          }`}>
+                            {project.risk_level}
+                          </span>
+                        </div>
+                        <div className="mt-2 w-full bg-gray-200 rounded-full h-1">
+                          <div 
+                            className="h-1 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
+                            style={{ width: `${project.physical_progress}%` }}
+                          />
+                        </div>
+                        <div className="mt-2 flex items-center justify-between text-xs">
+                          <span className="text-gray-500 truncate">{project.executive_agency}</span>
+                          {project.delay_days > 0 && (
+                            <span className="text-red-500 flex items-center gap-1">
+                              <Clock size={10} />
+                              {project.delay_days}d
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </>
+    );
+  };
+
   // Loading State
   if (loading) {
     return (
@@ -837,9 +1042,9 @@ const Engineering = () => {
               </div>
               
               <div className="flex flex-wrap gap-2">
-                {/* View Mode Toggle */}
+                {/* View Mode Toggle - Updated with Fast Filter option */}
                 <div className="flex rounded-lg overflow-hidden shadow-sm">
-                  {['dashboard', 'table', 'kanban'].map(mode => (
+                  {['dashboard', 'table', 'kanban', 'fastfilter'].map(mode => (
                     <button
                       key={mode}
                       onClick={() => setViewMode(mode)}
@@ -847,15 +1052,16 @@ const Engineering = () => {
                         viewMode === mode
                           ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
                           : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
-                      } hover:opacity-90 transition-all`}
+                      } hover:opacity-90 transition-all flex items-center gap-1`}
                     >
-                      {mode}
+                      {mode === 'fastfilter' && <Layers size={14} />}
+                      {mode === 'fastfilter' ? 'Fast Filter' : mode}
                     </button>
                   ))}
                 </div>
 
                 {/* Filter Info Toggle */}
-                {isCascadingActive && (
+                {isCascadingActive && viewMode !== 'fastfilter' && (
                   <button
                     onClick={() => setShowFilterInfo(!showFilterInfo)}
                     className={`px-4 py-2 text-sm rounded-lg transition-all flex items-center gap-2 ${
@@ -921,7 +1127,7 @@ const Engineering = () => {
           </div>
 
           {/* Cascading Filter Info Banner */}
-          {isCascadingActive && filters.availableOptions && (
+          {isCascadingActive && filters.availableOptions && viewMode !== 'fastfilter' && (
             <div className={`${
               darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'
             } rounded-xl p-3 border flex items-center gap-3`}>
@@ -948,122 +1154,10 @@ const Engineering = () => {
 
           {/* Filter Panel */}
           <FilterPanel filters={filters} darkMode={darkMode} rawData={rawData} />
+        
 
-          {/* Metrics Cards */}
-          <MetricsCards 
-            metrics={metrics} 
-            darkMode={darkMode}
-            filteredData={filteredData}
-            onMetricClick={handleDrillDown}
-            onProjectSelect={handleProjectSelect}
-          />
-
-          {/* Main Content Based on View Mode */}
-          {viewMode === 'dashboard' && (
-            <ChartTabs
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              filteredData={filteredData}
-              rawData={rawData}
-              darkMode={darkMode}
-              compareMode={compareMode}
-              selectedProjects={selectedProjects}
-              onProjectSelect={handleProjectSelect}
-              onDrillDown={handleDrillDown}
-              filters={filters}
-              setModalProject={setSelectedProject}
-              setModalOpen={setModalOpen}
-              onExportReport={handleExportReport}
-              onPrintReport={handlePrintReport}
-            />
-          )}
-
-          {viewMode === 'table' && (
-            <div className="w-full">
-              <DataTable
-                data={filteredData}
-                darkMode={darkMode}
-                onRowClick={handleProjectSelect}
-                compareMode={compareMode}
-                selectedProjects={selectedProjects}
-              />
-            </div>
-          )}
-
-          {viewMode === 'kanban' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-              {['NOT_STARTED', 'IN_PROGRESS', 'ADVANCED', 'COMPLETED'].map(status => (
-                <div key={status} className={`${
-                  darkMode ? 'bg-gray-800' : 'bg-white'
-                } rounded-2xl shadow-sm p-4 border ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-                  <h3 className="font-semibold mb-3 text-sm uppercase tracking-wider flex items-center justify-between">
-                    {status.replace('_', ' ')}
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      darkMode ? 'bg-gray-700' : 'bg-gray-100'
-                    }`}>
-                      {filteredData.filter(p => {
-                        if (status === 'NOT_STARTED') return p.physical_progress === 0;
-                        if (status === 'IN_PROGRESS') return p.physical_progress > 0 && p.physical_progress <= 50;
-                        if (status === 'ADVANCED') return p.physical_progress > 50 && p.physical_progress < 100;
-                        if (status === 'COMPLETED') return p.physical_progress >= 100;
-                        return false;
-                      }).length}
-                    </span>
-                  </h3>
-                  <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                    {filteredData
-                      .filter(p => {
-                        if (status === 'NOT_STARTED') return p.physical_progress === 0;
-                        if (status === 'IN_PROGRESS') return p.physical_progress > 0 && p.physical_progress <= 50;
-                        if (status === 'ADVANCED') return p.physical_progress > 50 && p.physical_progress < 100;
-                        if (status === 'COMPLETED') return p.physical_progress >= 100;
-                        return false;
-                      })
-                      .slice(0, 20)
-                      .map(project => (
-                        <div
-                          key={project.id}
-                          onClick={() => handleProjectSelect(project)}
-                          className={`p-3 rounded-lg cursor-pointer transition-all ${
-                            darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'
-                          } ${selectedProjects.find(p => p.id === project.id) ? 'ring-2 ring-blue-500' : ''}`}
-                        >
-                          <p className="text-sm font-semibold mb-1 truncate">
-                            {project.scheme_name}
-                          </p>
-                          <div className="flex justify-between text-xs text-gray-500">
-                            <span>{formatAmount(project.sanctioned_amount)}</span>
-                            <span className={`px-2 py-0.5 rounded-full ${
-                              project.risk_level === 'CRITICAL' ? 'bg-red-100 text-red-700' :
-                              project.risk_level === 'HIGH' ? 'bg-orange-100 text-orange-700' :
-                              project.risk_level === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-green-100 text-green-700'
-                            }`}>
-                              {project.risk_level}
-                            </span>
-                          </div>
-                          <div className="mt-2 w-full bg-gray-200 rounded-full h-1">
-                            <div 
-                              className="h-1 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
-                              style={{ width: `${project.physical_progress}%` }}
-                            />
-                          </div>
-                          <div className="mt-2 flex items-center justify-between text-xs">
-                            <span className="text-gray-500 truncate">{project.executive_agency}</span>
-                            {project.delay_days > 0 && (
-                              <span className="text-red-500 flex items-center gap-1">
-                                <Clock size={10} />
-                                {project.delay_days}d
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Main Content */}
+          {renderMainContent()}
 
           {/* Project Detail Modal */}
           {modalOpen && selectedProject && (
@@ -1088,7 +1182,7 @@ const Engineering = () => {
           )}
 
           {/* Filter Info Panel */}
-          <FilterInfoPanel />
+          {viewMode !== 'fastfilter' && <FilterInfoPanel />}
 
           {/* Quick Actions Panel */}
           <QuickActionsPanel />

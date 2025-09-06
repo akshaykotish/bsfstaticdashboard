@@ -7,12 +7,16 @@ import {
   Info, Target, Award, Briefcase, Hash, Package, FileCheck,
   CalendarDays, CalendarClock, CalendarCheck, CalendarX,
   GitBranch, Layers, Navigation, Globe, Heart, PlayCircle,
-  XCircle, BarChart3, PieChart, LineChart, Percent, TrendingDown
+  XCircle, BarChart3, PieChart, LineChart, Percent, TrendingDown,
+  Cross,
+  EyeClosed,
+  Table,
+  ShieldCloseIcon
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
-const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = false }) => {
+const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = false, onclose }) => {
   const [exporting, setExporting] = useState(false);
   const [activeSection, setActiveSection] = useState('all');
   const reportRef = useRef(null);
@@ -563,6 +567,16 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
               <Printer size={16} />
               <span>Print</span>
             </button>
+
+            <button
+              onClick={onclose}
+              disabled={exporting}
+              className="btn btn-close"
+              title="Print Report"
+            >
+              <ShieldCloseIcon size={16} />
+              <span>Close</span>
+            </button>
           </div>
         </div>
       </div>
@@ -925,6 +939,14 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
         .btn-secondary:hover {
           background: #f9fafb;
         }
+
+        
+        .btn-close {
+          background: red;
+          color: #ffffffff;
+          border: 1px solid #e5e7eb;
+        }
+
 
         /* Report Content Styles */
         .report-wrapper {
