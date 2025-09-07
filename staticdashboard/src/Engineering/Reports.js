@@ -453,12 +453,11 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                background: #f0f0f0;
+                background: #ffffffff;
               }
               img {
                 max-width: 100%;
                 height: auto;
-                box-shadow: 0 0 20px rgba(0,0,0,0.1);
               }
             </style>
           </head>
@@ -586,6 +585,24 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
         <div ref={reportRef} className="report-content">
           {/* Project Header */}
           <div className="project-header">
+            <div className='BrandingHeader'>
+              <div className='BSFTitle'>
+                <div className='bsflogo'>
+                  <img src='./bsf.png' width={40} height={40} />
+                </div>
+                <div className='bsfheading'>
+                  <span>Border Security Force</span>
+                  <span>सीमा सुरक्षा बल</span>
+                </div>
+              </div>
+              <div className='BSFoffice'>
+                <h5>SDG HQ WESTERN COMMAND</h5>
+                <span>MQRM+G2V, Ram Darbar Rd, Industrial Area Phase II,<br/> Chandigarh, 160003</span>
+              </div>
+            </div>
+            <div className='flag-divider'>
+
+            </div>
             <h2>{project.scheme_name}</h2>
             <div className="project-meta">
               <span><Hash size={12} /> {project.serial_no}</span>
@@ -841,7 +858,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
 
           {/* Footer */}
           <div className="report-footer">
-            Generated on {new Date().toLocaleString()} | BSF Dashboard | www.akshaykotish.com | connect@akshaykotish.com
+            Generated on {new Date().toLocaleString()} | WC HQ Engineering | www.akshaykotish.com | connect@akshaykotish.com
           </div>
         </div>
       </div>
@@ -852,6 +869,70 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
           background: white;
           min-height: 100vh;
         }
+
+        .BrandingHeader{
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: space-between;
+          align-items: flex-start;
+          align-content: flex-start;
+          flex-direction: row;
+        }
+          
+
+        .flag-divider {
+          height: 3px;
+          width: 100%;
+          background: linear-gradient(to right, #FF9933 0%, #FFFFFF 50%, #138808 100%);
+          border: none;
+          margin-bottom:1rem;
+          margin-top: 1rem;
+        }
+
+        .BSFTitle{
+          font-size: 15pt;
+          font-weight: bold;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: flex-start;
+          align-items: flex-start;
+          align-content: flex-start;
+          flex-direction: row;
+        }
+
+        .bsflogo{
+          margin-right: 1rem;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          align-items: flex-end;
+          align-content: flex-end;
+          flex-direction: row;
+          width: 50px;
+          height: 50px;
+        }
+
+        .bsfheading{
+          font-size: 14pt;
+          font-weight: bold;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: flex-start;
+          align-items: flex-start;
+          align-content: flex-start;
+          flex-direction: column;
+        }
+
+        .BSFoffice{
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: flex-start;
+          align-items: flex-start;
+          align-content: flex-start;
+          flex-direction: column;
+          font-size: 8pt;
+        }
+        
 
         /* Header Styles */
         .report-header {
@@ -875,18 +956,18 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
         .header-title {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
+          gap: 0.55rem;
         }
 
         .title-icon {
-          padding: 0.5rem;
+          padding: 0.4rem;
           background: linear-gradient(135deg, #3b82f6, #2563eb);
-          border-radius: 0.375rem;
+          border-radius: 0.275rem;
           color: white;
         }
 
         .header-title h1 {
-          font-size: 1.125rem;
+          font-size: 1.025rem;
           font-weight: 700;
           color: #111827;
           margin: 0;
@@ -973,7 +1054,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
         .export-mode {
           width: 1200px !important;
           max-width: 1200px !important;
-          padding: 3rem !important;
+          padding: 2rem !important;
           background: white !important;
         }
 
@@ -998,27 +1079,31 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
         .project-meta {
           display: flex;
           flex-wrap: wrap;
-          gap: 1.5rem;
+          gap: 1.6rem;
           font-size: 0.875rem;
           color: #6b7280;
         }
 
         .project-meta span {
+          gap: 0.475rem;
           display: flex;
-          align-items: center;
-          gap: 0.375rem;
+          flex-wrap: wrap;
+          justify-content: center;
+          align-items: flex-end;
+          align-content: flex-end;
+          flex-direction: row;
         }
 
         /* Metrics Grid */
         .metrics-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
-          gap: 1.5rem;
-          margin-bottom: 2rem;
+          gap: 0.3rem;
+          margin-bottom: 1rem;
         }
 
         .metric-card {
-          padding: 1.25rem;
+          padding: 1rem;
           background: #f9fafb;
           border: 1px solid #e5e7eb;
           border-radius: 0.5rem;
@@ -1028,32 +1113,32 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 0.75rem;
+          margin-bottom: 0.4rem;
         }
 
         .metric-header span {
-          font-size: 0.75rem;
+          font-size: 0.55rem;
           color: #6b7280;
           text-transform: uppercase;
           letter-spacing: 0.05em;
         }
 
         .metric-value {
-          font-size: 1.5rem;
+          font-size: 1rem;
           font-weight: 700;
           margin-bottom: 0.75rem;
         }
 
         .progress-bar {
           width: 100%;
-          height: 0.375rem;
+          height: 0.1rem;
           background: #e5e7eb;
           border-radius: 9999px;
           overflow: hidden;
         }
 
         .progress-bar.small {
-          height: 0.25rem;
+          height: 0.1rem;
         }
 
         .progress-fill {
@@ -1064,7 +1149,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
         }
 
         .progress-fill.secondary {
-          background: #9ca3af;
+          background: #de2358ff;
         }
 
         .metric-subtitle {
@@ -1078,12 +1163,13 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 1.5rem;
-          margin-bottom: 2rem;
+          margin-bottom: 1rem;
         }
 
         .detail-card {
-          padding: 1.25rem;
-          background: #f9fafb;
+          padding: 1rem;
+          background: #ffffffff;
+          border: solid 1px #ccccccff;
           border-radius: 0.5rem;
         }
 
@@ -1091,7 +1177,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
           display: flex;
           align-items: center;
           gap: 0.375rem;
-          font-size: 0.875rem;
+          font-size: 0.775rem;
           font-weight: 600;
           color: #374151;
           margin: 0 0 1rem 0;
