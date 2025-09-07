@@ -370,7 +370,7 @@ const App = () => {
 
           {/* Version Info */}
           <div className="px-2 text-[10px] text-gray-500">
-            v2.1.0 | © 2024 BSF
+            v2.1.0 | © 2025 BSF
           </div>
         </div>
       </header>

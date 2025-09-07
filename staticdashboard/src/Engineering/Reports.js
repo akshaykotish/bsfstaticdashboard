@@ -572,7 +572,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
               onClick={onclose}
               disabled={exporting}
               className="btn btn-close"
-              title="Print Report"
+              title="Close Report"
             >
               <ShieldCloseIcon size={16} />
               <span>Close</span>
@@ -730,7 +730,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
                   ['PDC Agreement', formatDate(project.pdc_agreement)],
                   ['Revised PDC', formatDate(project.revised_pdc)],
                   ['Completion Date', formatDate(project.actual_completion_date)],
-                  ['Time Allowed', `${project.time_allowed_days || 0} days`],
+                  ['Time Allowed', processedProject.calculated_time_allowed?.formatted || 'N/A'],
                   ['Time Elapsed', `${metrics.timeElapsed} days`]
                 ].filter(([_, value]) => value && value !== 'N/A').map(([label, value]) => (
                   <div key={label} className="detail-item">
@@ -792,6 +792,14 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
                   <span className="detail-label">Priority:</span>
                   <span className="detail-value">{project.priority || 'N/A'}</span>
                 </div>
+                {metrics.delayDays > 0 && (
+                  <div className="detail-item">
+                    <span className="detail-label">Delay Impact:</span>
+                    <span className="detail-value text-orange-600">
+                      {metrics.delayDays} days behind schedule
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -940,13 +948,11 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
           background: #f9fafb;
         }
 
-        
         .btn-close {
           background: red;
-          color: #ffffffff;
+          color: #ffffff;
           border: 1px solid #e5e7eb;
         }
-
 
         /* Report Content Styles */
         .report-wrapper {
@@ -1219,12 +1225,14 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
         .bg-yellow-100 { background-color: #fef3c7; }
         .bg-green-100 { background-color: #dcfce7; }
         .bg-amber-100 { background-color: #fef3c7; }
+        .bg-gray-100 { background-color: #f3f4f6; }
 
         .text-red-700 { color: #b91c1c; }
         .text-orange-700 { color: #c2410c; }
         .text-yellow-700 { color: #a16207; }
         .text-green-700 { color: #15803d; }
         .text-amber-700 { color: #a16207; }
+        .text-gray-700 { color: #374151; }
 
         /* Responsive Design */
         @media (max-width: 1024px) {
