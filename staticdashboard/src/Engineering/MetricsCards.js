@@ -20,7 +20,7 @@ import {
   MoreVertical, X, Maximize2, Filter, RefreshCw, Building2,
   Users, MapPin, Percent, Package, Cpu, ThermometerSun,
   GitBranch, Layers, FileText as FileTextIcon, Bell, Search,
-  HelpCircle
+  HelpCircle, Coins, PiggyBank, Banknote
 } from 'lucide-react';
 
 import {
@@ -72,7 +72,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     return `₹${num.toFixed(2)}Cr`;
   };
 
-  // Calculate all metrics from filteredData - Only recalculate when filteredData changes
+  // Calculate all metrics from filteredData
   const calculatedMetrics = useMemo(() => {
     if (!filteredData || filteredData.length === 0) {
       return {
@@ -87,11 +87,14 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
         // Budget Section
         totalBudget: 0,
         totalExpenditure: 0,
+        currentYearBudget: 0,
         currentYearExpenditure: 0,
+        previousYearExpenditure: 0,
+        quarterlyExpenditure: 0,
         allocatedBudget: 0,
         remainingBudget: 0,
-        periodBudget: 0,
-        periodExpenditure: 0,
+        unutilizedBudget: 0,
+        overBudgetProjects: 0,
         utilizationRate: 0,
         
         // Progress Section
@@ -158,10 +161,52 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     const underCodalFormality = filteredData.filter(d => !d.date_award || d.date_award === '').length;
     const awarded = filteredData.filter(d => d.date_award && d.date_award !== '').length;
     
-    // Budget Metrics
+    // Budget Metrics - ENHANCED
     const totalBudget = filteredData.reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
     const totalExpenditure = filteredData.reduce((sum, d) => sum + (d.total_expdr || 0), 0) / 100;
     const currentYearExpenditure = filteredData.reduce((sum, d) => sum + (d.expdr_cfy || 0), 0) / 100;
+    
+    // NEW: Current Year Budget (budget for projects started this year)
+    const currentYearBudget = filteredData
+      .filter(d => {
+        if (!d.date_award) return false;
+        try {
+          const awardDate = new Date(d.date_award);
+          return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear;
+        } catch {
+          return false;
+        }
+      })
+      .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
+    
+    // NEW: Previous Year Expenditure
+    const previousYearExpenditure = filteredData
+      .reduce((sum, d) => sum + ((d.total_expdr || 0) - (d.expdr_cfy || 0)), 0) / 100;
+    
+    // NEW: Quarterly Expenditure (current quarter)
+    const quarterStart = new Date(currentYear, currentQuarter * 3, 1);
+    const quarterlyExpenditure = filteredData
+      .filter(d => {
+        if (!d.date_award) return false;
+        try {
+          const awardDate = new Date(d.date_award);
+          return awardDate >= quarterStart;
+        } catch {
+          return false;
+        }
+      })
+      .reduce((sum, d) => sum + (d.total_expdr || 0), 0) / 100;
+    
+    // NEW: Unutilized Budget
+    const unutilizedBudget = filteredData
+      .filter(d => d.physical_progress >= 100)
+      .reduce((sum, d) => sum + ((d.sanctioned_amount || 0) - (d.total_expdr || 0)), 0) / 100;
+    
+    // NEW: Over Budget Projects
+    const overBudgetProjects = filteredData
+      .filter(d => d.total_expdr > d.sanctioned_amount)
+      .length;
+    
     const allocatedBudget = filteredData
       .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
       .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
@@ -321,14 +366,17 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       underCodalFormality,
       awarded,
       
-      // Budget
+      // Budget - ENHANCED
       totalBudget,
       totalExpenditure,
+      currentYearBudget,
       currentYearExpenditure,
+      previousYearExpenditure,
+      quarterlyExpenditure,
       allocatedBudget,
       remainingBudget,
-      periodBudget: totalBudget,
-      periodExpenditure: totalExpenditure,
+      unutilizedBudget,
+      overBudgetProjects,
       utilizationRate: totalBudget > 0 ? (totalExpenditure / totalBudget * 100) : 0,
       
       // Progress
@@ -402,7 +450,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     }
   }, []);
 
-  // Get filtered data based on metric type - ENHANCED VERSION
+  // Get filtered data based on metric type
   const getMetricData = (metricId) => {
     if (!filteredData || filteredData.length === 0) return [];
 
@@ -523,14 +571,6 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       case 'allocated':
         return filteredData.filter(d => d.aa_es_ref && d.aa_es_ref !== '');
       case 'current-year-budget':
-        return filteredData.filter(d => (d.expdr_cfy || 0) > 0);
-      case 'remaining':
-        return filteredData.filter(d => ((d.sanctioned_amount || 0) - (d.total_expdr || 0)) > 0);
-      case 'high-budget':
-        return filteredData.filter(d => d.sanctioned_amount > 50000);
-        
-      // Timeline Section
-      case 'current-year':
         const currentYear = new Date().getFullYear();
         return filteredData.filter(d => {
           if (!d.date_award) return false;
@@ -541,18 +581,55 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
             return false;
           }
         });
+      case 'current-year-expenditure':
+        return filteredData.filter(d => (d.expdr_cfy || 0) > 0);
+      case 'previous-year-expenditure':
+        return filteredData.filter(d => ((d.total_expdr || 0) - (d.expdr_cfy || 0)) > 0);
+      case 'quarterly-expenditure':
+        const currentQuarter = Math.floor(new Date().getMonth() / 3);
+        const quarterStart = new Date(new Date().getFullYear(), currentQuarter * 3, 1);
+        return filteredData.filter(d => {
+          if (!d.date_award) return false;
+          try {
+            const awardDate = new Date(d.date_award);
+            return awardDate >= quarterStart && d.total_expdr > 0;
+          } catch {
+            return false;
+          }
+        });
+      case 'remaining':
+        return filteredData.filter(d => ((d.sanctioned_amount || 0) - (d.total_expdr || 0)) > 0);
+      case 'unutilized':
+        return filteredData.filter(d => d.physical_progress >= 100 && ((d.sanctioned_amount || 0) - (d.total_expdr || 0)) > 0);
+      case 'over-budget':
+        return filteredData.filter(d => d.total_expdr > d.sanctioned_amount);
+      case 'high-budget':
+        return filteredData.filter(d => d.sanctioned_amount > 50000);
+        
+      // Timeline Section
+      case 'current-year':
+        const thisYear = new Date().getFullYear();
+        return filteredData.filter(d => {
+          if (!d.date_award) return false;
+          try {
+            const awardDate = new Date(d.date_award);
+            return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === thisYear;
+          } catch {
+            return false;
+          }
+        });
       case 'last-quarter':
         const currentMonth = new Date().getMonth();
-        const currentQuarter = Math.floor(currentMonth / 3);
-        const lastQuarter = currentQuarter === 0 ? 3 : currentQuarter - 1;
-        const checkYear = currentQuarter === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear();
+        const currentQtr = Math.floor(currentMonth / 3);
+        const lastQtr = currentQtr === 0 ? 3 : currentQtr - 1;
+        const checkYear = currentQtr === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear();
         return filteredData.filter(d => {
           if (!d.date_award) return false;
           try {
             const awardDate = new Date(d.date_award);
             if (isNaN(awardDate.getTime())) return false;
             const projectQuarter = Math.floor(awardDate.getMonth() / 3);
-            return awardDate.getFullYear() === checkYear && projectQuarter === lastQuarter;
+            return awardDate.getFullYear() === checkYear && projectQuarter === lastQtr;
           } catch {
             return false;
           }
@@ -574,7 +651,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     }
   };
 
-  // Handle metric click - ENHANCED VERSION
+  // Handle metric click
   const handleMetricClick = (metric) => {
     const data = getMetricData(metric.id);
     
@@ -593,7 +670,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     setDrillDownTitle('');
   };
 
-  // Define all sections with metrics including info descriptions - USE DISPLAY METRICS
+  // Define all sections with metrics
   const projectsMetrics = [
     {
       id: 'total-projects',
@@ -718,12 +795,50 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       id: 'current-year-budget',
       group: 'budget',
       title: 'Current Year Budget',
-      value: formatCurrency(displayMetrics.currentYearExpenditure || 0),
+      value: formatCurrency(displayMetrics.currentYearBudget || 0),
       subtitle: `FY ${new Date().getFullYear()}`,
       icon: Calendar,
       color: 'indigo',
       gradient: 'from-indigo-500 to-indigo-600',
-      infoText: "Money spent in the current financial year. This helps track yearly spending patterns and budget utilization."
+      infoText: "Total budget allocated for projects started in the current financial year."
+    },
+    {
+      id: 'current-year-expenditure',
+      group: 'budget',
+      title: 'Current Year Spent',
+      value: formatCurrency(displayMetrics.currentYearExpenditure || 0),
+      subtitle: `${displayMetrics.currentYearBudget ? 
+        ((displayMetrics.currentYearExpenditure / displayMetrics.currentYearBudget) * 100).toFixed(1) : 0}% utilized`,
+      icon: Coins,
+      color: 'cyan',
+      gradient: 'from-cyan-500 to-cyan-600',
+      percentage: displayMetrics.currentYearBudget > 0 
+        ? ((displayMetrics.currentYearExpenditure / displayMetrics.currentYearBudget) * 100)
+        : 0,
+      sparkline: generateTrendData(displayMetrics.currentYearExpenditure || 0, 20),
+      infoText: "Actual expenditure in the current financial year. Shows how much of this year's budget has been spent."
+    },
+    {
+      id: 'previous-year-expenditure',
+      group: 'budget',
+      title: 'Previous Years Spent',
+      value: formatCurrency(displayMetrics.previousYearExpenditure || 0),
+      subtitle: 'Cumulative',
+      icon: Banknote,
+      color: 'gray',
+      gradient: 'from-gray-500 to-gray-600',
+      infoText: "Total expenditure from all previous years combined."
+    },
+    {
+      id: 'quarterly-expenditure',
+      group: 'budget',
+      title: 'Quarterly Spending',
+      value: formatCurrency(displayMetrics.quarterlyExpenditure || 0),
+      subtitle: `Q${Math.floor(new Date().getMonth() / 3) + 1} ${new Date().getFullYear()}`,
+      icon: PiggyBank,
+      color: 'emerald',
+      gradient: 'from-emerald-500 to-emerald-600',
+      infoText: "Expenditure in the current quarter. Helps track spending pace within the quarter."
     },
     {
       id: 'remaining',
@@ -735,6 +850,30 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       color: 'amber',
       gradient: 'from-amber-500 to-amber-600',
       infoText: "The amount of money left to be spent. This is the difference between allocated budget and what has been spent so far."
+    },
+    {
+      id: 'unutilized',
+      group: 'budget',
+      title: 'Unutilized Budget',
+      value: formatCurrency(displayMetrics.unutilizedBudget || 0),
+      subtitle: 'Completed projects',
+      icon: AlertCircle,
+      color: 'orange',
+      gradient: 'from-orange-500 to-orange-600',
+      alert: displayMetrics.unutilizedBudget > displayMetrics.totalBudget * 0.05,
+      infoText: "Budget remaining unutilized after project completion. This represents potential savings or underutilization."
+    },
+    {
+      id: 'over-budget',
+      group: 'budget',
+      title: 'Over Budget Projects',
+      value: displayMetrics.overBudgetProjects || 0,
+      subtitle: 'Cost overrun',
+      icon: AlertTriangle,
+      color: 'red',
+      gradient: 'from-red-500 to-red-600',
+      alert: displayMetrics.overBudgetProjects > 0,
+      infoText: "Number of projects where actual expenditure has exceeded the sanctioned budget."
     }
   ];
 
@@ -1179,7 +1318,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
               </div>
             </div>
             
-            {/* Value display - now using stable metric.value */}
+            {/* Value display */}
             <div className={`${
               size === 'compact' ? 'text-base' : isMain ? 'text-xl' : 'text-lg'
             } font-bold ${
@@ -1323,7 +1462,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     );
   };
 
-  // Drill-down Modal Component - NOW USING DataTable
+  // Drill-down Modal Component
   const DrillDownModal = () => {
     if (!showDrillDown) return null;
 
@@ -1530,7 +1669,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
             </div>
           </div>
 
-          {/* Budget Section */}
+          {/* Budget Section - ENHANCED WITH NEW METRICS */}
           <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
             darkMode ? 'border-gray-700' : 'border-gray-100'
           } overflow-hidden`}>
@@ -1549,9 +1688,9 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
             </div>
             <div className={`p-4 grid gap-3 ${
               cardSize === 'compact' 
-                ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-6' 
+                ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-5' 
                 : cardSize === 'large'
-                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                ? 'grid-cols-1 md:grid-cols-2'
                 : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
             }`}>
               {budgetMetrics.map((metric) => (
@@ -1579,7 +1718,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
             </div>
             <div className={`p-4 grid gap-3 ${
               cardSize === 'compact' 
-                ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-6' 
+                ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-5' 
                 : cardSize === 'large'
                 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
                 : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
@@ -1609,10 +1748,10 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
             </div>
             <div className={`p-4 grid gap-3 ${
               cardSize === 'compact' 
-                ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-6' 
+                ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-5' 
                 : cardSize === 'large'
                 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-                : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
+                : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
             }`}>
               {healthMetrics.map((metric) => (
                 <MetricCard key={metric.id} metric={metric} isMain={['critical', 'delayed'].includes(metric.id)} size={cardSize} />
@@ -1659,7 +1798,9 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
             ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
             : selectedMetricGroup === 'timeline'
             ? 'grid-cols-1 md:grid-cols-3'
-            : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
+            : selectedMetricGroup === 'budget'
+            ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+            : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
         }`}>
           {metricGroups[selectedMetricGroup].map((metric) => (
             <MetricCard 
@@ -1727,101 +1868,6 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
           </span>
         </div>
       </div>
-
-      {/* Metric Explanations Guide */}
-      {expandedView && (
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm border ${
-          darkMode ? 'border-gray-700' : 'border-gray-100'
-        } p-6`}>
-          <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-            <HelpCircle size={20} className="text-blue-500" />
-            Metrics Guide for Decision Makers
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div>
-              <h4 className="font-semibold text-sm mb-2 text-blue-600 dark:text-blue-400">Critical Metrics</h4>
-              <ul className="space-y-2 text-xs">
-                <li className="flex items-start gap-2">
-                  <AlertTriangle size={12} className="text-red-500 mt-0.5" />
-                  <div>
-                    <span className="font-medium">Critical Projects:</span>
-                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Projects needing immediate attention to avoid failure</span>
-                  </div>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Clock size={12} className="text-yellow-500 mt-0.5" />
-                  <div>
-                    <span className="font-medium">Delayed Projects:</span>
-                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Behind schedule, may incur penalties</span>
-                  </div>
-                </li>
-                <li className="flex items-start gap-2">
-                  <IndianRupee size={12} className="text-green-500 mt-0.5" />
-                  <div>
-                    <span className="font-medium">Budget Utilization:</span>
-                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> How much allocated money has been spent</span>
-                  </div>
-                </li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-semibold text-sm mb-2 text-green-600 dark:text-green-400">Performance Indicators</h4>
-              <ul className="space-y-2 text-xs">
-                <li className="flex items-start gap-2">
-                  <Gauge size={12} className="text-green-500 mt-0.5" />
-                  <div>
-                    <span className="font-medium">Perfect Pace:</span>
-                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Projects proceeding exactly as planned</span>
-                  </div>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Target size={12} className="text-blue-500 mt-0.5" />
-                  <div>
-                    <span className="font-medium">Efficiency Score:</span>
-                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Progress achieved per rupee spent</span>
-                  </div>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle size={12} className="text-green-500 mt-0.5" />
-                  <div>
-                    <span className="font-medium">Completion Rate:</span>
-                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Percentage of projects successfully finished</span>
-                  </div>
-                </li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-semibold text-sm mb-2 text-purple-600 dark:text-purple-400">Early Warning Signs</h4>
-              <ul className="space-y-2 text-xs">
-                <li className="flex items-start gap-2">
-                  <PauseCircle size={12} className="text-red-500 mt-0.5" />
-                  <div>
-                    <span className="font-medium">Sleep Pace:</span>
-                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Projects barely moving, need intervention</span>
-                  </div>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CreditCard size={12} className="text-amber-500 mt-0.5" />
-                  <div>
-                    <span className="font-medium">Payment Pending:</span>
-                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Work done but contractors not paid</span>
-                  </div>
-                </li>
-                <li className="flex items-start gap-2">
-                  <AlertCircle size={12} className="text-orange-500 mt-0.5" />
-                  <div>
-                    <span className="font-medium">Overdue:</span>
-                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}> Delayed beyond acceptable limits (&lt;90 days)</span>
-                  </div>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Drill-down Modal */}
       <DrillDownModal />

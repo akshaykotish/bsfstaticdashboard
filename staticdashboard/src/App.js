@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import HomePage from './Home';
 import Engineering from './Engineering';
+import Operations from './Operations';
 import { 
   LayoutGrid, Home, Lock, Shield, AlertTriangle, CreditCard, Mail, Globe, CheckCircle
 } from 'lucide-react';
@@ -165,7 +166,7 @@ const PaywallScreen = () => {
           {/* Footer */}
           <div className="bg-gray-900/30 px-6 py-4 border-t border-gray-700/50">
             <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>© 2024 BSF Dashboard</span>
+              <span>© 2025 BSF Dashboard</span>
               <span>Version 2.1.0 | License Required</span>
             </div>
           </div>
@@ -185,7 +186,7 @@ const App = () => {
     // Check activation status
     const checkActivation = () => {
       const currentDate = new Date();
-      const cutoffDate = new Date('2025-09-04');
+      const cutoffDate = new Date('2025-10-30');
       
       // If current date is after October 30, 2025, check for activation
       if (currentDate > cutoffDate) {
@@ -355,6 +356,42 @@ const App = () => {
                 Engineering
               </span>
             </button>
+
+            {/* Operations Tab */}
+            <button 
+              onClick={() => handleNavigate('operations')}
+              className={`px-3 py-1.5 rounded-md transition-all duration-200 flex items-center gap-1.5 ${
+                currentView === 'operations' 
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg transform scale-105' 
+                  : 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/70 hover:text-gray-100'
+              }`}
+              style={{ 
+                display: 'flex', 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                gap: '6px',
+                minWidth: 'fit-content'
+              }}
+            >
+              <LayoutGrid 
+                style={{ 
+                  width: '14px', 
+                  height: '14px', 
+                  flexShrink: 0,
+                  strokeWidth: currentView === 'operations' ? 2.5 : 2
+                }} 
+              />
+              <span 
+                style={{ 
+                  whiteSpace: 'nowrap', 
+                  display: 'inline-block',
+                  fontSize: '11px',
+                  fontWeight: currentView === 'operations' ? '600' : '500'
+                }}
+              >
+                Operations
+              </span>
+            </button>
           </div>
 
           {/* Spacer */}
@@ -380,6 +417,7 @@ const App = () => {
         <div className="neu-content-wrapper">
           {currentView === 'home' && <HomePage onNavigate={handleNavigate} />}
           {currentView === 'engineering' && <Engineering />}
+          {currentView === 'operations' && <Operations />}
         </div>
       </main>
 

@@ -1,0 +1,14 @@
+{
+  "port": 443,
+  "https": true,
+  "cert": "D:\BSF\BSF_BIG_DASHBOARD\SaticDashboard\staticdashboard\ssl\cert.pem",
+  "key": "D:\BSF\BSF_BIG_DASHBOARD\SaticDashboard\staticdashboard\ssl\key.pem",
+  "directory": "build",
+  "spa": "index.html",
+  "rewrite": [
+    {
+      "from": "/**",
+      "to": "/index.html"
+    }
+  ]
+}

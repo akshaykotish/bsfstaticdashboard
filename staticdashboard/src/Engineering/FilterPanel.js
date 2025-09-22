@@ -1563,7 +1563,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
                 min={dataRanges.delayMin}
                 max={dataRanges.delayMax}
                 step={1}
-                value={filters.delayRange || [0, dataRanges.delayMax]}
+                value={filters.delayRange || [dataRanges.delayMin, dataRanges.delayMax]}
                 onChange={filters.setDelayRange}
                 label="Delay Range (Days)"
                 icon={Clock}

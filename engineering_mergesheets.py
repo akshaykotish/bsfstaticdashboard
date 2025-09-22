@@ -121,34 +121,59 @@ def standardize_column_names(df):
     column_mapping = {
         's no': 'serial_no',
         's/no': 'serial_no',
+        'S No': 'serial_no',
         'budget head': 'budget_head',
+        'Budget head': 'budget_head',
         'name of scheme': 'scheme_name',
+        'Name of scheme': 'scheme_name',
         'name of ftr hq': 'ftr_hq',
+        'Name of Ftr HQ': 'ftr_hq',
         'name of ftr': 'ftr_hq',
         'name of shq': 'shq',
+        'Name of SHQ': 'shq',
         'name of work/site': 'work_site',
+        'Name of work/site': 'work_site',
         'executive agency': 'executive_agency',
+        'Executive agency ': 'executive_agency',
         'ref of aa/es': 'aa_es_ref',
+        'Ref of AA/ES': 'aa_es_ref',
         'sd amount': 'sanctioned_amount',
         'sd amount\n(in lakh)': 'sanctioned_amount',
+        'Sd Amount\n(In Lakh)': 'sanctioned_amount',
         'date of ts': 'date_ts',
+        'Date of TS': 'date_ts',
         'date of tender': 'date_tender',
+        'Date of Tender': 'date_tender',
         'date of acceptance': 'date_acceptance',
+        'Date of acceptance': 'date_acceptance',
         'date of award': 'date_award',
+        'Date of award': 'date_award',
         'time allowed (in days)': 'time_allowed_days',
         'time allowed (in days': 'time_allowed_days',
+        'Time allowed (in days)': 'time_allowed_days',
         'pdc as per agreement': 'pdc_agreement',
+        'PDC as per agreement ': 'pdc_agreement',
         'revised pdc, if date of original pdc lapsed': 'revised_pdc',
+        'Revised PDC, if date of original PDC lapsed ': 'revised_pdc',
         'actual date of completion': 'actual_completion_date',
+        'Actual date of completion ': 'actual_completion_date',
         'name of firm': 'firm_name',
         'physical progress (%)': 'physical_progress',
+        'Physical progress (%)': 'physical_progress',
         'whether progress is one time of slow': 'progress_status',
+        'Whether progress is one time of slow': 'progress_status',
         'expdr booked upto 31.03.25': 'expdr_upto_31mar25',
+        'Expdr booked upto 31.03.25': 'expdr_upto_31mar25',
         'expdr booked during cfy': 'expdr_cfy',
+        'Expdr booked during CFY ': 'expdr_cfy',
         'total expd booked': 'total_expdr',
+        'Total expd booked ': 'total_expdr',
+        '%age of expdr': 'percent_expdr',
         '%age of expdr': 'percent_expdr',
         'remarks': 'remarks',
-        'if aa&es  not issued then, pending with hq (shq/ftr/ command/ fhq)': 'aa_es_pending_with'
+        'Remarks': 'remarks',
+        'if aa&es  not issued then, pending with hq (shq/ftr/ command/ fhq)': 'aa_es_pending_with',
+        'If AA&Es  not issued then, pending with HQ (SHQ/Ftr/ Command/ FHQ)': 'aa_es_pending_with'
     }
     
     # Clean column names
@@ -465,8 +490,8 @@ def analyze_consolidated_data(df):
 # Example usage
 if __name__ == "__main__":
     # Specify your input file path
-    input_file = "PROGRESS OF WORKS.xls"
-    output_file = "consolidated_progress_report.xlsx"
+    input_file = "engineering.xls"
+    output_file = "engineering.xlsx"
     
     # Process the file
     consolidated_data = process_excel_file(input_file, output_file)
@@ -477,7 +502,7 @@ if __name__ == "__main__":
         
         # Optional: Save as CSV for easier viewing
         try:
-            consolidated_data.to_csv("consolidated_progress_report.csv", index=False)
-            print(f"\nAlso saved as CSV: consolidated_progress_report.csv")
+            consolidated_data.to_csv("engineering.csv", index=False)
+            print(f"\nAlso saved as CSV: engineering.csv")
         except Exception as e:
             print(f"Could not save CSV: {e}")

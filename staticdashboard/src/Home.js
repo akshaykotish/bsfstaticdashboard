@@ -13,6 +13,13 @@ const HomePage = ({ onNavigate }) => {
       description: 'Analytics Hub for Engineering Projects',
       icon: LayoutGrid,
       color: 'blue'
+    },
+    {
+      id: 'operations',
+      title: 'Operations',
+      description: 'Operational Management and Control Center',
+      icon: LayoutGrid,
+      color: 'green'
     }
   ];
 

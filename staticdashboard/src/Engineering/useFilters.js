@@ -21,8 +21,8 @@ export const useFilters = () => {
   
   // Range filters
   const [progressRange, setProgressRange] = useState([0, 100]);
-  const [amountRange, setAmountRange] = useState([0, 100000]);
-  const [delayRange, setDelayRange] = useState([0, 365]);
+  const [amountRange, setAmountRange] = useState([0, 1000000]);
+  const [delayRange, setDelayRange] = useState([0, 3684]);
   const [efficiencyRange, setEfficiencyRange] = useState([0, 100]);
   const [healthRange, setHealthRange] = useState([0, 100]);
   
@@ -743,7 +743,7 @@ export const useFilters = () => {
       : 100000;
     setAmountRange([0, maxAmount]);
     
-    setDelayRange([0, 365]);
+    setDelayRange([0, 3684]);
     setEfficiencyRange([0, 100]);
     setHealthRange([0, 100]);
     setExpectedProgressRange([0, 100]);
