@@ -20,7 +20,7 @@ import {
   MoreVertical, X, Maximize2, Filter, RefreshCw, Building2,
   Users, MapPin, Percent, Package, Cpu, ThermometerSun,
   GitBranch, Layers, FileText as FileTextIcon, Bell, Search,
-  HelpCircle, Coins, PiggyBank, Banknote
+  HelpCircle, Coins, PiggyBank, Banknote, DollarSign
 } from 'lucide-react';
 
 import {
@@ -28,8 +28,9 @@ import {
   ResponsiveContainer, XAxis, YAxis, Tooltip, Cell, PieChart, Pie
 } from 'recharts';
 import DataTable from './DataTable';
+import { usePatchEngineeringCYB, generatePatchBudgetMetrics, PatchDataTable } from './patchEngineeringCYB';
 
-const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onProjectSelect }) => {
+const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onProjectSelect, filters }) => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [expandedView, setExpandedView] = useState(false);
   const [selectedMetricGroup, setSelectedMetricGroup] = useState('all');
@@ -37,12 +38,32 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
   const [cardSize, setCardSize] = useState('normal');
   const [showDetails, setShowDetails] = useState(false);
   const [showInfoTooltips, setShowInfoTooltips] = useState(true);
+  const [showPatchData, setShowPatchData] = useState(true);
   
   // States for drill-down functionality
   const [selectedMetric, setSelectedMetric] = useState(null);
   const [showDrillDown, setShowDrillDown] = useState(false);
   const [drillDownData, setDrillDownData] = useState([]);
   const [drillDownTitle, setDrillDownTitle] = useState('');
+
+  const [showPatchTable, setShowPatchTable] = useState(false);
+
+  // Load patch data using the hook with filters
+  const { 
+    patchData,
+    patchMetrics, 
+    patchLoading, 
+    patchError,
+    rawPatchData,
+    PatchDataTable: PatchTable  // Get the table component
+  } = usePatchEngineeringCYB({
+    searchTerm: filters?.searchTerm,
+    selectedBudgetHeads: filters?.selectedBudgetHeads,
+    selectedFrontierHQs: filters?.selectedFrontierHQs,
+    selectedSectorHQs: filters?.selectedSectorHQs,
+    selectedAgencies: filters?.selectedAgencies,
+    selectedSchemes: filters?.selectedSchemes
+  });
 
   // Store previous metrics to prevent unnecessary recalculations
   const prevMetricsRef = useRef({});
@@ -157,206 +178,327 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     const totalProjects = filteredData.length;
     const sanctionedProjects = filteredData.filter(d => d.aa_es_ref && d.aa_es_ref !== '').length;
     const notSanctioned = filteredData.filter(d => !d.aa_es_ref || d.aa_es_ref === '').length;
-    const tenderNotCalled = filteredData.filter(d => !d.date_tender || d.date_tender === '').length;
-    const underCodalFormality = filteredData.filter(d => !d.date_award || d.date_award === '').length;
-    const awarded = filteredData.filter(d => d.date_award && d.date_award !== '').length;
-    
+    const tenderNotCalled = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' && 
+        (!d.date_tender || d.date_tender === '') && 
+        d.physical_progress === 0
+    ).length;
+    const underCodalFormality = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' && 
+        (!d.date_award || d.date_award === '')
+    ).length;
+    const awarded = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' && 
+        d.date_award && d.date_award !== ''
+    ).length;
+
     // Budget Metrics - ENHANCED
-    const totalBudget = filteredData.reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
-    const totalExpenditure = filteredData.reduce((sum, d) => sum + (d.total_expdr || 0), 0) / 100;
-    const currentYearExpenditure = filteredData.reduce((sum, d) => sum + (d.expdr_cfy || 0), 0) / 100;
-    
+    const totalBudget = filteredData
+        .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
+
+    const totalExpenditure = filteredData
+        .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
+        .reduce((sum, d) => sum + (d.total_expdr || 0), 0) / 100;
+
+    const currentYearExpenditure = filteredData
+        .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
+        .reduce((sum, d) => sum + (d.expdr_cfy || 0), 0) / 100;
+
     // NEW: Current Year Budget (budget for projects started this year)
     const currentYearBudget = filteredData
-      .filter(d => {
-        if (!d.date_award) return false;
-        try {
-          const awardDate = new Date(d.date_award);
-          return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear;
-        } catch {
-          return false;
-        }
-      })
-      .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
-    
+        .filter(d => {
+            if (!d.aa_es_ref || d.aa_es_ref === '') return false;
+            if (!d.date_award) return false;
+            try {
+                const awardDate = new Date(d.date_award);
+                return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear;
+            } catch {
+                return false;
+            }
+        })
+        .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
+
     // NEW: Previous Year Expenditure
     const previousYearExpenditure = filteredData
-      .reduce((sum, d) => sum + ((d.total_expdr || 0) - (d.expdr_cfy || 0)), 0) / 100;
-    
+        .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
+        .reduce((sum, d) => sum + ((d.total_expdr || 0) - (d.expdr_cfy || 0)), 0) / 100;
+
     // NEW: Quarterly Expenditure (current quarter)
     const quarterStart = new Date(currentYear, currentQuarter * 3, 1);
     const quarterlyExpenditure = filteredData
-      .filter(d => {
-        if (!d.date_award) return false;
-        try {
-          const awardDate = new Date(d.date_award);
-          return awardDate >= quarterStart;
-        } catch {
-          return false;
-        }
-      })
-      .reduce((sum, d) => sum + (d.total_expdr || 0), 0) / 100;
-    
+        .filter(d => {
+            if (!d.aa_es_ref || d.aa_es_ref === '') return false;
+            if (!d.date_award) return false;
+            try {
+                const awardDate = new Date(d.date_award);
+                return awardDate >= quarterStart;
+            } catch {
+                return false;
+            }
+        })
+        .reduce((sum, d) => sum + (d.total_expdr || 0), 0) / 100;
+
     // NEW: Unutilized Budget
     const unutilizedBudget = filteredData
-      .filter(d => d.physical_progress >= 100)
-      .reduce((sum, d) => sum + ((d.sanctioned_amount || 0) - (d.total_expdr || 0)), 0) / 100;
-    
+        .filter(d => d.aa_es_ref && d.aa_es_ref !== '' && d.physical_progress >= 100)
+        .reduce((sum, d) => sum + ((d.sanctioned_amount || 0) - (d.total_expdr || 0)), 0) / 100;
+
     // NEW: Over Budget Projects
     const overBudgetProjects = filteredData
-      .filter(d => d.total_expdr > d.sanctioned_amount)
-      .length;
-    
+        .filter(d => d.aa_es_ref && d.aa_es_ref !== '' && d.total_expdr > d.sanctioned_amount)
+        .length;
+
     const allocatedBudget = filteredData
-      .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
-      .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
-    const remainingBudget = (filteredData.reduce((sum, d) => sum + ((d.sanctioned_amount || 0) - (d.total_expdr || 0)), 0)) / 100;
-    
+        .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
+        .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
+
+    const remainingBudget = filteredData
+        .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
+        .reduce((sum, d) => sum + ((d.sanctioned_amount || 0) - (d.total_expdr || 0)), 0) / 100;
+
     // Progress Categories
     const tenderProgress = filteredData.filter(d => 
-      (!d.date_tender || d.date_tender === '') && d.physical_progress === 0
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        (!d.date_tender || d.date_tender === '') && d.physical_progress === 0
     ).length;
-    
+
     const tenderedNotAwarded = filteredData.filter(d => 
-      d.date_tender && (!d.date_award || d.date_award === '')
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.date_tender && (!d.date_award || d.date_award === '')
     ).length;
-    
+
     const awardedNotStarted = filteredData.filter(d => 
-      d.date_award && d.physical_progress === 0
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.date_award && d.physical_progress === 0
     ).length;
-    
+
     const progress1To50 = filteredData.filter(d => 
-      d.physical_progress > 0 && d.physical_progress <= 50
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.physical_progress > 0 && d.physical_progress <= 50
     ).length;
-    
+
     const progress51To71 = filteredData.filter(d => 
-      d.physical_progress > 50 && d.physical_progress <= 71
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.physical_progress > 50 && d.physical_progress <= 71
     ).length;
-    
+
     const progress71To99 = filteredData.filter(d => 
-      d.physical_progress > 71 && d.physical_progress < 100
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.physical_progress > 71 && d.physical_progress < 100
     ).length;
-    
-    const completed = filteredData.filter(d => d.physical_progress >= 100).length;
-    
+
+    const completed = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.physical_progress >= 100
+    ).length;
+
     // Recent metrics
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    
+
     const yearStart = new Date(currentYear, 0, 1);
-    
+
     const recentlyAwarded = filteredData.filter(d => {
-      if (!d.date_award) return false;
-      try {
-        const awardDate = new Date(d.date_award);
-        return !isNaN(awardDate.getTime()) && awardDate >= thirtyDaysAgo;
-      } catch {
-        return false;
-      }
+        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
+        if (!d.date_award) return false;
+        try {
+            const awardDate = new Date(d.date_award);
+            return !isNaN(awardDate.getTime()) && awardDate >= thirtyDaysAgo;
+        } catch {
+            return false;
+        }
     }).length;
-    
+
     const awardedThisYear = filteredData.filter(d => {
-      if (!d.date_award) return false;
-      try {
-        const awardDate = new Date(d.date_award);
-        return !isNaN(awardDate.getTime()) && awardDate >= yearStart;
-      } catch {
-        return false;
-      }
+        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
+        if (!d.date_award) return false;
+        try {
+            const awardDate = new Date(d.date_award);
+            return !isNaN(awardDate.getTime()) && awardDate >= yearStart;
+        } catch {
+            return false;
+        }
     }).length;
-    
+
     const completedRecently = filteredData.filter(d => {
-      if (!d.actual_completion_date || d.physical_progress < 100) return false;
-      try {
-        const completionDate = new Date(d.actual_completion_date);
-        return !isNaN(completionDate.getTime()) && completionDate >= ninetyDaysAgo;
-      } catch {
-        return false;
-      }
+        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
+        if (!d.actual_completion_date || d.physical_progress < 100) return false;
+        try {
+            const completionDate = new Date(d.actual_completion_date);
+            return !isNaN(completionDate.getTime()) && completionDate >= ninetyDaysAgo;
+        } catch {
+            return false;
+        }
     }).length;
-    
+
     const oldProjects = filteredData.filter(d => {
-      if (!d.date_award) return false;
-      try {
-        const awardDate = new Date(d.date_award);
-        if (isNaN(awardDate.getTime())) return false;
-        const ageInDays = (now - awardDate) / (1000 * 60 * 60 * 24);
-        return ageInDays > 365;
-      } catch {
-        return false;
-      }
+        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
+        if (!d.date_award) return false;
+        try {
+            const awardDate = new Date(d.date_award);
+            if (isNaN(awardDate.getTime())) return false;
+            const ageInDays = (now - awardDate) / (1000 * 60 * 60 * 24);
+            return ageInDays > 365;
+        } catch {
+            return false;
+        }
     }).length;
-    
+
     // Health Metrics
-    const critical = filteredData.filter(d => d.risk_level === 'CRITICAL').length;
-    const highRisk = filteredData.filter(d => d.risk_level === 'HIGH').length;
-    const mediumRisk = filteredData.filter(d => d.risk_level === 'MEDIUM').length;
-    const lowRisk = filteredData.filter(d => d.risk_level === 'LOW').length;
-    const delayed = filteredData.filter(d => (d.delay_days || 0) > 0).length;
-    const ongoing = filteredData.filter(d => d.physical_progress > 0 && d.physical_progress < 100).length;
-    const notStarted = filteredData.filter(d => d.physical_progress === 0).length;
-    const highBudget = filteredData.filter(d => d.sanctioned_amount > 50000).length;
-    const lowHealth = filteredData.filter(d => (d.health_score || 0) < 50).length;
-    const highEfficiency = filteredData.filter(d => (d.efficiency_score || 0) > 80).length;
-    const overdue = filteredData.filter(d => d.delay_days > 90).length;
-    const nearCompletion = filteredData.filter(d => d.physical_progress >= 75 && d.physical_progress < 100).length;
-    const onTrack = filteredData.filter(d => d.delay_days === 0 && d.physical_progress > 0).length;
-    
+    const critical = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.risk_level === 'CRITICAL'
+    ).length;
+
+    const highRisk = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.risk_level === 'HIGH'
+    ).length;
+
+    const mediumRisk = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.risk_level === 'MEDIUM'
+    ).length;
+
+    const lowRisk = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.risk_level === 'LOW'
+    ).length;
+
+    const delayed = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        (d.delay_days || 0) > 0
+    ).length;
+
+    const ongoing = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.physical_progress > 0 && d.physical_progress < 100
+    ).length;
+
+    const notStarted = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.physical_progress === 0
+    ).length;
+
+    const highBudget = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.sanctioned_amount > 50000
+    ).length;
+
+    const lowHealth = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        (d.health_score || 0) < 50
+    ).length;
+
+    const highEfficiency = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        (d.efficiency_score || 0) > 80
+    ).length;
+
+    const overdue = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.delay_days > 90
+    ).length;
+
+    const nearCompletion = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.physical_progress >= 75 && d.physical_progress < 100
+    ).length;
+
+    const onTrack = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.delay_days === 0 && d.physical_progress > 0
+    ).length;
+
     // Pace categories
-    const perfectPace = filteredData.filter(d => d.health_status === 'PERFECT_PACE').length;
-    const slowPace = filteredData.filter(d => d.health_status === 'SLOW_PACE').length;
-    const badPace = filteredData.filter(d => d.health_status === 'BAD_PACE').length;
-    const sleepPace = filteredData.filter(d => d.health_status === 'SLEEP_PACE').length;
-    const paymentPending = filteredData.filter(d => d.health_status === 'PAYMENT_PENDING').length;
-    
+    const perfectPace = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.health_status === 'PERFECT_PACE'
+    ).length;
+
+    const slowPace = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.health_status === 'SLOW_PACE'
+    ).length;
+
+    const badPace = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.health_status === 'BAD_PACE'
+    ).length;
+
+    const sleepPace = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.health_status === 'SLEEP_PACE'
+    ).length;
+
+    const paymentPending = filteredData.filter(d => 
+        d.aa_es_ref && d.aa_es_ref !== '' &&
+        d.health_status === 'PAYMENT_PENDING'
+    ).length;
+
     // Timeline Metrics
     const currentYearProjects = filteredData.filter(d => {
-      if (!d.date_award) return false;
-      try {
-        const awardDate = new Date(d.date_award);
-        return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear;
-      } catch {
-        return false;
-      }
+        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
+        if (!d.date_award) return false;
+        try {
+            const awardDate = new Date(d.date_award);
+            return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear;
+        } catch {
+            return false;
+        }
     }).length;
-    
+
     const lastQuarterProjects = filteredData.filter(d => {
-      if (!d.date_award) return false;
-      try {
-        const awardDate = new Date(d.date_award);
-        if (isNaN(awardDate.getTime())) return false;
-        const projectQuarter = Math.floor(awardDate.getMonth() / 3);
-        const lastQuarter = currentQuarter === 0 ? 3 : currentQuarter - 1;
-        const checkYear = currentQuarter === 0 ? currentYear - 1 : currentYear;
-        return awardDate.getFullYear() === checkYear && projectQuarter === lastQuarter;
-      } catch {
-        return false;
-      }
+        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
+        if (!d.date_award) return false;
+        try {
+            const awardDate = new Date(d.date_award);
+            if (isNaN(awardDate.getTime())) return false;
+            const projectQuarter = Math.floor(awardDate.getMonth() / 3);
+            const lastQuarter = currentQuarter === 0 ? 3 : currentQuarter - 1;
+            const checkYear = currentQuarter === 0 ? currentYear - 1 : currentYear;
+            return awardDate.getFullYear() === checkYear && projectQuarter === lastQuarter;
+        } catch {
+            return false;
+        }
     }).length;
-    
+
     const lastYearProjects = filteredData.filter(d => {
-      if (!d.date_award) return false;
-      try {
-        const awardDate = new Date(d.date_award);
-        return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear - 1;
-      } catch {
-        return false;
-      }
+        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
+        if (!d.date_award) return false;
+        try {
+            const awardDate = new Date(d.date_award);
+            return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear - 1;
+        } catch {
+            return false;
+        }
     }).length;
-    
-    // Calculate averages and other metrics
-    const avgProgress = filteredData.reduce((sum, d) => sum + (d.physical_progress || 0), 0) / totalProjects || 0;
-    const avgEfficiency = filteredData.reduce((sum, d) => sum + (d.efficiency_score || 0), 0) / totalProjects || 0;
-    const avgHealthScore = filteredData.reduce((sum, d) => sum + (d.health_score || 0), 0) / totalProjects || 0;
-    
-    // Calculate unique organizations
-    const uniqueAgencies = new Set(filteredData.map(d => d.executive_agency).filter(Boolean));
-    const uniqueContractors = new Set(filteredData.map(d => d.firm_name).filter(Boolean));
-    const uniqueLocations = new Set(filteredData.map(d => d.work_site?.split(',')[0]).filter(Boolean));
-    
+
+    // Calculate averages and other metrics (only for sanctioned projects)
+    const sanctionedData = filteredData.filter(d => d.aa_es_ref && d.aa_es_ref !== '');
+    const sanctionedCount = sanctionedData.length;
+
+    const avgProgress = sanctionedCount > 0 
+        ? sanctionedData.reduce((sum, d) => sum + (d.physical_progress || 0), 0) / sanctionedCount 
+        : 0;
+
+    const avgEfficiency = sanctionedCount > 0 
+        ? sanctionedData.reduce((sum, d) => sum + (d.efficiency_score || 0), 0) / sanctionedCount 
+        : 0;
+
+    const avgHealthScore = sanctionedCount > 0 
+        ? sanctionedData.reduce((sum, d) => sum + (d.health_score || 0), 0) / sanctionedCount 
+        : 0;
+
+    // Calculate unique organizations (only for sanctioned projects)
+    const uniqueAgencies = new Set(sanctionedData.map(d => d.executive_agency).filter(Boolean));
+    const uniqueContractors = new Set(sanctionedData.map(d => d.firm_name).filter(Boolean));
+    const uniqueLocations = new Set(sanctionedData.map(d => d.work_site?.split(',')[0]).filter(Boolean));
+
+
     return {
       // Projects
       totalProjects,
@@ -483,6 +625,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       case 'progress-71-99':
         return filteredData.filter(d => d.physical_progress > 71 && d.physical_progress < 100);
       case 'completed':
+      case 'progress-completed':
         return filteredData.filter(d => d.physical_progress >= 100);
       case 'recently-awarded':
         const thirtyDaysAgo = new Date();
@@ -651,15 +794,24 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     }
   };
 
-  // Handle metric click
+  // Handle metric click - Updated version
   const handleMetricClick = (metric) => {
-    const data = getMetricData(metric.id);
-    
-    // Set the drill-down data
-    setDrillDownData(data);
-    setDrillDownTitle(`${metric.title} - ${metric.value} ${metric.subtitle || ''}`);
-    setSelectedMetric(metric);
-    setShowDrillDown(true);
+    if (metric.isPatchData) {
+      // For patch metrics, show the patch data table
+      setSelectedMetric(metric);
+      setDrillDownTitle(`${metric.title} - ${metric.value} ${metric.subtitle || ''}`);
+      setDrillDownData(patchData);
+      setShowDrillDown(true);
+      console.log('[MetricsCard] Opening patch data view:', patchData.length, 'entries');
+    } else {
+      // For regular metrics, show filtered project data
+      const data = getMetricData(metric.id);
+      setDrillDownData(data);
+      setDrillDownTitle(`${metric.title} - ${metric.value} ${metric.subtitle || ''}`);
+      setSelectedMetric(metric);
+      setShowDrillDown(true);
+      console.log('[MetricsCard] Opening project data view:', data.length, 'entries');
+    }
   };
 
   // Close drill-down modal
@@ -720,15 +872,16 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       infoText: "Projects waiting for official government approval. These projects cannot proceed until they receive Administrative Approval and Expenditure Sanction."
     },
     {
-      id: 'tender-not-called',
+      id: 'awarded',
       group: 'projects',
-      title: 'Tender Yet to Call',
-      value: displayMetrics.tenderNotCalled || 0,
-      subtitle: 'No tender date',
-      icon: Calendar,
-      color: 'yellow',
-      gradient: 'from-yellow-500 to-yellow-600',
-      infoText: "Projects approved but haven't started the bidding process. The tender is a formal invitation for contractors to submit bids for project execution."
+      title: 'Work Awarded',
+      value: displayMetrics.awarded || 0,
+      subtitle: `${safeNumber((displayMetrics.awarded / Math.max(1, displayMetrics.totalProjects)) * 100).toFixed(1)}%`,
+      icon: Award,
+      color: 'teal',
+      gradient: 'from-teal-500 to-teal-600',
+      sparkline: generateTrendData(displayMetrics.awarded || 0, 3),
+      infoText: "Projects where contractors have been officially selected and contracts signed. These projects are ready for or have started physical execution."
     },
     {
       id: 'codal',
@@ -742,24 +895,23 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       infoText: "Projects where bidding is complete but the contract hasn't been formally awarded. They are undergoing legal and procedural checks before final contractor selection."
     },
     {
-      id: 'awarded',
+      id: 'tender-not-called',
       group: 'projects',
-      title: 'Work Awarded',
-      value: displayMetrics.awarded || 0,
-      subtitle: `${safeNumber((displayMetrics.awarded / Math.max(1, displayMetrics.totalProjects)) * 100).toFixed(1)}%`,
-      icon: Award,
-      color: 'teal',
-      gradient: 'from-teal-500 to-teal-600',
-      sparkline: generateTrendData(displayMetrics.awarded || 0, 3),
-      infoText: "Projects where contractors have been officially selected and contracts signed. These projects are ready for or have started physical execution."
-    }
+      title: 'Tender Yet to Call',
+      value: displayMetrics.tenderNotCalled || 0,
+      subtitle: 'No tender date',
+      icon: Calendar,
+      color: 'yellow',
+      gradient: 'from-yellow-500 to-yellow-600',
+      infoText: "Projects approved but haven't started the bidding process. The tender is a formal invitation for contractors to submit bids for project execution."
+    },
   ];
 
   const budgetMetrics = [
     {
       id: 'total-budget',
       group: 'budget',
-      title: 'Total Budget',
+      title: 'Total Budget (Appraised)',
       value: formatCurrency(displayMetrics.totalBudget || 0),
       subtitle: `${displayMetrics.totalProjects || 0} projects`,
       icon: IndianRupee,
@@ -767,6 +919,17 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       gradient: 'from-green-500 to-green-600',
       sparkline: generateTrendData(displayMetrics.totalBudget || 0, 100),
       infoText: "The total amount of money allocated by the government for all projects. This is the maximum that can be spent across all projects."
+    },
+    {
+      id: 'allocated',
+      group: 'budget',
+      title: 'Allocated Budget (Sanctioned)',
+      value: formatCurrency(displayMetrics.allocatedBudget || 0),
+      subtitle: 'Sanctioned projects',
+      icon: Wallet,
+      color: 'purple',
+      gradient: 'from-purple-500 to-purple-600',
+      infoText: "Budget specifically assigned to projects that have received official approval. This is the portion of total budget ready for use."
     },
     {
       id: 'expenditure',
@@ -779,17 +942,6 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       gradient: 'from-blue-500 to-blue-600',
       percentage: displayMetrics.utilizationRate || 0,
       infoText: "The actual amount of money spent so far on all projects. The percentage shows how much of the total budget has been used."
-    },
-    {
-      id: 'allocated',
-      group: 'budget',
-      title: 'Allocated Budget',
-      value: formatCurrency(displayMetrics.allocatedBudget || 0),
-      subtitle: 'Sanctioned projects',
-      icon: Wallet,
-      color: 'purple',
-      gradient: 'from-purple-500 to-purple-600',
-      infoText: "Budget specifically assigned to projects that have received official approval. This is the portion of total budget ready for use."
     },
     {
       id: 'current-year-budget',
@@ -874,34 +1026,17 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       gradient: 'from-red-500 to-red-600',
       alert: displayMetrics.overBudgetProjects > 0,
       infoText: "Number of projects where actual expenditure has exceeded the sanctioned budget."
-    }
+    },
+    
+    // Integrate patch data metrics here
+    ...(showPatchData && !patchLoading && patchMetrics ? generatePatchBudgetMetrics(patchMetrics, darkMode) : []),
   ];
 
   const progressMetrics = [
     {
-      id: 'tender-progress',
-      group: 'progress',
-      title: 'Tender Progress',
-      value: displayMetrics.tenderProgress || 0,
-      icon: Activity,
-      color: 'slate',
-      gradient: 'from-slate-500 to-slate-600',
-      infoText: "Projects in the initial stage where the tender (bidding) process is being prepared or is ongoing."
-    },
-    {
-      id: 'tendered-not-awarded',
-      group: 'progress',
-      title: 'Tendered Not Awarded',
-      value: displayMetrics.tenderedNotAwarded || 0,
-      icon: PauseCircle,
-      color: 'yellow',
-      gradient: 'from-yellow-500 to-yellow-600',
-      infoText: "Projects where bidding is complete but no contractor has been selected yet. This could be due to evaluation delays or re-tendering."
-    },
-    {
       id: 'awarded-not-started',
       group: 'progress',
-      title: 'Awarded Not Started',
+      title: 'Awarded but Not Started',
       value: displayMetrics.awardedNotStarted || 0,
       icon: PlayCircle,
       color: 'orange',
@@ -921,7 +1056,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     {
       id: 'progress-51-71',
       group: 'progress',
-      title: 'Progress 51-71%',
+      title: 'Progress 51-70%',
       value: displayMetrics.progress51To71 || 0,
       icon: Activity,
       color: 'yellow',
@@ -937,6 +1072,19 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       color: 'blue',
       gradient: 'from-blue-500 to-green-500',
       infoText: "Projects nearing completion. These need final push and quality checks before handover."
+    },
+    {
+      id: 'progress-completed',
+      group: 'progress',
+      title: 'Completed',
+      value: displayMetrics.completed || 0,
+      subtitle: '100% done',
+      icon: CheckCircle,
+      color: 'green',
+      gradient: 'from-green-500 to-green-600',
+      sparkline: generateTrendData(displayMetrics.completed || 0, 2),
+      percentage: safeNumber((displayMetrics.completed / Math.max(1, displayMetrics.totalProjects)) * 100),
+      infoText: "Projects that have finished all work (100% progress). These are ready for handover or already in use."
     },
     {
       id: 'recently-awarded',
@@ -981,7 +1129,27 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       color: 'gray',
       gradient: 'from-gray-500 to-gray-600',
       infoText: "Projects that were started more than a year ago but aren't complete. These may need special attention or intervention."
-    }
+    },
+    {
+      id: 'tender-progress',
+      group: 'progress',
+      title: 'Tender Progress',
+      value: displayMetrics.tenderProgress || 0,
+      icon: Activity,
+      color: 'slate',
+      gradient: 'from-slate-500 to-slate-600',
+      infoText: "Projects in the initial stage where the tender (bidding) process is being prepared or is ongoing."
+    },
+    {
+      id: 'tendered-not-awarded',
+      group: 'progress',
+      title: 'Tendered Not Awarded',
+      value: displayMetrics.tenderedNotAwarded || 0,
+      icon: PauseCircle,
+      color: 'yellow',
+      gradient: 'from-yellow-500 to-yellow-600',
+      infoText: "Projects where bidding is complete but no contractor has been selected yet. This could be due to evaluation delays or re-tendering."
+    },
   ];
 
   const healthMetrics = [
@@ -1265,6 +1433,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
             hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5
             ${metric.alert ? 'ring-2 ring-red-400 ring-opacity-50' : ''}
             ${metric.pulse ? 'animate-pulse' : ''}
+            ${metric.isPatchData ? 'border-l-4 border-l-indigo-500' : ''}
           `}
         >
           <div className={`absolute inset-0 bg-gradient-to-br ${metric.gradient} opacity-[0.03] rounded-2xl pointer-events-none`} />
@@ -1275,6 +1444,15 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
               <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+              </span>
+            </div>
+          )}
+
+          {/* Patch Data Indicator */}
+          {metric.isPatchData && (
+            <div className="absolute top-2 right-2">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-medium">
+                CY
               </span>
             </div>
           )}
@@ -1462,21 +1640,56 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     );
   };
 
-  // Drill-down Modal Component
+  // Drill-down Modal Component - Updated for patch data
   const DrillDownModal = () => {
     if (!showDrillDown) return null;
 
+    // Handle modal close
+    const handleClose = () => {
+      closeDrillDown();
+    };
+
+    // Handle row selection (only for project data)
+    const handleRowClick = (row) => {
+      // Only handle clicks for project data, not patch data
+      if (!selectedMetric?.isPatchData) {
+        handleClose();
+        if (onProjectSelect) {
+          onProjectSelect(row);
+        } else if (onMetricClick) {
+          onMetricClick('project', row);
+        }
+      }
+    };
+
+    // Render patch data table using dedicated component for patch metrics
+    if (selectedMetric?.isPatchData && PatchTable) {
+      return (
+        <PatchTable
+          data={patchData}
+          darkMode={darkMode}
+          title={drillDownTitle}
+          onClose={handleClose}
+          isModal={true}
+        />
+      );
+    }
+
+    // Render regular project data table
     return (
       <div className="fixed inset-0 z-[9999] overflow-hidden flex items-center justify-center">
+        {/* Backdrop */}
         <div 
           className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-          onClick={closeDrillDown}
+          onClick={handleClose}
         />
         
+        {/* Modal Container */}
         <div className={`relative w-[95vw] max-w-[1600px] h-[85vh] ${
           darkMode ? 'bg-gray-900' : 'bg-white'
         } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
           
+          {/* Header */}
           <div className={`px-6 py-4 border-b ${
             darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
           }`}>
@@ -1489,36 +1702,25 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
                   Showing {drillDownData.length} projects
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={closeDrillDown}
-                  className={`p-2 rounded-lg ${
-                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
-                  } transition-colors`}
-                >
-                  <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
-                </button>
-              </div>
+              
+              <button
+                onClick={handleClose}
+                className={`p-2 rounded-lg ${
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
+                } transition-colors`}
+              >
+                <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
+              </button>
             </div>
           </div>
 
-          {/* Use DataTable component for the table display */}
+          {/* Data Table */}
           <div className="flex-1 overflow-hidden">
             <DataTable
               data={drillDownData}
               darkMode={darkMode}
-              onRowClick={(row) => {
-                // Close drill-down modal first
-                closeDrillDown();
-                
-                // Then trigger project selection if handler exists
-                if (onProjectSelect) {
-                  onProjectSelect(row);
-                } else if (onMetricClick) {
-                  onMetricClick('project', row);
-                }
-              }}
-              compareMode={true}
+              onRowClick={handleRowClick}
+              compareMode={false}
               selectedProjects={[]}
               isEmbedded={false}
               maxHeight="calc(85vh - 200px)"
@@ -1560,6 +1762,24 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
         
         {/* Options */}
         <div className="flex items-center gap-3">
+          {/* Patch Data Toggle (only for budget section) */}
+          {(selectedMetricGroup === 'budget' || selectedMetricGroup === 'all') && (
+            <button
+              onClick={() => setShowPatchData(!showPatchData)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${
+                showPatchData
+                  ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-sm'
+                  : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+              title="Toggle Current Year Budget patch data from enggcurrentyear.csv"
+            >
+              <DollarSign size={12} />
+              CY Patch
+              {patchLoading && <RefreshCw size={10} className="animate-spin ml-1" />}
+              {patchError && <AlertCircle size={10} className="text-red-400 ml-1" />}
+            </button>
+          )}
+          
           {/* Size Toggle */}
           <div className="flex items-center gap-2">
             <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Size:</span>
@@ -1669,7 +1889,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
             </div>
           </div>
 
-          {/* Budget Section - ENHANCED WITH NEW METRICS */}
+          {/* Budget Section - ENHANCED WITH PATCH DATA */}
           <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
             darkMode ? 'border-gray-700' : 'border-gray-100'
           } overflow-hidden`}>
@@ -1684,6 +1904,30 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
                 }`}>
                   {budgetMetrics.length} metrics
                 </span>
+                
+                {/* Patch Data Status Indicator */}
+                {showPatchData && (
+                  <div className="flex items-center gap-2 ml-2">
+                    {patchLoading && (
+                      <span className="flex items-center gap-1 text-xs text-indigo-500">
+                        <RefreshCw size={12} className="animate-spin" />
+                        Loading CY patch...
+                      </span>
+                    )}
+                    {!patchLoading && !patchError && patchMetrics && (
+                      <span className="flex items-center gap-1 text-xs text-green-500">
+                        <CheckCircle size={12} />
+                        CY patch: {patchMetrics.totalRecords} records
+                      </span>
+                    )}
+                    {patchError && (
+                      <span className="flex items-center gap-1 text-xs text-red-500" title={patchError}>
+                        <AlertCircle size={12} />
+                        CY patch error
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <div className={`p-4 grid gap-3 ${
@@ -1724,7 +1968,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
                 : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
             }`}>
               {progressMetrics.map((metric) => (
-                <MetricCard key={metric.id} metric={metric} isMain={metric.id === 'completed'} size={cardSize} />
+                <MetricCard key={metric.id} metric={metric} isMain={metric.id === 'progress-completed'} size={cardSize} />
               ))}
             </div>
           </div>
@@ -1807,7 +2051,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
               key={metric.id} 
               metric={metric} 
               isMain={
-                ['total-projects', 'total-budget', 'critical', 'completed', 'delayed'].includes(metric.id)
+                ['total-projects', 'total-budget', 'critical', 'completed', 'delayed', 'progress-completed'].includes(metric.id)
               } 
               size={cardSize} 
             />
@@ -1828,6 +2072,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
             <p className={darkMode ? 'text-gray-300' : 'text-gray-600'}>
               Click on any metric card to view detailed project data. Hover over the help icon (?) on each card for explanations. 
               The table view provides sorting, filtering, and export capabilities for comprehensive data analysis.
+              {showPatchData && ' CY Patch metrics (marked with blue border) show current year budget data from the patch file.'}
             </p>
           </div>
         </div>
@@ -1867,6 +2112,14 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
             Organizations: {displayMetrics.activeAgencies || 0} agencies, {displayMetrics.totalContractors || 0} contractors
           </span>
         </div>
+        {showPatchData && !patchLoading && !patchError && patchMetrics && (
+          <div className="flex items-center gap-2">
+            <DollarSign size={14} className="text-indigo-500" />
+            <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+              CY Patch: ₹{((patchMetrics?.currentYearAllocation || 0)).toFixed(2)}Cr allocated
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Drill-down Modal */}

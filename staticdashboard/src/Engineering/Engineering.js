@@ -1000,6 +1000,14 @@ const Engineering = () => {
             filteredData={filteredData}
             onMetricClick={handleDrillDown}
             onProjectSelect={handleProjectSelect}
+            filters={filters.getFilterState ? filters.getFilterState() : {
+              searchTerm: filters.searchTerm,
+              selectedBudgetHeads: filters.selectedBudgetHeads,
+              selectedFrontierHQs: filters.selectedFrontierHQs,
+              selectedSectorHQs: filters.selectedSectorHQs,
+              selectedAgencies: filters.selectedAgencies,
+              selectedSchemes: filters.selectedSchemes
+            }}
           />
 
           {/* Chart Tabs */}

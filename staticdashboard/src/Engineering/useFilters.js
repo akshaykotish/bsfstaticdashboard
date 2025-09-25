@@ -22,7 +22,7 @@ export const useFilters = () => {
   // Range filters
   const [progressRange, setProgressRange] = useState([0, 100]);
   const [amountRange, setAmountRange] = useState([0, 1000000]);
-  const [delayRange, setDelayRange] = useState([0, 3684]);
+  const [delayRange, setDelayRange] = useState([0, 5000]);
   const [efficiencyRange, setEfficiencyRange] = useState([0, 100]);
   const [healthRange, setHealthRange] = useState([0, 100]);
   

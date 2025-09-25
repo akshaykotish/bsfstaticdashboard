@@ -631,6 +631,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
 
   const [selectedSchemes, setSelectedSchemes] = useState([]);
   const [showRelatedInfo, setShowRelatedInfo] = useState(false);
+  const [showFilterDetails, setShowFilterDetails] = useState(true);
 
   // Filter presets
   const [filterPresets] = useState([
@@ -909,13 +910,13 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
     if (filters.selectedHealthStatuses?.length > 0) count++;
     if (selectedSchemes.length > 0) count++;
     
-    // Check if ranges are modified from defaults
-    if (filters.progressRange && (filters.progressRange[0] > 0 || filters.progressRange[1] < 100)) count++;
-    if (filters.amountRange && (filters.amountRange[0] > dataRanges.amountMin || filters.amountRange[1] < dataRanges.amountMax)) count++;
+    // Check if ranges are modified from defaults (0 to max)
+    if (filters.progressRange && (filters.progressRange[0] > 0 || filters.progressRange[1] < dataRanges.progressMax)) count++;
+    if (filters.amountRange && (filters.amountRange[0] > 0 || filters.amountRange[1] < dataRanges.amountMax)) count++;
     if (filters.delayRange && (filters.delayRange[0] > 0 || filters.delayRange[1] < dataRanges.delayMax)) count++;
-    if (filters.efficiencyRange && (filters.efficiencyRange[0] > 0 || filters.efficiencyRange[1] < 100)) count++;
-    if (filters.healthRange && (filters.healthRange[0] > dataRanges.healthMin || filters.healthRange[1] < dataRanges.healthMax)) count++;
-    if (filters.expectedProgressRange && (filters.expectedProgressRange[0] > 0 || filters.expectedProgressRange[1] < 100)) count++;
+    if (filters.efficiencyRange && (filters.efficiencyRange[0] > 0 || filters.efficiencyRange[1] < dataRanges.efficiencyMax)) count++;
+    if (filters.healthRange && (filters.healthRange[0] > 0 || filters.healthRange[1] < dataRanges.healthMax)) count++;
+    if (filters.expectedProgressRange && (filters.expectedProgressRange[0] > 0 || filters.expectedProgressRange[1] < dataRanges.expectedProgressMax)) count++;
     
     // Count active date filters
     if (filters.dateFilters) {
@@ -1080,7 +1081,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
         </div>
       </div>
 
-      {/* Category Filters Section (MERGED) */}
+      {/* Category Filters Section (REARRANGED) */}
       <div className="border-b border-gray-100 dark:border-gray-700">
         <button
           onClick={() => toggleSection('basic')}
@@ -1111,34 +1112,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
         {expandedSections.basic && (
           <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 relative bg-gray-50/50 dark:bg-gray-900/20">
             
-            {/* Physical Progress Category */}
-            <MultiSelect
-              options={uniqueValues.progressCategories}
-              value={filters.selectedProgressCategories || []}
-              onChange={filters.setSelectedProgressCategories}
-              placeholder="Physical Progress"
-              darkMode={darkMode}
-              icon={Activity}
-              customLabels={progressCategoryLabels}
-              showCounts={true}
-              totalCount={allOptions.progressCategories?.length || 0}
-              isFiltered={uniqueValues.progressCategories?.length < allOptions.progressCategories?.length}
-            />
-            
-            {/* Health Status (Pace) */}
-            <MultiSelect
-              options={uniqueValues.healthStatuses}
-              value={filters.selectedHealthStatuses || []}
-              onChange={filters.setSelectedHealthStatuses}
-              placeholder="Project Health"
-              darkMode={darkMode}
-              icon={Heart}
-              customLabels={healthStatusLabels}
-              showCounts={true}
-              totalCount={allOptions.healthStatuses?.length || 0}
-              isFiltered={uniqueValues.healthStatuses?.length < allOptions.healthStatuses?.length}
-            />
-
+            {/* 1. Budget Head */}
             <MultiSelect
               options={uniqueValues.budgetHeads}
               value={filters.selectedBudgetHeads || []}
@@ -1151,6 +1125,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
               isFiltered={uniqueValues.budgetHeads?.length < allOptions.budgetHeads?.length}
             />
 
+            {/* 2. Frontier HQ */}
             <MultiSelect
               options={uniqueValues.frontierHQs}
               value={filters.selectedFrontierHQs || []}
@@ -1163,6 +1138,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
               isFiltered={uniqueValues.frontierHQs?.length < allOptions.frontierHQs?.length}
             />
 
+            {/* 3. Sector HQ */}
             <MultiSelect
               options={uniqueValues.sectorHQs}
               value={filters.selectedSectorHQs || []}
@@ -1176,6 +1152,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
               disabled={false}
             />
 
+            {/* 4. All Schemes */}
             <MultiSelect
               options={uniqueValues.schemes}
               value={selectedSchemes}
@@ -1189,6 +1166,20 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
               isFiltered={uniqueValues.schemes?.length < allOptions.schemes?.length}
             />
 
+            {/* 5. All Agencies */}
+            <MultiSelect
+              options={uniqueValues.agencies}
+              value={filters.selectedAgencies || []}
+              onChange={filters.setSelectedAgencies}
+              placeholder="All Agencies"
+              darkMode={darkMode}
+              icon={Building2}
+              showCounts={true}
+              totalCount={allOptions.agencies?.length || 0}
+              isFiltered={uniqueValues.agencies?.length < allOptions.agencies?.length}
+            />
+
+            {/* 6. All Statuses */}
             <MultiSelect
               options={uniqueValues.statuses}
               value={filters.selectedStatuses || []}
@@ -1202,31 +1193,21 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
               isFiltered={uniqueValues.statuses?.length < allOptions.statuses?.length}
             />
 
+            {/* 7. Physical Progress */}
             <MultiSelect
-              options={uniqueValues.riskLevels}
-              value={filters.selectedRiskLevels || []}
-              onChange={filters.setSelectedRiskLevels}
-              placeholder="All Risk Levels"
+              options={uniqueValues.progressCategories}
+              value={filters.selectedProgressCategories || []}
+              onChange={filters.setSelectedProgressCategories}
+              placeholder="Physical Progress"
               darkMode={darkMode}
-              icon={AlertTriangle}
-              customLabels={riskLevelLabels}
+              icon={Activity}
+              customLabels={progressCategoryLabels}
               showCounts={true}
-              totalCount={allOptions.riskLevels?.length || 0}
-              isFiltered={uniqueValues.riskLevels?.length < allOptions.riskLevels?.length}
+              totalCount={allOptions.progressCategories?.length || 0}
+              isFiltered={uniqueValues.progressCategories?.length < allOptions.progressCategories?.length}
             />
 
-            <MultiSelect
-              options={uniqueValues.agencies}
-              value={filters.selectedAgencies || []}
-              onChange={filters.setSelectedAgencies}
-              placeholder="All Agencies"
-              darkMode={darkMode}
-              icon={Building2}
-              showCounts={true}
-              totalCount={allOptions.agencies?.length || 0}
-              isFiltered={uniqueValues.agencies?.length < allOptions.agencies?.length}
-            />
-
+            {/* 8. All Contractors */}
             <MultiSelect
               options={uniqueValues.contractors}
               value={filters.selectedContractors || []}
@@ -1239,6 +1220,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
               isFiltered={uniqueValues.contractors?.length < allOptions.contractors?.length}
             />
 
+            {/* 9. All Locations */}
             <MultiSelect
               options={uniqueValues.locations}
               value={filters.selectedLocations || []}
@@ -1253,6 +1235,35 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
               showCounts={true}
               totalCount={allOptions.locations?.length || 0}
               isFiltered={uniqueValues.locations?.length < allOptions.locations?.length}
+            />
+
+            {/* Additional filters that weren't in the list but exist in original code */}
+            {/* Health Status (Pace) */}
+            <MultiSelect
+              options={uniqueValues.healthStatuses}
+              value={filters.selectedHealthStatuses || []}
+              onChange={filters.setSelectedHealthStatuses}
+              placeholder="Project Health"
+              darkMode={darkMode}
+              icon={Heart}
+              customLabels={healthStatusLabels}
+              showCounts={true}
+              totalCount={allOptions.healthStatuses?.length || 0}
+              isFiltered={uniqueValues.healthStatuses?.length < allOptions.healthStatuses?.length}
+            />
+
+            {/* Risk Levels */}
+            <MultiSelect
+              options={uniqueValues.riskLevels}
+              value={filters.selectedRiskLevels || []}
+              onChange={filters.setSelectedRiskLevels}
+              placeholder="All Risk Levels"
+              darkMode={darkMode}
+              icon={AlertTriangle}
+              customLabels={riskLevelLabels}
+              showCounts={true}
+              totalCount={allOptions.riskLevels?.length || 0}
+              isFiltered={uniqueValues.riskLevels?.length < allOptions.riskLevels?.length}
             />
           </div>
         )}
@@ -1441,7 +1452,8 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
                 onEndDateChange={(date) => {
                   const updatedFilter = {
                     enabled: filters.dateFilters.completionDate?.enabled || true,
-                    start: filters.dateFilters.completionDate?.start,end: date
+                    start: filters.dateFilters.completionDate?.start,
+                    end: date
                   };
                   filters.setDateFilter('completionDate', updatedFilter);
                 }}
