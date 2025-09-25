@@ -7,11 +7,14 @@ import {
   Check, ChevronRight, Sparkles, Zap, Info, RefreshCw,
   FileText, Briefcase, CreditCard, PieChart, Database, Eye,
   Activity, Heart, Gauge, PauseCircle, PlayCircle,
-  AlertCircle, CheckCircle, XCircle, Timer, CalendarDays
+  AlertCircle, CheckCircle, XCircle, Timer, CalendarDays,
+  Edit, Plus // Added Edit and Plus icons
 } from 'lucide-react';
 
 // Import the Report component directly (not the openProjectReport function)
 import Report from './Reports';
+// Import the new Edit component
+import EditComponent from './Edit';
 
 // Modal Component for Report - A4 Optimized
 const ReportModal = ({ isOpen, onClose, projectData, darkMode }) => {
@@ -144,6 +147,11 @@ const DataTable = ({
   // State for Report Modal
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedProjectForReport, setSelectedProjectForReport] = useState(null);
+
+  // State for Edit Modal - NEW
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedProjectForEdit, setSelectedProjectForEdit] = useState(null);
+  const [isNewProject, setIsNewProject] = useState(false);
 
   // Calculate Time Allowed for each project
   const calculateTimeAllowed = (row) => {
@@ -568,6 +576,25 @@ const DataTable = ({
     if (!selectedProjects || !Array.isArray(selectedProjects)) return false;
     return selectedProjects.some(p => p?.id === project?.id);
   };
+  
+  // Add this function near the other handler functions
+const handleRefreshData = () => {
+  // If you have a refetch function from parent component, call it
+  // Otherwise, you can implement a state update to trigger re-render
+  
+  // Option 1: If you have access to a refetch function from parent
+  // if (props.onRefresh) {
+  //   props.onRefresh();
+  // }
+  
+  // Option 2: Force component to re-render by updating a state
+  setCurrentPage(1); // Reset to first page
+  // You might need to pass a key prop to force re-render
+  // or implement a more sophisticated refresh mechanism
+  
+  console.log('Data refresh requested');
+};
+
 
   const handleRowClick = (row, event) => {
     if (event.target.closest('button')) return;
@@ -591,6 +618,40 @@ const DataTable = ({
     
     setSelectedProjectForReport(rowWithCalculatedFields);
     setReportModalOpen(true);
+  };
+
+  // Function to open edit modal - NEW
+  const openEditModal = (row, isNew = false) => {
+    if (isNew) {
+      setSelectedProjectForEdit(null);
+      setIsNewProject(true);
+    } else {
+      const rowWithCalculatedFields = {
+        ...row,
+        calculated_time_allowed: row.calculated_time_allowed,
+        progress_status_display: row.progress_status_display
+      };
+      setSelectedProjectForEdit(rowWithCalculatedFields);
+      setIsNewProject(false);
+    }
+    setEditModalOpen(true);
+  };
+
+  // Handler for save success - NEW
+  const handleEditSaveSuccess = (savedData) => {
+    // You might want to refresh the data here
+    // For example, call a refetch function if available
+    console.log('Project saved:', savedData);
+    // Add notification or refresh logic here
+    window.location.reload(); // Simple refresh for now
+  };
+
+  // Handler for delete success - NEW
+  const handleEditDeleteSuccess = (deletedData) => {
+    // You might want to refresh the data here
+    console.log('Project deleted:', deletedData);
+    // Add notification or refresh logic here
+    window.location.reload(); // Simple refresh for now
   };
 
   const exportTableData = () => {
@@ -785,6 +846,15 @@ const DataTable = ({
               )}
             </div>
 
+            {/* Add New Project Button - NEW */}
+            <button
+              onClick={() => openEditModal(null, true)}
+              className="px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:opacity-90 flex items-center gap-2 text-sm transition-all shadow-sm whitespace-nowrap"
+            >
+              <Plus size={16} />
+              <span>Add Project</span>
+            </button>
+
             {/* Export */}
             <button
               onClick={exportTableData}
@@ -899,6 +969,19 @@ const DataTable = ({
                         >
                           <Eye size={14} className="text-blue-500" />
                         </button>
+                        
+                        {/* Edit Button - NEW */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditModal(row, false);
+                          }}
+                          className="p-1 hover:bg-green-100 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                          title="Edit Project"
+                        >
+                          <Edit size={14} className="text-green-500" />
+                        </button>
+                        
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1249,6 +1332,22 @@ const DataTable = ({
         }}
         projectData={selectedProjectForReport}
         darkMode={darkMode}
+      />
+
+      {/* Edit Modal - NEW */}
+      <EditComponent 
+        isOpen={editModalOpen}
+        onClose={() => {
+          setEditModalOpen(false);
+          setSelectedProjectForEdit(null);
+          setIsNewProject(false);
+        }}
+        projectData={selectedProjectForEdit}
+        darkMode={darkMode}
+        isNewProject={isNewProject}
+        onSaveSuccess={handleEditSaveSuccess}
+        onDeleteSuccess={handleEditDeleteSuccess}
+        onRefreshData={handleRefreshData} // Add this new prop
       />
 
       {/* Add animation styles */}

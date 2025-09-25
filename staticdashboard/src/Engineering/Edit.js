@@ -1,1265 +1,631 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  Edit2, Save, X, Plus, Trash2, Search, Filter,
-  Download, Upload, RefreshCw, CheckCircle, AlertCircle,
-  Database, Copy, Eye, EyeOff, Moon, Sun, Grid,
-  List, ChevronUp, ChevronDown, FileText, Lock,
-  Unlock, History, ArrowLeft, ArrowRight, Settings,
-  IndianRupee, Calendar, MapPin, Building2, User,
-  AlertTriangle, Info, Check, XCircle, Loader
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  X, Save, AlertCircle, Calendar, DollarSign, 
+  MapPin, Building2, User, FileText, Hash,
+  Loader, Check, ChevronDown, Info, RefreshCw,
+  Trash2
 } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = 'http://localhost:3456';
 
-const Edit = () => {
-  // State Management
-  const [data, setData] = useState([]);
-  const [originalData, setOriginalData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
-  const [viewMode, setViewMode] = useState('table');
-  const [selectedRows, setSelectedRows] = useState([]);
-  const [editingCell, setEditingCell] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(50);
-  const [filters, setFilters] = useState({});
-  const [showFilters, setShowFilters] = useState(false);
-  const [changes, setChanges] = useState({});
-  const [history, setHistory] = useState([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  const [notification, setNotification] = useState(null);
-  const [columnVisibility, setColumnVisibility] = useState({});
+const Edit = ({ 
+  isOpen, 
+  onClose, 
+  projectData, 
+  darkMode,
+  isNewProject = false,
+  onSaveSuccess = () => {},
+  onDeleteSuccess = () => {},
+  onRefreshData = () => {} // Prop for refreshing data
+}) => {
+  const [formData, setFormData] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
-  const [autoSave, setAutoSave] = useState(false);
-  const [lastSaved, setLastSaved] = useState(null);
-  const [bulkEditMode, setBulkEditMode] = useState(false);
-  const [bulkEditField, setBulkEditField] = useState('');
-  const [bulkEditValue, setBulkEditValue] = useState('');
+  const [isDirty, setIsDirty] = useState(false);
+  
+  const formRef = useRef(null);
 
-  // Column definitions with validation rules
-  const columns = [
-    { key: 'serial_no', label: 'S.No', type: 'number', required: true, editable: false },
-    { key: 'scheme_name', label: 'Scheme Name', type: 'text', required: true },
-    { key: 'budget_head', label: 'Budget Head', type: 'text' },
-    { key: 'frontier_hq', label: 'Frontier HQ', type: 'text' },
-    { key: 'sector_hq', label: 'Sector HQ', type: 'text' },
-    { key: 'work_site', label: 'Work Site', type: 'text' },
-    { key: 'executive_agency', label: 'Executive Agency', type: 'text' },
-    { key: 'firm_name', label: 'Contractor', type: 'text' },
-    { key: 'sanctioned_amount', label: 'Sanctioned Amount', type: 'currency', min: 0 },
-    { key: 'total_expdr', label: 'Total Expenditure', type: 'currency', min: 0 },
-    { key: 'percent_expdr', label: 'Expenditure %', type: 'percentage', min: 0, max: 100 },
-    { key: 'physical_progress', label: 'Physical Progress', type: 'percentage', min: 0, max: 100 },
-    { key: 'expected_progress', label: 'Expected Progress', type: 'percentage', min: 0, max: 100 },
-    { key: 'delay_days', label: 'Delay Days', type: 'number', min: 0 },
-    { key: 'risk_level', label: 'Risk Level', type: 'select', options: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] },
-    { key: 'status', label: 'Status', type: 'select', options: ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'DELAYED', 'CANCELLED'] },
-    { key: 'health_status', label: 'Health Status', type: 'select', options: ['GOOD', 'FAIR', 'POOR', 'CRITICAL'] },
-    { key: 'efficiency_score', label: 'Efficiency Score', type: 'number', min: 0, max: 100 },
-    { key: 'health_score', label: 'Health Score', type: 'number', min: 0, max: 100 },
-    { key: 'time_allowed_days', label: 'Time Allowed (Days)', type: 'number', min: 0 },
-    { key: 'start_date', label: 'Start Date', type: 'date' },
-    { key: 'expected_completion_date', label: 'Expected Completion', type: 'date' },
-    { key: 'actual_completion_date', label: 'Actual Completion', type: 'date' },
-    { key: 'remarks', label: 'Remarks', type: 'textarea' }
+  // All fields from CSV - organized into groups
+  const fieldGroups = [
+    {
+      title: 'Basic Information',
+      icon: FileText,
+      fields: [
+        { key: 'serial_no', label: 'Serial No', type: 'text', required: true, width: 'col-span-1' },
+        { key: 'source_sheet', label: 'Source Sheet', type: 'text', width: 'col-span-1' },
+        { key: 'budget_head', label: 'Budget Head', type: 'text', required: true, width: 'col-span-1' },
+        { key: 'scheme_name', label: 'Scheme Name', type: 'text', required: true, width: 'col-span-3' },
+        { key: 'aa_es_ref', label: 'AA/ES Reference', type: 'text', width: 'col-span-2' },
+        { key: 'aa_es_pending_with', label: 'AA/ES Pending With', type: 'text', width: 'col-span-1' },
+      ]
+    },
+    {
+      title: 'Location & Organizations',
+      icon: MapPin,
+      fields: [
+        { key: 'ftr_hq', label: 'Frontier HQ', type: 'text', required: true, width: 'col-span-1' },
+        { key: 'shq', label: 'Sector HQ', type: 'text', required: true, width: 'col-span-1' },
+        { key: 'work_site', label: 'Work Site', type: 'text', required: true, width: 'col-span-1' },
+        { key: 'executive_agency', label: 'Executive Agency', type: 'text', required: true, width: 'col-span-2' },
+        { key: 'firm_name', label: 'Contractor/Firm Name', type: 'text', width: 'col-span-1' },
+      ]
+    },
+    {
+      title: 'Financial Details',
+      icon: DollarSign,
+      fields: [
+        { key: 'sanctioned_amount', label: 'Sanctioned Amount (Lakhs)', type: 'number', required: true, min: 0, width: 'col-span-1', step: 'any' },
+        { key: 'expdr_upto_31mar25', label: 'Expenditure upto 31 Mar 25', type: 'number', min: 0, width: 'col-span-1', step: 'any' },
+        { key: 'expdr_cfy', label: 'Current FY Expenditure', type: 'number', min: 0, width: 'col-span-1', step: 'any' },
+        { key: 'total_expdr', label: 'Total Expenditure', type: 'number', min: 0, width: 'col-span-1', readonly: true, step: 'any' },
+        { key: 'percent_expdr', label: 'Expenditure %', type: 'number', min: 0, max: 200, width: 'col-span-1', readonly: true, step: 'any' },
+        { key: 'remaining_amount', label: 'Remaining Amount', type: 'number', width: 'col-span-1', readonly: true, step: 'any' },
+      ]
+    },
+    {
+      title: 'Timeline & Dates',
+      icon: Calendar,
+      fields: [
+        { key: 'date_ts', label: 'Date TS', type: 'date', width: 'col-span-1' },
+        { key: 'date_tender', label: 'Tender Date', type: 'date', width: 'col-span-1' },
+        { key: 'date_acceptance', label: 'Acceptance Date', type: 'date', width: 'col-span-1' },
+        { key: 'date_award', label: 'Award Date', type: 'date', width: 'col-span-1' },
+        { key: 'pdc_agreement', label: 'PDC Agreement', type: 'date', width: 'col-span-1' },
+        { key: 'revised_pdc', label: 'Revised PDC', type: 'date', width: 'col-span-1' },
+        { key: 'actual_completion_date', label: 'Actual Completion Date', type: 'date', width: 'col-span-1' },
+        { key: 'time_allowed_days', label: 'Time Allowed (Days)', type: 'number', min: 0, width: 'col-span-1' },
+      ]
+    },
+    {
+      title: 'Progress & Status',
+      icon: Hash,
+      fields: [
+        { key: 'physical_progress', label: 'Physical Progress (%)', type: 'number', min: 0, max: 100, width: 'col-span-1', step: 'any' },
+        { key: 'progress_status', label: 'Progress Status', type: 'number', min: 0, width: 'col-span-1', step: 'any' },
+        { key: 'remarks', label: 'Remarks', type: 'textarea', width: 'col-span-3' },
+      ]
+    }
   ];
 
-  // Initialize column visibility
+  // Initialize form data
   useEffect(() => {
-    const initialVisibility = {};
-    columns.forEach(col => {
-      initialVisibility[col.key] = true;
+    if (isOpen) {
+      if (isNewProject) {
+        // Set default values for new project
+        const defaults = {
+          serial_no: '',
+          source_sheet: '',
+          scheme_name: '',
+          budget_head: '',
+          ftr_hq: '',
+          shq: '',
+          work_site: '',
+          executive_agency: '',
+          firm_name: '',
+          aa_es_ref: '',
+          aa_es_pending_with: '',
+          sanctioned_amount: 0,
+          expdr_upto_31mar25: 0,
+          expdr_cfy: 0,
+          total_expdr: 0,
+          percent_expdr: 0,
+          remaining_amount: 0,
+          physical_progress: 0,
+          progress_status: 0,
+          time_allowed_days: 0,
+          remarks: ''
+        };
+        setFormData(defaults);
+      } else if (projectData) {
+        // Load existing project data - preserve all fields
+        const data = { ...projectData };
+        
+        // Ensure numeric fields are numbers
+        const numericFields = ['sanctioned_amount', 'expdr_upto_31mar25', 'expdr_cfy', 
+                               'total_expdr', 'percent_expdr', 'remaining_amount',
+                               'physical_progress', 'progress_status', 'time_allowed_days'];
+        
+        numericFields.forEach(field => {
+          if (data[field] !== undefined && data[field] !== null && data[field] !== '') {
+            data[field] = parseFloat(data[field]) || 0;
+          } else {
+            data[field] = 0;
+          }
+        });
+        
+        // Format dates for input fields
+        const dateFields = ['date_ts', 'date_tender', 'date_acceptance', 'date_award', 
+                           'pdc_agreement', 'revised_pdc', 'actual_completion_date'];
+        
+        dateFields.forEach(field => {
+          if (data[field] && data[field] !== 'N/A' && data[field] !== '') {
+            try {
+              const date = new Date(data[field]);
+              if (!isNaN(date.getTime())) {
+                data[field] = date.toISOString().split('T')[0];
+              } else {
+                data[field] = '';
+              }
+            } catch {
+              data[field] = '';
+            }
+          } else {
+            data[field] = '';
+          }
+        });
+        
+        setFormData(data);
+      }
+      setError('');
+      setSuccess('');
+      setValidationErrors({});
+      setIsDirty(false);
+    }
+  }, [isOpen, projectData, isNewProject]);
+
+  // Handle input changes
+  const handleChange = (key, value) => {
+    // For number fields, ensure we're storing numbers
+    const field = fieldGroups.flatMap(g => g.fields).find(f => f.key === key);
+    let processedValue = value;
+    
+    if (field && field.type === 'number') {
+      processedValue = value === '' ? 0 : parseFloat(value) || 0;
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      [key]: processedValue
+    }));
+    setIsDirty(true);
+    
+    // Clear validation error for this field
+    if (validationErrors[key]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[key];
+        return newErrors;
+      });
+    }
+  };
+
+  // Validate form
+  const validateForm = () => {
+    const errors = {};
+    
+    fieldGroups.forEach(group => {
+      group.fields.forEach(field => {
+        const value = formData[field.key];
+        
+        // Required field validation
+        if (field.required && (!value || value === '' || (field.type === 'number' && value === 0))) {
+          if (field.key === 'sanctioned_amount' && value === 0) {
+            errors[field.key] = `${field.label} must be greater than 0`;
+          } else if (!value || value === '') {
+            errors[field.key] = `${field.label} is required`;
+          }
+        }
+        
+        // Number validation
+        if (field.type === 'number' && value !== '' && value !== null && value !== undefined) {
+          const numValue = parseFloat(value);
+          if (isNaN(numValue)) {
+            errors[field.key] = `${field.label} must be a number`;
+          } else {
+            if (field.min !== undefined && numValue < field.min) {
+              errors[field.key] = `${field.label} must be at least ${field.min}`;
+            }
+            if (field.max !== undefined && numValue > field.max) {
+              errors[field.key] = `${field.label} must not exceed ${field.max}`;
+            }
+          }
+        }
+      });
     });
-    setColumnVisibility(initialVisibility);
-  }, []);
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
-  // Fetch data on mount
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  // Auto-save functionality
-  useEffect(() => {
-    if (autoSave && Object.keys(changes).length > 0) {
-      const timer = setTimeout(() => {
-        saveChanges();
-      }, 5000);
-      return () => clearTimeout(timer);
+  // Save data - Updated to trigger data refresh instead of page reload
+  const handleSave = async () => {
+    if (!validateForm()) {
+      setError('Please fix the validation errors');
+      // Scroll to first error
+      const firstErrorField = Object.keys(validationErrors)[0];
+      const element = document.getElementById(`field-${firstErrorField}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
     }
-  }, [changes, autoSave]);
 
-  // Notification auto-hide
-  useEffect(() => {
-    if (notification) {
-      const timer = setTimeout(() => {
-        setNotification(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification]);
+    setLoading(true);
+    setError('');
+    setSuccess('');
 
-  // API Functions
-  const fetchData = async () => {
     try {
-      setLoading(true);
-      const response = await fetch(`${API_URL}/api/engineering`);
-      if (!response.ok) throw new Error('Failed to fetch data');
+      // Prepare data for submission - preserve all original fields
+      const submitData = { ...formData };
+      
+      // Ensure numeric fields are numbers
+      const numericFields = ['sanctioned_amount', 'expdr_upto_31mar25', 'expdr_cfy', 
+                             'total_expdr', 'percent_expdr', 'remaining_amount',
+                             'physical_progress', 'progress_status', 'time_allowed_days'];
+      
+      numericFields.forEach(field => {
+        if (submitData[field] !== undefined) {
+          submitData[field] = parseFloat(submitData[field]) || 0;
+        }
+      });
+      
+      // Convert empty date strings to null
+      const dateFields = ['date_ts', 'date_tender', 'date_acceptance', 'date_award', 
+                         'pdc_agreement', 'revised_pdc', 'actual_completion_date'];
+      
+      dateFields.forEach(field => {
+        if (submitData[field] === '') {
+          submitData[field] = null;
+        }
+      });
+
+      // Determine the row index - use serial_no or id field
+      let rowIndex;
+      if (!isNewProject) {
+        // Try different approaches to get the row index
+        if (projectData.rowIndex !== undefined) {
+          rowIndex = projectData.rowIndex;
+        } else if (projectData.id !== undefined) {
+          rowIndex = projectData.id - 1;
+        } else if (projectData.serial_no !== undefined) {
+          // If using serial_no, it might already be the row index
+          rowIndex = parseInt(projectData.serial_no) - 1;
+        } else {
+          throw new Error('Cannot determine row index for update');
+        }
+      }
+
+      const endpoint = isNewProject 
+        ? `${API_URL}/csv/engineering.csv/add`
+        : `${API_URL}/csv/engineering.csv/update`;
+
+      const body = isNewProject
+        ? { row: submitData }
+        : { 
+            rowIndex: rowIndex,
+            updates: submitData 
+          };
+
+      console.log('Saving project:', { endpoint, body, isNewProject });
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
       const result = await response.json();
-      setData(result);
-      setOriginalData(JSON.parse(JSON.stringify(result)));
-      showNotification('Data loaded successfully', 'success');
-    } catch (error) {
-      showNotification(error.message, 'error');
+
+      if (result.success) {
+        setSuccess(isNewProject ? 'Project added successfully!' : 'Project updated successfully!');
+        setIsDirty(false);
+        
+        // Notify parent component of successful save FIRST
+        if (onSaveSuccess && typeof onSaveSuccess === 'function') {
+          await onSaveSuccess(submitData);
+        }
+        
+        // Then call the refresh function to update data without page reload
+        if (onRefreshData && typeof onRefreshData === 'function') {
+          await onRefreshData();
+        }
+        
+        // Close modal after brief delay to show success message
+        setTimeout(() => {
+          onClose();
+        }, 1000);
+      } else {
+        throw new Error(result.error || 'Failed to save data');
+      }
+    } catch (err) {
+      console.error('Save error:', err);
+      setError(err.message || 'Failed to save project data');
     } finally {
       setLoading(false);
     }
   };
 
-  const saveChanges = async () => {
+  // Delete project - Updated to trigger data refresh instead of page reload
+  const handleDelete = async () => {
+    if (isNewProject || !projectData) return;
+    
+    if (!window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
     try {
-      setSaving(true);
-      const changedRecords = Object.keys(changes).map(id => {
-        const record = data.find(r => r.id === id || r.serial_no === parseInt(id));
-        return { ...record, ...changes[id] };
+      const response = await fetch(`${API_URL}/csv/engineering.csv/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rowIndex: projectData.id - 1 }),
       });
 
-      const response = await fetch(`${API_URL}/api/engineering/batch`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(changedRecords)
-      });
-
-      if (!response.ok) throw new Error('Failed to save changes');
-      
       const result = await response.json();
-      setOriginalData(JSON.parse(JSON.stringify(data)));
-      setChanges({});
-      setLastSaved(new Date());
-      showNotification(`${result.updated} records updated successfully`, 'success');
-    } catch (error) {
-      showNotification(error.message, 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
 
-  const addRow = async () => {
-    const newRow = {
-      id: `new_${Date.now()}`,
-      serial_no: Math.max(...data.map(d => d.serial_no || 0)) + 1,
-      scheme_name: 'New Project',
-      budget_head: '',
-      frontier_hq: '',
-      sector_hq: '',
-      work_site: '',
-      executive_agency: '',
-      firm_name: '',
-      sanctioned_amount: 0,
-      total_expdr: 0,
-      percent_expdr: 0,
-      physical_progress: 0,
-      expected_progress: 0,
-      delay_days: 0,
-      risk_level: 'LOW',
-      status: 'NOT_STARTED',
-      health_status: 'GOOD',
-      efficiency_score: 0,
-      health_score: 0,
-      time_allowed_days: 0,
-      start_date: new Date().toISOString().split('T')[0],
-      expected_completion_date: '',
-      actual_completion_date: '',
-      remarks: '',
-      isNew: true
-    };
-
-    setData([newRow, ...data]);
-    addToHistory();
-    showNotification('New row added', 'success');
-  };
-
-  const deleteRows = async (rowIds) => {
-    try {
-      const response = await fetch(`${API_URL}/api/engineering/batch`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: rowIds })
-      });
-
-      if (!response.ok) throw new Error('Failed to delete rows');
-      
-      setData(data.filter(row => !rowIds.includes(row.id || row.serial_no)));
-      setSelectedRows([]);
-      addToHistory();
-      showNotification(`${rowIds.length} row(s) deleted`, 'success');
-    } catch (error) {
-      showNotification(error.message, 'error');
-    }
-  };
-
-  const duplicateRows = () => {
-    const newRows = selectedRows.map(id => {
-      const original = data.find(r => r.id === id || r.serial_no === id);
-      return {
-        ...original,
-        id: `new_${Date.now()}_${Math.random()}`,
-        serial_no: Math.max(...data.map(d => d.serial_no || 0)) + 1,
-        scheme_name: `${original.scheme_name} (Copy)`,
-        isNew: true
-      };
-    });
-    setData([...newRows, ...data]);
-    addToHistory();
-    showNotification(`${newRows.length} row(s) duplicated`, 'success');
-  };
-
-  // Helper Functions
-  const showNotification = (message, type = 'info') => {
-    setNotification({ message, type });
-  };
-
-  const addToHistory = () => {
-    const newHistory = [...history.slice(0, historyIndex + 1), JSON.parse(JSON.stringify(data))];
-    setHistory(newHistory.slice(-50)); // Keep last 50 states
-    setHistoryIndex(newHistory.length - 1);
-  };
-
-  const undo = () => {
-    if (historyIndex > 0) {
-      setHistoryIndex(historyIndex - 1);
-      setData(JSON.parse(JSON.stringify(history[historyIndex - 1])));
-    }
-  };
-
-  const redo = () => {
-    if (historyIndex < history.length - 1) {
-      setHistoryIndex(historyIndex + 1);
-      setData(JSON.parse(JSON.stringify(history[historyIndex + 1])));
-    }
-  };
-
-  const validateCell = (value, column) => {
-    if (column.required && !value) {
-      return 'This field is required';
-    }
-    if (column.type === 'number' || column.type === 'currency' || column.type === 'percentage') {
-      const numValue = parseFloat(value);
-      if (isNaN(numValue)) return 'Must be a number';
-      if (column.min !== undefined && numValue < column.min) {
-        return `Must be at least ${column.min}`;
-      }
-      if (column.max !== undefined && numValue > column.max) {
-        return `Must be at most ${column.max}`;
-      }
-    }
-    if (column.type === 'date' && value) {
-      const date = new Date(value);
-      if (isNaN(date.getTime())) return 'Invalid date';
-    }
-    return null;
-  };
-
-  const handleCellEdit = (rowId, columnKey, value) => {
-    const column = columns.find(c => c.key === columnKey);
-    const error = validateCell(value, column);
-    
-    if (error) {
-      setValidationErrors({ ...validationErrors, [`${rowId}_${columnKey}`]: error });
-      return;
-    }
-    
-    // Clear validation error
-    const newErrors = { ...validationErrors };
-    delete newErrors[`${rowId}_${columnKey}`];
-    setValidationErrors(newErrors);
-    
-    // Update data
-    const newData = data.map(row => {
-      if (row.id === rowId || row.serial_no === rowId) {
-        return { ...row, [columnKey]: value };
-      }
-      return row;
-    });
-    
-    setData(newData);
-    
-    // Track changes
-    const existingChanges = changes[rowId] || {};
-    setChanges({
-      ...changes,
-      [rowId]: { ...existingChanges, [columnKey]: value }
-    });
-    
-    addToHistory();
-  };
-
-  const handleBulkEdit = () => {
-    if (!bulkEditField || bulkEditValue === '') return;
-    
-    const column = columns.find(c => c.key === bulkEditField);
-    const error = validateCell(bulkEditValue, column);
-    
-    if (error) {
-      showNotification(error, 'error');
-      return;
-    }
-    
-    const newData = data.map(row => {
-      if (selectedRows.includes(row.id || row.serial_no)) {
-        return { ...row, [bulkEditField]: bulkEditValue };
-      }
-      return row;
-    });
-    
-    setData(newData);
-    
-    // Track changes for all selected rows
-    const newChanges = { ...changes };
-    selectedRows.forEach(rowId => {
-      const existingChanges = newChanges[rowId] || {};
-      newChanges[rowId] = { ...existingChanges, [bulkEditField]: bulkEditValue };
-    });
-    setChanges(newChanges);
-    
-    setBulkEditMode(false);
-    setBulkEditField('');
-    setBulkEditValue('');
-    addToHistory();
-    showNotification(`${selectedRows.length} rows updated`, 'success');
-  };
-
-  const exportData = (format = 'csv') => {
-    const exportableData = filteredData;
-    
-    if (format === 'csv') {
-      const headers = columns.filter(c => columnVisibility[c.key]).map(c => c.label).join(',');
-      const rows = exportableData.map(row => 
-        columns.filter(c => columnVisibility[c.key]).map(c => {
-          const value = row[c.key];
-          return typeof value === 'string' && value.includes(',') ? `"${value}"` : value;
-        }).join(',')
-      );
-      const csv = [headers, ...rows].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `engineering_data_${new Date().toISOString()}.csv`;
-      a.click();
-    } else if (format === 'json') {
-      const json = JSON.stringify(exportableData, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `engineering_data_${new Date().toISOString()}.json`;
-      a.click();
-    }
-    
-    showNotification(`Data exported as ${format.toUpperCase()}`, 'success');
-  };
-
-  const importData = async (file) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        let importedData;
-        if (file.name.endsWith('.csv')) {
-          const text = e.target.result;
-          const lines = text.split('\n');
-          const headers = lines[0].split(',').map(h => h.trim());
-          importedData = lines.slice(1).map(line => {
-            const values = line.split(',');
-            const row = {};
-            headers.forEach((header, index) => {
-              const column = columns.find(c => c.label === header);
-              if (column) {
-                row[column.key] = values[index]?.trim();
-              }
-            });
-            return row;
-          });
-        } else if (file.name.endsWith('.json')) {
-          importedData = JSON.parse(e.target.result);
+      if (result.success) {
+        setSuccess('Project deleted successfully!');
+        
+        // Call the refresh function to update data without page reload
+        if (onRefreshData && typeof onRefreshData === 'function') {
+          await onRefreshData();
         }
         
-        // Add to existing data
-        setData([...data, ...importedData]);
-        showNotification(`Imported ${importedData.length} rows`, 'success');
-      } catch (error) {
-        showNotification('Failed to import data', 'error');
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  // Sorting and Filtering
-  const handleSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  const sortedData = useMemo(() => {
-    if (!sortConfig.key) return data;
-    
-    return [...data].sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
-      
-      if (aValue === null || aValue === undefined) return 1;
-      if (bValue === null || bValue === undefined) return -1;
-      
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
-      }
-      
-      const aString = String(aValue).toLowerCase();
-      const bString = String(bValue).toLowerCase();
-      
-      if (sortConfig.direction === 'asc') {
-        return aString < bString ? -1 : aString > bString ? 1 : 0;
+        // Notify parent component of successful deletion
+        onDeleteSuccess(projectData);
+        
+        // Close modal after brief delay
+        setTimeout(() => {
+          onClose();
+        }, 1000);
       } else {
-        return aString > bString ? -1 : aString < bString ? 1 : 0;
+        throw new Error(result.error || 'Failed to delete project');
       }
-    });
-  }, [data, sortConfig]);
+    } catch (err) {
+      console.error('Delete error:', err);
+      setError(err.message || 'Failed to delete project');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const filteredData = useMemo(() => {
-    let filtered = sortedData;
+  // Auto-calculate total expenditure and remaining amount
+  useEffect(() => {
+    const expdr31mar = parseFloat(formData.expdr_upto_31mar25) || 0;
+    const expdrCfy = parseFloat(formData.expdr_cfy) || 0;
+    const total = expdr31mar + expdrCfy;
     
-    // Apply search
-    if (searchTerm) {
-      filtered = filtered.filter(row =>
-        Object.values(row).some(value =>
-          String(value).toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      );
+    if (formData.total_expdr !== total) {
+      setFormData(prev => ({ ...prev, total_expdr: total }));
     }
     
-    // Apply column filters
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) {
-        filtered = filtered.filter(row => {
-          const rowValue = String(row[key]).toLowerCase();
-          return rowValue.includes(value.toLowerCase());
-        });
+    // Calculate percentage
+    const sanctioned = parseFloat(formData.sanctioned_amount) || 0;
+    if (sanctioned > 0) {
+      const percentage = (total / sanctioned) * 100;
+      if (formData.percent_expdr !== percentage) {
+        setFormData(prev => ({ ...prev, percent_expdr: parseFloat(percentage.toFixed(2)) }));
       }
-    });
-    
-    return filtered;
-  }, [sortedData, searchTerm, filters]);
-
-  const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * rowsPerPage;
-    const end = start + rowsPerPage;
-    return filteredData.slice(start, end);
-  }, [filteredData, currentPage, rowsPerPage]);
-
-  const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-
-  // Format currency
-  const formatCurrency = (value) => {
-    if (!value || isNaN(value)) return '₹0';
-    const absValue = Math.abs(value);
-    if (absValue >= 10000) {
-      return `₹${(value / 100).toFixed(2)} Cr`;
-    } else if (absValue >= 100) {
-      return `₹${value.toFixed(2)} L`;
     } else {
-      return `₹${(value * 100).toFixed(2)} K`;
-    }
-  };
-
-  // Render cell based on type
-  const renderCell = (row, column) => {
-    const value = row[column.key];
-    const cellKey = `${row.id || row.serial_no}_${column.key}`;
-    const isEditing = editingCell === cellKey;
-    const hasError = validationErrors[cellKey];
-    const hasChange = changes[row.id || row.serial_no]?.[column.key] !== undefined;
-    
-    if (isEditing) {
-      return (
-        <div className="relative">
-          {column.type === 'select' ? (
-            <select
-              className={`w-full px-2 py-1 border rounded ${
-                darkMode ? 'bg-gray-700 text-white' : 'bg-white'
-              } ${hasError ? 'border-red-500' : 'border-blue-500'}`}
-              defaultValue={value}
-              onBlur={(e) => {
-                handleCellEdit(row.id || row.serial_no, column.key, e.target.value);
-                setEditingCell(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleCellEdit(row.id || row.serial_no, column.key, e.target.value);
-                  setEditingCell(null);
-                }
-                if (e.key === 'Escape') {
-                  setEditingCell(null);
-                }
-              }}
-              autoFocus
-            >
-              {column.options.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-          ) : column.type === 'textarea' ? (
-            <textarea
-              className={`w-full px-2 py-1 border rounded resize-none ${
-                darkMode ? 'bg-gray-700 text-white' : 'bg-white'
-              } ${hasError ? 'border-red-500' : 'border-blue-500'}`}
-              defaultValue={value}
-              rows={3}
-              onBlur={(e) => {
-                handleCellEdit(row.id || row.serial_no, column.key, e.target.value);
-                setEditingCell(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && e.ctrlKey) {
-                  handleCellEdit(row.id || row.serial_no, column.key, e.target.value);
-                  setEditingCell(null);
-                }
-                if (e.key === 'Escape') {
-                  setEditingCell(null);
-                }
-              }}
-              autoFocus
-            />
-          ) : (
-            <input
-              type={column.type === 'date' ? 'date' : column.type === 'number' || column.type === 'currency' || column.type === 'percentage' ? 'number' : 'text'}
-              className={`w-full px-2 py-1 border rounded ${
-                darkMode ? 'bg-gray-700 text-white' : 'bg-white'
-              } ${hasError ? 'border-red-500' : 'border-blue-500'}`}
-              defaultValue={value}
-              min={column.min}
-              max={column.max}
-              step={column.type === 'percentage' ? '0.01' : column.type === 'currency' ? '0.01' : '1'}
-              onBlur={(e) => {
-                handleCellEdit(row.id || row.serial_no, column.key, e.target.value);
-                setEditingCell(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleCellEdit(row.id || row.serial_no, column.key, e.target.value);
-                  setEditingCell(null);
-                }
-                if (e.key === 'Escape') {
-                  setEditingCell(null);
-                }
-              }}
-              autoFocus
-            />
-          )}
-          {hasError && (
-            <div className="absolute top-full left-0 mt-1 p-1 bg-red-500 text-white text-xs rounded z-10">
-              {hasError}
-            </div>
-          )}
-        </div>
-      );
+      if (formData.percent_expdr !== 0) {
+        setFormData(prev => ({ ...prev, percent_expdr: 0 }));
+      }
     }
     
-    return (
-      <div
-        className={`cursor-pointer px-2 py-1 ${
-          hasChange ? 'bg-yellow-100 dark:bg-yellow-900/20' : ''
-        } ${column.editable === false ? 'opacity-75' : ''}`}
-        onClick={() => column.editable !== false && setEditingCell(cellKey)}
-      >
-        {column.type === 'currency' ? formatCurrency(value) :
-         column.type === 'percentage' ? `${value || 0}%` :
-         column.type === 'date' && value ? new Date(value).toLocaleDateString() :
-         value || '-'}
-      </div>
-    );
-  };
+    // Calculate remaining amount
+    const remaining = sanctioned - total;
+    if (formData.remaining_amount !== remaining) {
+      setFormData(prev => ({ ...prev, remaining_amount: remaining }));
+    }
+  }, [formData.expdr_upto_31mar25, formData.expdr_cfy, formData.sanctioned_amount]);
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className={`min-h-screen flex items-center justify-center ${
-        darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'
-      }`}>
-        <div className="text-center">
-          <Loader className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
-          <p className="text-lg">Loading data...</p>
-        </div>
-      </div>
-    );
-  }
+  if (!isOpen) return null;
 
   return (
-    <div className={`min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'}`}>
-      {/* Header */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm border-b ${
-        darkMode ? 'border-gray-700' : 'border-gray-200'
-      }`}>
-        <div className="max-w-full mx-auto px-4 py-4">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <Database className="text-blue-500" />
-                Engineering Data Editor
-              </h1>
-              <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                <span>{data.length} total rows</span>
-                <span>•</span>
-                <span>{filteredData.length} filtered</span>
-                <span>•</span>
-                <span>{selectedRows.length} selected</span>
-                {Object.keys(changes).length > 0 && (
-                  <>
-                    <span>•</span>
-                    <span className="text-orange-500 font-medium">
-                      {Object.keys(changes).length} unsaved changes
-                    </span>
-                  </>
-                )}
-                {lastSaved && (
-                  <>
-                    <span>•</span>
-                    <span className="text-green-500">
-                      Last saved: {lastSaved.toLocaleTimeString()}
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-            
-            {/* Actions */}
-            <div className="flex flex-wrap gap-2">
-              {/* Save/Cancel */}
-              {Object.keys(changes).length > 0 && (
-                <>
-                  <button
-                    onClick={saveChanges}
-                    disabled={saving}
-                    className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2 disabled:opacity-50"
-                  >
-                    {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Save size={16} />}
-                    Save Changes
-                  </button>
-                  <button
-                    onClick={() => {
-                      setData(originalData);
-                      setChanges({});
-                      showNotification('Changes discarded', 'info');
-                    }}
-                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-2"
-                  >
-                    <X size={16} />
-                    Discard
-                  </button>
-                </>
-              )}
-              
-              {/* Auto-save toggle */}
-              <button
-                onClick={() => setAutoSave(!autoSave)}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-                  autoSave ? 'bg-blue-500 text-white' : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
-                }`}
-              >
-                {autoSave ? <CheckCircle size={16} /> : <Circle size={16} />}
-                Auto-save
-              </button>
-              
-              {/* History */}
-              <button
-                onClick={undo}
-                disabled={historyIndex <= 0}
-                className={`px-3 py-2 rounded-lg ${
-                  darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
-                } disabled:opacity-50`}
-              >
-                <ArrowLeft size={16} />
-              </button>
-              <button
-                onClick={redo}
-                disabled={historyIndex >= history.length - 1}
-                className={`px-3 py-2 rounded-lg ${
-                  darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
-                } disabled:opacity-50`}
-              >
-                <ArrowRight size={16} />
-              </button>
-              
-              {/* View toggle */}
-              <button
-                onClick={() => setViewMode(viewMode === 'table' ? 'grid' : 'table')}
-                className={`px-3 py-2 rounded-lg ${
-                  darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
-                }`}
-              >
-                {viewMode === 'table' ? <Grid size={16} /> : <List size={16} />}
-              </button>
-              
-              {/* Dark mode */}
-              <button
-                onClick={() => setDarkMode(!darkMode)}
-                className={`px-3 py-2 rounded-lg ${
-                  darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-200 text-gray-700'
-                }`}
-              >
-                {darkMode ? <Sun size={16} /> : <Moon size={16} />}
-              </button>
-              
-              {/* Refresh */}
-              <button
-                onClick={fetchData}
-                className={`px-3 py-2 rounded-lg ${
-                  darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
-                }`}
-              >
-                <RefreshCw size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} border-b ${
-        darkMode ? 'border-gray-700' : 'border-gray-200'
-      } px-4 py-3`}>
-        <div className="flex flex-col lg:flex-row gap-3">
-          {/* Search */}
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-              <input
-                type="text"
-                placeholder="Search all fields..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-10 pr-3 py-2 rounded-lg ${
-                  darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100'
-                }`}
-              />
-            </div>
-          </div>
-          
-          {/* Actions */}
-          <div className="flex gap-2">
-            <button
-              onClick={addRow}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
-            >
-              <Plus size={16} />
-              Add Row
-            </button>
-            
-            {selectedRows.length > 0 && (
-              <>
-                <button
-                  onClick={duplicateRows}
-                  className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center gap-2"
-                >
-                  <Copy size={16} />
-                  Duplicate ({selectedRows.length})
-                </button>
-                
-                <button
-                  onClick={() => setBulkEditMode(true)}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 flex items-center gap-2"
-                >
-                  <Edit2 size={16} />
-                  Bulk Edit
-                </button>
-                
-                <button
-                  onClick={() => {
-                    if (confirm(`Delete ${selectedRows.length} row(s)?`)) {
-                      deleteRows(selectedRows);
-                    }
-                  }}
-                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-2"
-                >
-                  <Trash2 size={16} />
-                  Delete ({selectedRows.length})
-                </button>
-              </>
-            )}
-            
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-                showFilters ? 'bg-blue-500 text-white' : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
-              }`}
-            >
-              <Filter size={16} />
-              Filters
-            </button>
-            
-            {/* Export dropdown */}
-            <div className="relative group">
-              <button className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-                darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
-              }`}>
-                <Download size={16} />
-                Export
-                <ChevronDown size={14} />
-              </button>
-              <div className={`absolute top-full mt-1 right-0 w-32 rounded-lg shadow-lg ${
-                darkMode ? 'bg-gray-800' : 'bg-white'
-              } border ${darkMode ? 'border-gray-700' : 'border-gray-200'}
-              opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10`}>
-                <button
-                  onClick={() => exportData('csv')}
-                  className={`w-full px-3 py-2 text-left hover:${
-                    darkMode ? 'bg-gray-700' : 'bg-gray-100'
-                  } transition-colors`}
-                >
-                  CSV
-                </button>
-                <button
-                  onClick={() => exportData('json')}
-                  className={`w-full px-3 py-2 text-left hover:${
-                    darkMode ? 'bg-gray-700' : 'bg-gray-100'
-                  } transition-colors`}
-                >
-                  JSON
-                </button>
-              </div>
-            </div>
-            
-            {/* Import */}
-            <label className={`px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2 ${
-              darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
-            }`}>
-              <Upload size={16} />
-              Import
-              <input
-                type="file"
-                accept=".csv,.json"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files[0]) {
-                    importData(e.target.files[0]);
-                  }
-                }}
-              />
-            </label>
-          </div>
-        </div>
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={() => {
+          if (isDirty) {
+            if (window.confirm('You have unsaved changes. Are you sure you want to close?')) {
+              onClose();
+            }
+          } else {
+            onClose();
+          }
+        }}
+      />
+      
+      {/* Modal */}
+      <div className={`relative w-full max-w-6xl max-h-[90vh] ${
+        darkMode ? 'bg-gray-900' : 'bg-white'
+      } rounded-2xl shadow-2xl overflow-hidden flex flex-col`}>
         
-        {/* Column filters */}
-        {showFilters && (
-          <div className="mt-3 pt-3 border-t border-gray-300 dark:border-gray-600">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
-              {columns.slice(0, 12).map(column => (
-                <div key={column.key}>
-                  <label className="text-xs text-gray-500 dark:text-gray-400">{column.label}</label>
-                  <input
-                    type="text"
-                    placeholder={`Filter ${column.label}`}
-                    value={filters[column.key] || ''}
-                    onChange={(e) => setFilters({ ...filters, [column.key]: e.target.value })}
-                    className={`w-full px-2 py-1 text-sm rounded ${
-                      darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100'
-                    }`}
-                  />
-                </div>
-              ))}
+        {/* Header */}
+        <div className={`px-6 py-4 border-b ${
+          darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
+        }`}>
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                {isNewProject ? 'Add New Project' : 'Edit Project'}
+              </h2>
+              {!isNewProject && formData.scheme_name && (
+                <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
+                  {formData.scheme_name} | Serial No: {formData.serial_no}
+                </p>
+              )}
             </div>
+            
             <button
-              onClick={() => setFilters({})}
-              className="mt-2 text-sm text-blue-500 hover:text-blue-600"
+              onClick={() => {
+                if (isDirty) {
+                  if (window.confirm('You have unsaved changes. Are you sure you want to close?')) {
+                    onClose();
+                  }
+                } else {
+                  onClose();
+                }
+              }}
+              className={`p-2 rounded-lg ${
+                darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
+              } transition-colors`}
             >
-              Clear all filters
+              <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
             </button>
+          </div>
+        </div>
+
+        {/* Alerts */}
+        {(error || success) && (
+          <div className="px-6 py-3">
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg">
+                <AlertCircle size={16} />
+                <span className="text-sm">{error}</span>
+              </div>
+            )}
+            {success && (
+              <div className="flex items-center gap-2 p-3 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg">
+                <Check size={16} />
+                <span className="text-sm">{success}</span>
+              </div>
+            )}
           </div>
         )}
-      </div>
 
-      {/* Bulk Edit Modal */}
-      {bulkEditMode && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-6 max-w-md w-full`}>
-            <h2 className="text-xl font-bold mb-4">Bulk Edit {selectedRows.length} Rows</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Field to Edit</label>
-                <select
-                  value={bulkEditField}
-                  onChange={(e) => setBulkEditField(e.target.value)}
-                  className={`w-full px-3 py-2 rounded ${
-                    darkMode ? 'bg-gray-700' : 'bg-gray-100'
-                  }`}
-                >
-                  <option value="">Select field...</option>
-                  {columns.filter(c => c.editable !== false).map(col => (
-                    <option key={col.key} value={col.key}>{col.label}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {bulkEditField && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">New Value</label>
-                  {columns.find(c => c.key === bulkEditField)?.type === 'select' ? (
-                    <select
-                      value={bulkEditValue}
-                      onChange={(e) => setBulkEditValue(e.target.value)}
-                      className={`w-full px-3 py-2 rounded ${
-                        darkMode ? 'bg-gray-700' : 'bg-gray-100'
-                      }`}
+        {/* Form Body */}
+        <div ref={formRef} className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="space-y-6">
+            {fieldGroups.map((group, groupIndex) => (
+              <div key={groupIndex} className={`p-5 rounded-xl border ${
+                darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <h3 className="font-semibold text-sm mb-4 flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                  <group.icon size={16} />
+                  {group.title}
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {group.fields.map((field) => (
+                    <div 
+                      key={field.key} 
+                      id={`field-${field.key}`}
+                      className={field.width || 'col-span-1'}
                     >
-                      <option value="">Select value...</option>
-                      {columns.find(c => c.key === bulkEditField)?.options.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type={columns.find(c => c.key === bulkEditField)?.type === 'number' ? 'number' : 'text'}
-                      value={bulkEditValue}
-                      onChange={(e) => setBulkEditValue(e.target.value)}
-                      className={`w-full px-3 py-2 rounded ${
-                        darkMode ? 'bg-gray-700' : 'bg-gray-100'
-                      }`}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-            
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={handleBulkEdit}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                Apply Changes
-              </button>
-              <button
-                onClick={() => {
-                  setBulkEditMode(false);
-                  setBulkEditField('');
-                  setBulkEditValue('');
-                }}
-                className={`flex-1 px-4 py-2 rounded ${
-                  darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
-                }`}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main Content */}
-      <div className="p-4">
-        {viewMode === 'table' ? (
-          /* Table View */
-          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg overflow-hidden shadow-sm`}>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} sticky top-0 z-10`}>
-                  <tr>
-                    <th className="px-4 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={selectedRows.length === paginatedData.length && paginatedData.length > 0}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedRows(paginatedData.map(r => r.id || r.serial_no));
-                          } else {
-                            setSelectedRows([]);
-                          }
-                        }}
-                        className="rounded"
-                      />
-                    </th>
-                    {columns.filter(col => columnVisibility[col.key]).map(column => (
-                      <th
-                        key={column.key}
-                        onClick={() => handleSort(column.key)}
-                        className="px-4 py-3 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium text-sm">{column.label}</span>
-                          {sortConfig.key === column.key && (
-                            sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                          )}
-                        </div>
-                      </th>
-                    ))}
-                    <th className="px-4 py-3 text-left">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedData.map((row, index) => (
-                    <tr
-                      key={row.id || row.serial_no}
-                      className={`border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}
-                        ${row.isNew ? 'bg-green-50 dark:bg-green-900/20' : ''}
-                        ${selectedRows.includes(row.id || row.serial_no) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}
-                        hover:bg-gray-50 dark:hover:bg-gray-700/50`}
-                    >
-                      <td className="px-4 py-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedRows.includes(row.id || row.serial_no)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedRows([...selectedRows, row.id || row.serial_no]);
-                            } else {
-                              setSelectedRows(selectedRows.filter(id => id !== (row.id || row.serial_no)));
-                            }
-                          }}
-                          className="rounded"
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {field.label}
+                        {field.required && <span className="text-red-500 ml-1">*</span>}
+                        {field.readonly && (
+                          <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">
+                            Auto
+                          </span>
+                        )}
+                      </label>
+                      
+                      {field.type === 'textarea' ? (
+                        <textarea
+                          value={formData[field.key] || ''}
+                          onChange={(e) => handleChange(field.key, e.target.value)}
+                          rows={3}
+                          disabled={field.readonly}
+                          className={`w-full px-3 py-2 text-sm rounded-lg border ${
+                            field.readonly
+                              ? darkMode
+                                ? 'bg-gray-900 border-gray-700 text-gray-500 cursor-not-allowed'
+                                : 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
+                              : validationErrors[field.key]
+                                ? 'border-red-500 focus:ring-red-400'
+                                : darkMode 
+                                  ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400' 
+                                  : 'bg-white border-gray-200 focus:ring-blue-400'
+                          } focus:ring-2 focus:outline-none transition-colors`}
                         />
-                      </td>
-                      {columns.filter(col => columnVisibility[col.key]).map(column => (
-                        <td key={column.key} className="px-4 py-2">
-                          {renderCell(row, column)}
-                        </td>
-                      ))}
-                      <td className="px-4 py-2">
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => duplicateRows([row.id || row.serial_no])}
-                            className="p-1 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded"
-                            title="Duplicate"
-                          >
-                            <Copy size={14} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (confirm('Delete this row?')) {
-                                deleteRows([row.id || row.serial_no]);
-                              }
-                            }}
-                            className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/20 rounded"
-                            title="Delete"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                      ) : (
+                        <input
+                          type={field.type}
+                          value={formData[field.key] ?? ''}
+                          onChange={(e) => handleChange(field.key, e.target.value)}
+                          min={field.min}
+                          max={field.max}
+                          step={field.step || (field.type === 'number' ? 'any' : undefined)}
+                          disabled={field.readonly}
+                          className={`w-full px-3 py-2 text-sm rounded-lg border ${
+                            field.readonly
+                              ? darkMode
+                                ? 'bg-gray-900 border-gray-700 text-gray-500 cursor-not-allowed'
+                                : 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
+                              : validationErrors[field.key]
+                                ? 'border-red-500 focus:ring-red-400'
+                                : darkMode 
+                                  ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400' 
+                                  : 'bg-white border-gray-200 focus:ring-blue-400'
+                          } focus:ring-2 focus:outline-none transition-colors`}
+                        />
+                      )}
+                      
+                      {validationErrors[field.key] && (
+                        <p className="text-xs text-red-500 mt-1">{validationErrors[field.key]}</p>
+                      )}
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-            
-            {/* Pagination */}
-            <div className={`px-4 py-3 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}
-              flex flex-col md:flex-row justify-between items-center gap-3`}>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Rows per page:</span>
-                <select
-                  value={rowsPerPage}
-                  onChange={(e) => {
-                    setRowsPerPage(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className={`px-2 py-1 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}
-                >
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value={250}>250</option>
-                </select>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded ${
-                    darkMode ? 'bg-gray-700' : 'bg-gray-200'
-                  } disabled:opacity-50`}
-                >
-                  First
-                </button>
-                <button
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded ${
-                    darkMode ? 'bg-gray-700' : 'bg-gray-200'
-                  } disabled:opacity-50`}
-                >
-                  Previous
-                </button>
-                <span className="px-3 py-1">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className={`px-3 py-1 rounded ${
-                    darkMode ? 'bg-gray-700' : 'bg-gray-200'
-                  } disabled:opacity-50`}
-                >
-                  Next
-                </button>
-                <button
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                  className={`px-3 py-1 rounded ${
-                    darkMode ? 'bg-gray-700' : 'bg-gray-200'
-                  } disabled:opacity-50`}
-                >
-                  Last
-                </button>
-              </div>
-              
-              <div className="text-sm text-gray-500">
-                Showing {((currentPage - 1) * rowsPerPage) + 1} to {Math.min(currentPage * rowsPerPage, filteredData.length)} of {filteredData.length} entries
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* Grid View */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {paginatedData.map((row) => (
-              <div
-                key={row.id || row.serial_no}
-                className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-4 shadow-sm
-                  ${row.isNew ? 'ring-2 ring-green-500' : ''}
-                  ${selectedRows.includes(row.id || row.serial_no) ? 'ring-2 ring-blue-500' : ''}`}
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="font-semibold text-sm truncate flex-1">{row.scheme_name}</h3>
-                  <input
-                    type="checkbox"
-                    checked={selectedRows.includes(row.id || row.serial_no)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedRows([...selectedRows, row.id || row.serial_no]);
-                      } else {
-                        setSelectedRows(selectedRows.filter(id => id !== (row.id || row.serial_no)));
-                      }
-                    }}
-                    className="rounded ml-2"
-                  />
-                </div>
-                
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Budget:</span>
-                    <span className="font-medium">{formatCurrency(row.sanctioned_amount)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Progress:</span>
-                    <span className="font-medium">{row.physical_progress || 0}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Risk:</span>
-                    <span className={`font-medium ${
-                      row.risk_level === 'CRITICAL' ? 'text-red-500' :
-                      row.risk_level === 'HIGH' ? 'text-orange-500' :
-                      row.risk_level === 'MEDIUM' ? 'text-yellow-500' :
-                      'text-green-500'
-                    }`}>
-                      {row.risk_level}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Agency:</span>
-                    <span className="font-medium truncate">{row.executive_agency || '-'}</span>
-                  </div>
-                </div>
-                
-                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 flex gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedRows([row.id || row.serial_no]);
-                      setViewMode('table');
-                    }}
-                    className="flex-1 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => duplicateRows([row.id || row.serial_no])}
-                    className="flex-1 px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600"
-                  >
-                    Duplicate
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm('Delete this row?')) {
-                        deleteRows([row.id || row.serial_no]);
-                      }
-                    }}
-                    className="flex-1 px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-                  >
-                    Delete
-                  </button>
                 </div>
               </div>
             ))}
           </div>
-        )}
-      </div>
-
-      {/* Notification */}
-      {notification && (
-        <div className={`fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50 ${
-          notification.type === 'success' ? 'bg-green-500 text-white' :
-          notification.type === 'error' ? 'bg-red-500 text-white' :
-          notification.type === 'warning' ? 'bg-orange-500 text-white' :
-          'bg-blue-500 text-white'
-        }`}>
-          {notification.type === 'success' ? <CheckCircle size={20} /> :
-           notification.type === 'error' ? <XCircle size={20} /> :
-           notification.type === 'warning' ? <AlertTriangle size={20} /> :
-           <Info size={20} />}
-          <span>{notification.message}</span>
-          <button
-            onClick={() => setNotification(null)}
-            className="ml-2 hover:opacity-80"
-          >
-            <X size={16} />
-          </button>
         </div>
-      )}
 
-      {/* Column Visibility Settings */}
-      <div className={`fixed bottom-4 left-4 ${
-        darkMode ? 'bg-gray-800' : 'bg-white'
-      } rounded-lg shadow-lg p-4 max-w-xs max-h-96 overflow-y-auto z-40
-        ${Object.values(columnVisibility).some(v => !v) ? 'block' : 'hidden'}`}>
-        <h3 className="font-semibold mb-3 flex items-center gap-2">
-          <Eye size={16} />
-          Hidden Columns
-        </h3>
-        <div className="space-y-2">
-          {columns.filter(col => !columnVisibility[col.key]).map(col => (
+        {/* Footer */}
+        <div className={`px-6 py-4 border-t ${
+          darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
+        } flex justify-between items-center`}>
+          <div className="flex gap-2">
+            {!isNewProject && (
+              <button
+                onClick={handleDelete}
+                disabled={loading}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {loading ? <Loader size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                Delete Project
+              </button>
+            )}
+          </div>
+          
+          <div className="flex gap-2">
             <button
-              key={col.key}
-              onClick={() => setColumnVisibility({ ...columnVisibility, [col.key]: true })}
-              className={`w-full text-left px-2 py-1 rounded text-sm ${
-                darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'
-              }`}
+              onClick={onClose}
+              disabled={loading}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                darkMode 
+                  ? 'bg-gray-700 text-gray-100 hover:bg-gray-600' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              Show {col.label}
+              Cancel
             </button>
-          ))}
+            
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:opacity-90 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+            >
+              {loading ? (
+                <>
+                  <Loader size={16} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  {isNewProject ? 'Add Project' : 'Save Changes'}
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
-
-// Helper component for circle icon
-const Circle = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"></circle>
-  </svg>
-);
 
 export default Edit;

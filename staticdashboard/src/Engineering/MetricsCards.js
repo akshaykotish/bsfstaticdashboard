@@ -1450,8 +1450,8 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
 
           {/* Patch Data Indicator */}
           {metric.isPatchData && (
-            <div className="absolute top-2 right-2">
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-medium">
+            <div className="absolute top-20 right-3">
+              <span className="text-[10px] px-1.6 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-medium bottom-0">
                 CY
               </span>
             </div>

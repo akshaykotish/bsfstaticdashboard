@@ -1,0 +1,27 @@
+{
+  "name": "csv-editor-server",
+  "version": "1.0.0",
+  "description": "CSV file editor server with REST API",
+  "main": "edit.js",
+  "scripts": {
+    "start": "node edit.js",
+    "dev": "nodemon edit.js"
+  },
+  "keywords": [
+    "csv",
+    "editor",
+    "api",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "csv-parse": "^5.5.3",
+    "csv-stringify": "^6.4.5",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
