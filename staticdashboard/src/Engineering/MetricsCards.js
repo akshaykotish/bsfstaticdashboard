@@ -55,7 +55,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     patchLoading, 
     patchError,
     rawPatchData,
-    PatchDataTable: PatchTable  // Get the table component
+    PatchDataTable: PatchTable
   } = usePatchEngineeringCYB({
     searchTerm: filters?.searchTerm,
     selectedBudgetHeads: filters?.selectedBudgetHeads,
@@ -87,13 +87,16 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     return isNaN(num) ? defaultValue : num;
   };
 
-  // Format currency
+  // Format currency - values are already in lakhs from useData.js
   const formatCurrency = (value) => {
     const num = safeNumber(value, 0);
-    return `₹${num.toFixed(2)}Cr`;
+    if (num >= 100) {
+      return `₹${(num / 100).toFixed(2)} Cr`;
+    }
+    return `₹${num.toFixed(2)} L`;
   };
 
-  // Calculate all metrics from filteredData
+  // Calculate all metrics from filteredData using the same field names as useData.js
   const calculatedMetrics = useMemo(() => {
     if (!filteredData || filteredData.length === 0) {
       return {
@@ -174,7 +177,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     const currentMonth = now.getMonth();
     const currentQuarter = Math.floor(currentMonth / 3);
     
-    // Projects Metrics
+    // Projects Metrics - using aa_es_ref field from useData.js
     const totalProjects = filteredData.length;
     const sanctionedProjects = filteredData.filter(d => d.aa_es_ref && d.aa_es_ref !== '').length;
     const notSanctioned = filteredData.filter(d => !d.aa_es_ref || d.aa_es_ref === '').length;
@@ -192,19 +195,19 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
         d.date_award && d.date_award !== ''
     ).length;
 
-    // Budget Metrics - ENHANCED
+    // Budget Metrics - using fields from useData.js (already in lakhs)
     const totalBudget = filteredData
-        .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
+        .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0);
 
     const totalExpenditure = filteredData
         .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
-        .reduce((sum, d) => sum + (d.total_expdr || 0), 0) / 100;
+        .reduce((sum, d) => sum + (d.total_expdr || 0), 0);
 
     const currentYearExpenditure = filteredData
         .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
-        .reduce((sum, d) => sum + (d.expdr_cfy || 0), 0) / 100;
+        .reduce((sum, d) => sum + (d.expdr_cfy || 0), 0);
 
-    // NEW: Current Year Budget (budget for projects started this year)
+    // Current Year Budget (budget for projects started this year)
     const currentYearBudget = filteredData
         .filter(d => {
             if (!d.aa_es_ref || d.aa_es_ref === '') return false;
@@ -216,14 +219,14 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
                 return false;
             }
         })
-        .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
+        .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0);
 
-    // NEW: Previous Year Expenditure
+    // Previous Year Expenditure (using expdr_upto_31mar25 from useData.js)
     const previousYearExpenditure = filteredData
         .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
-        .reduce((sum, d) => sum + ((d.total_expdr || 0) - (d.expdr_cfy || 0)), 0) / 100;
+        .reduce((sum, d) => sum + (d.expdr_upto_31mar25 || 0), 0);
 
-    // NEW: Quarterly Expenditure (current quarter)
+    // Quarterly Expenditure (current quarter)
     const quarterStart = new Date(currentYear, currentQuarter * 3, 1);
     const quarterlyExpenditure = filteredData
         .filter(d => {
@@ -236,60 +239,53 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
                 return false;
             }
         })
-        .reduce((sum, d) => sum + (d.total_expdr || 0), 0) / 100;
+        .reduce((sum, d) => sum + (d.total_expdr || 0), 0);
 
-    // NEW: Unutilized Budget
+    // Unutilized Budget
     const unutilizedBudget = filteredData
         .filter(d => d.aa_es_ref && d.aa_es_ref !== '' && d.physical_progress >= 100)
-        .reduce((sum, d) => sum + ((d.sanctioned_amount || 0) - (d.total_expdr || 0)), 0) / 100;
+        .reduce((sum, d) => sum + (d.remaining_amount || 0), 0);
 
-    // NEW: Over Budget Projects
+    // Over Budget Projects
     const overBudgetProjects = filteredData
         .filter(d => d.aa_es_ref && d.aa_es_ref !== '' && d.total_expdr > d.sanctioned_amount)
         .length;
 
     const allocatedBudget = filteredData
         .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
-        .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
+        .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0);
 
     const remainingBudget = filteredData
         .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
-        .reduce((sum, d) => sum + ((d.sanctioned_amount || 0) - (d.total_expdr || 0)), 0) / 100;
+        .reduce((sum, d) => sum + (d.remaining_amount || 0), 0);
 
-    // Progress Categories
+    // Progress Categories - using progress_category from useData.js
     const tenderProgress = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        (!d.date_tender || d.date_tender === '') && d.physical_progress === 0
+        d.progress_category === 'TENDER_PROGRESS'
     ).length;
 
     const tenderedNotAwarded = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.date_tender && (!d.date_award || d.date_award === '')
+        d.progress_category === 'TENDERED_NOT_AWARDED'
     ).length;
 
     const awardedNotStarted = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.date_award && d.physical_progress === 0
+        d.progress_category === 'AWARDED_NOT_STARTED'
     ).length;
 
     const progress1To50 = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.physical_progress > 0 && d.physical_progress <= 50
+        d.progress_category === 'PROGRESS_1_TO_50'
     ).length;
 
     const progress51To71 = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.physical_progress > 50 && d.physical_progress <= 71
+        d.progress_category === 'PROGRESS_51_TO_71'
     ).length;
 
     const progress71To99 = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.physical_progress > 71 && d.physical_progress < 100
+        d.progress_category === 'PROGRESS_71_TO_99'
     ).length;
 
     const completed = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.physical_progress >= 100
+        d.progress_category === 'COMPLETED'
     ).length;
 
     // Recent metrics
@@ -347,7 +343,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
         }
     }).length;
 
-    // Health Metrics
+    // Health Metrics - using pre-calculated values from useData.js
     const critical = filteredData.filter(d => 
         d.aa_es_ref && d.aa_es_ref !== '' &&
         d.risk_level === 'CRITICAL'
@@ -385,7 +381,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
 
     const highBudget = filteredData.filter(d => 
         d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.sanctioned_amount > 50000
+        d.sanctioned_amount > 500 // 500 lakhs = 5 crores
     ).length;
 
     const lowHealth = filteredData.filter(d => 
@@ -413,7 +409,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
         d.delay_days === 0 && d.physical_progress > 0
     ).length;
 
-    // Pace categories
+    // Pace categories - using health_status from useData.js
     const perfectPace = filteredData.filter(d => 
         d.aa_es_ref && d.aa_es_ref !== '' &&
         d.health_status === 'PERFECT_PACE'
@@ -498,7 +494,6 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     const uniqueContractors = new Set(sanctionedData.map(d => d.firm_name).filter(Boolean));
     const uniqueLocations = new Set(sanctionedData.map(d => d.work_site?.split(',')[0]).filter(Boolean));
 
-
     return {
       // Projects
       totalProjects,
@@ -508,7 +503,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       underCodalFormality,
       awarded,
       
-      // Budget - ENHANCED
+      // Budget
       totalBudget,
       totalExpenditure,
       currentYearBudget,
@@ -592,7 +587,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     }
   }, []);
 
-  // Get filtered data based on metric type
+  // Get filtered data based on metric type - using correct field names from useData.js
   const getMetricData = (metricId) => {
     if (!filteredData || filteredData.length === 0) return [];
 
@@ -605,32 +600,43 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       case 'not-sanctioned':
         return filteredData.filter(d => !d.aa_es_ref || d.aa_es_ref === '');
       case 'tender-not-called':
-        return filteredData.filter(d => !d.date_tender || d.date_tender === '');
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          (!d.date_tender || d.date_tender === '') && 
+          d.physical_progress === 0
+        );
       case 'codal':
-        return filteredData.filter(d => !d.date_award || d.date_award === '');
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          (!d.date_award || d.date_award === '')
+        );
       case 'awarded':
-        return filteredData.filter(d => d.date_award && d.date_award !== '');
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.date_award && d.date_award !== ''
+        );
         
-      // Progress Section
+      // Progress Section - using progress_category from useData.js
       case 'tender-progress':
-        return filteredData.filter(d => (!d.date_tender || d.date_tender === '') && d.physical_progress === 0);
+        return filteredData.filter(d => d.progress_category === 'TENDER_PROGRESS');
       case 'tendered-not-awarded':
-        return filteredData.filter(d => d.date_tender && (!d.date_award || d.date_award === ''));
+        return filteredData.filter(d => d.progress_category === 'TENDERED_NOT_AWARDED');
       case 'awarded-not-started':
-        return filteredData.filter(d => d.date_award && d.physical_progress === 0);
+        return filteredData.filter(d => d.progress_category === 'AWARDED_NOT_STARTED');
       case 'progress-1-50':
-        return filteredData.filter(d => d.physical_progress > 0 && d.physical_progress <= 50);
+        return filteredData.filter(d => d.progress_category === 'PROGRESS_1_TO_50');
       case 'progress-51-71':
-        return filteredData.filter(d => d.physical_progress > 50 && d.physical_progress <= 71);
+        return filteredData.filter(d => d.progress_category === 'PROGRESS_51_TO_71');
       case 'progress-71-99':
-        return filteredData.filter(d => d.physical_progress > 71 && d.physical_progress < 100);
+        return filteredData.filter(d => d.progress_category === 'PROGRESS_71_TO_99');
       case 'completed':
       case 'progress-completed':
-        return filteredData.filter(d => d.physical_progress >= 100);
+        return filteredData.filter(d => d.progress_category === 'COMPLETED');
       case 'recently-awarded':
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         return filteredData.filter(d => {
+          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
           if (!d.date_award) return false;
           try {
             const awardDate = new Date(d.date_award);
@@ -642,6 +648,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       case 'awarded-year':
         const yearStart = new Date(new Date().getFullYear(), 0, 1);
         return filteredData.filter(d => {
+          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
           if (!d.date_award) return false;
           try {
             const awardDate = new Date(d.date_award);
@@ -654,6 +661,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
         const ninetyDaysAgo = new Date();
         ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
         return filteredData.filter(d => {
+          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
           if (!d.actual_completion_date || d.physical_progress < 100) return false;
           try {
             const completionDate = new Date(d.actual_completion_date);
@@ -665,6 +673,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       case 'old-projects':
         const now = new Date();
         return filteredData.filter(d => {
+          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
           if (!d.date_award) return false;
           try {
             const awardDate = new Date(d.date_award);
@@ -676,46 +685,97 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
           }
         });
         
-      // Health Section
+      // Health Section - using pre-calculated fields from useData.js
       case 'critical':
-        return filteredData.filter(d => d.risk_level === 'CRITICAL');
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.risk_level === 'CRITICAL'
+        );
       case 'high-risk':
-        return filteredData.filter(d => d.risk_level === 'HIGH');
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.risk_level === 'HIGH'
+        );
       case 'delayed':
-        return filteredData.filter(d => (d.delay_days || 0) > 0);
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          (d.delay_days || 0) > 0
+        );
       case 'ongoing':
-        return filteredData.filter(d => d.physical_progress > 0 && d.physical_progress < 100);
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.physical_progress > 0 && d.physical_progress < 100
+        );
       case 'notstarted':
-        return filteredData.filter(d => d.physical_progress === 0);
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.physical_progress === 0
+        );
       case 'overdue':
-        return filteredData.filter(d => d.delay_days > 90);
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.delay_days > 90
+        );
       case 'near-completion':
-        return filteredData.filter(d => d.physical_progress >= 75 && d.physical_progress < 100);
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.physical_progress >= 75 && d.physical_progress < 100
+        );
       case 'perfect-pace':
-        return filteredData.filter(d => d.health_status === 'PERFECT_PACE');
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.health_status === 'PERFECT_PACE'
+        );
       case 'slow-pace':
-        return filteredData.filter(d => d.health_status === 'SLOW_PACE');
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.health_status === 'SLOW_PACE'
+        );
       case 'bad-pace':
-        return filteredData.filter(d => d.health_status === 'BAD_PACE');
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.health_status === 'BAD_PACE'
+        );
       case 'sleep-pace':
-        return filteredData.filter(d => d.health_status === 'SLEEP_PACE');
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.health_status === 'SLEEP_PACE'
+        );
       case 'payment-pending':
-        return filteredData.filter(d => d.health_status === 'PAYMENT_PENDING');
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.health_status === 'PAYMENT_PENDING'
+        );
       case 'low-health':
-        return filteredData.filter(d => (d.health_score || 0) < 50);
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          (d.health_score || 0) < 50
+        );
       case 'high-efficiency':
-        return filteredData.filter(d => (d.efficiency_score || 0) > 80);
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          (d.efficiency_score || 0) > 80
+        );
+      case 'high-budget':
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.sanctioned_amount > 500 // 500 lakhs = 5 crores
+        );
         
       // Budget Section
       case 'total-budget':
         return filteredData;
       case 'expenditure':
-        return filteredData.filter(d => (d.total_expdr || 0) > 0);
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          (d.total_expdr || 0) > 0
+        );
       case 'allocated':
         return filteredData.filter(d => d.aa_es_ref && d.aa_es_ref !== '');
       case 'current-year-budget':
         const currentYear = new Date().getFullYear();
         return filteredData.filter(d => {
+          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
           if (!d.date_award) return false;
           try {
             const awardDate = new Date(d.date_award);
@@ -725,13 +785,20 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
           }
         });
       case 'current-year-expenditure':
-        return filteredData.filter(d => (d.expdr_cfy || 0) > 0);
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          (d.expdr_cfy || 0) > 0
+        );
       case 'previous-year-expenditure':
-        return filteredData.filter(d => ((d.total_expdr || 0) - (d.expdr_cfy || 0)) > 0);
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          (d.expdr_upto_31mar25 || 0) > 0
+        );
       case 'quarterly-expenditure':
         const currentQuarter = Math.floor(new Date().getMonth() / 3);
         const quarterStart = new Date(new Date().getFullYear(), currentQuarter * 3, 1);
         return filteredData.filter(d => {
+          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
           if (!d.date_award) return false;
           try {
             const awardDate = new Date(d.date_award);
@@ -741,18 +808,27 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
           }
         });
       case 'remaining':
-        return filteredData.filter(d => ((d.sanctioned_amount || 0) - (d.total_expdr || 0)) > 0);
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          (d.remaining_amount || 0) > 0
+        );
       case 'unutilized':
-        return filteredData.filter(d => d.physical_progress >= 100 && ((d.sanctioned_amount || 0) - (d.total_expdr || 0)) > 0);
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.physical_progress >= 100 && 
+          (d.remaining_amount || 0) > 0
+        );
       case 'over-budget':
-        return filteredData.filter(d => d.total_expdr > d.sanctioned_amount);
-      case 'high-budget':
-        return filteredData.filter(d => d.sanctioned_amount > 50000);
+        return filteredData.filter(d => 
+          d.aa_es_ref && d.aa_es_ref !== '' &&
+          d.total_expdr > d.sanctioned_amount
+        );
         
       // Timeline Section
       case 'current-year':
         const thisYear = new Date().getFullYear();
         return filteredData.filter(d => {
+          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
           if (!d.date_award) return false;
           try {
             const awardDate = new Date(d.date_award);
@@ -767,6 +843,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
         const lastQtr = currentQtr === 0 ? 3 : currentQtr - 1;
         const checkYear = currentQtr === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear();
         return filteredData.filter(d => {
+          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
           if (!d.date_award) return false;
           try {
             const awardDate = new Date(d.date_award);
@@ -780,6 +857,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       case 'last-year':
         const lastYear = new Date().getFullYear() - 1;
         return filteredData.filter(d => {
+          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
           if (!d.date_award) return false;
           try {
             const awardDate = new Date(d.date_award);
@@ -794,7 +872,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     }
   };
 
-  // Handle metric click - Updated version
+  // Handle metric click
   const handleMetricClick = (metric) => {
     if (metric.isPatchData) {
       // For patch metrics, show the patch data table
@@ -810,7 +888,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       setDrillDownTitle(`${metric.title} - ${metric.value} ${metric.subtitle || ''}`);
       setSelectedMetric(metric);
       setShowDrillDown(true);
-      console.log('[MetricsCard] Opening project data view:', data.length, 'entries');
+      console.log('[MetricsCard] Opening project data view:', data.length, 'entries for', metric.id);
     }
   };
 
@@ -857,7 +935,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       color: 'green',
       gradient: 'from-green-500 to-green-600',
       percentage: safeNumber((displayMetrics.sanctionedProjects / Math.max(1, displayMetrics.totalProjects)) * 100),
-      infoText: "Projects that have received Administrative Approval (AA) and Expenditure Sanction (ES) from the government, meaning they are officially approved for execution."
+      infoText: "Projects that have received Administrative Approval (AA) and Expenditure Sanction (ES) from the government."
     },
     {
       id: 'not-sanctioned',
@@ -869,7 +947,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       color: 'red',
       gradient: 'from-red-500 to-red-600',
       alert: displayMetrics.notSanctioned > displayMetrics.totalProjects * 0.3,
-      infoText: "Projects waiting for official government approval. These projects cannot proceed until they receive Administrative Approval and Expenditure Sanction."
+      infoText: "Projects waiting for official government approval."
     },
     {
       id: 'awarded',
@@ -881,7 +959,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       color: 'teal',
       gradient: 'from-teal-500 to-teal-600',
       sparkline: generateTrendData(displayMetrics.awarded || 0, 3),
-      infoText: "Projects where contractors have been officially selected and contracts signed. These projects are ready for or have started physical execution."
+      infoText: "Projects where contractors have been officially selected and contracts signed."
     },
     {
       id: 'codal',
@@ -892,7 +970,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: FileText,
       color: 'orange',
       gradient: 'from-orange-500 to-orange-600',
-      infoText: "Projects where bidding is complete but the contract hasn't been formally awarded. They are undergoing legal and procedural checks before final contractor selection."
+      infoText: "Projects undergoing legal and procedural checks before final contractor selection."
     },
     {
       id: 'tender-not-called',
@@ -903,7 +981,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Calendar,
       color: 'yellow',
       gradient: 'from-yellow-500 to-yellow-600',
-      infoText: "Projects approved but haven't started the bidding process. The tender is a formal invitation for contractors to submit bids for project execution."
+      infoText: "Projects approved but haven't started the bidding process."
     },
   ];
 
@@ -911,25 +989,25 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     {
       id: 'total-budget',
       group: 'budget',
-      title: 'Total Budget (Appraised)',
+      title: 'Scheme Amount',
       value: formatCurrency(displayMetrics.totalBudget || 0),
       subtitle: `${displayMetrics.totalProjects || 0} projects`,
       icon: IndianRupee,
       color: 'green',
       gradient: 'from-green-500 to-green-600',
       sparkline: generateTrendData(displayMetrics.totalBudget || 0, 100),
-      infoText: "The total amount of money allocated by the government for all projects. This is the maximum that can be spent across all projects."
+      infoText: "The total amount of money allocated for all projects."
     },
     {
       id: 'allocated',
       group: 'budget',
-      title: 'Allocated Budget (Sanctioned)',
+      title: 'Sanctioned Issue',
       value: formatCurrency(displayMetrics.allocatedBudget || 0),
       subtitle: 'Sanctioned projects',
       icon: Wallet,
       color: 'purple',
       gradient: 'from-purple-500 to-purple-600',
-      infoText: "Budget specifically assigned to projects that have received official approval. This is the portion of total budget ready for use."
+      infoText: "Budget assigned to projects that have received official approval."
     },
     {
       id: 'expenditure',
@@ -941,23 +1019,23 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       color: 'blue',
       gradient: 'from-blue-500 to-blue-600',
       percentage: displayMetrics.utilizationRate || 0,
-      infoText: "The actual amount of money spent so far on all projects. The percentage shows how much of the total budget has been used."
+      infoText: "The actual amount of money spent so far on all projects."
     },
-    {
-      id: 'current-year-budget',
-      group: 'budget',
-      title: 'Current Year Budget',
-      value: formatCurrency(displayMetrics.currentYearBudget || 0),
-      subtitle: `FY ${new Date().getFullYear()}`,
-      icon: Calendar,
-      color: 'indigo',
-      gradient: 'from-indigo-500 to-indigo-600',
-      infoText: "Total budget allocated for projects started in the current financial year."
-    },
+    // {
+    //   id: 'current-year-budget',
+    //   group: 'budget',
+    //   title: 'Current Year Budget',
+    //   value: formatCurrency(displayMetrics.currentYearBudget || 0),
+    //   subtitle: `FY ${new Date().getFullYear()}`,
+    //   icon: Calendar,
+    //   color: 'indigo',
+    //   gradient: 'from-indigo-500 to-indigo-600',
+    //   infoText: "Total budget allocated for projects started in the current financial year."
+    // },
     {
       id: 'current-year-expenditure',
       group: 'budget',
-      title: 'Current Year Spent',
+      title: 'Expenditure Current FY',
       value: formatCurrency(displayMetrics.currentYearExpenditure || 0),
       subtitle: `${displayMetrics.currentYearBudget ? 
         ((displayMetrics.currentYearExpenditure / displayMetrics.currentYearBudget) * 100).toFixed(1) : 0}% utilized`,
@@ -968,19 +1046,19 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
         ? ((displayMetrics.currentYearExpenditure / displayMetrics.currentYearBudget) * 100)
         : 0,
       sparkline: generateTrendData(displayMetrics.currentYearExpenditure || 0, 20),
-      infoText: "Actual expenditure in the current financial year. Shows how much of this year's budget has been spent."
+      infoText: "Actual expenditure in the current financial year."
     },
-    {
-      id: 'previous-year-expenditure',
-      group: 'budget',
-      title: 'Previous Years Spent',
-      value: formatCurrency(displayMetrics.previousYearExpenditure || 0),
-      subtitle: 'Cumulative',
-      icon: Banknote,
-      color: 'gray',
-      gradient: 'from-gray-500 to-gray-600',
-      infoText: "Total expenditure from all previous years combined."
-    },
+    // {
+    //   id: 'previous-year-expenditure',
+    //   group: 'budget',
+    //   title: 'Previous Years Spent',
+    //   value: formatCurrency(displayMetrics.previousYearExpenditure || 0),
+    //   subtitle: 'Cumulative',
+    //   icon: Banknote,
+    //   color: 'gray',
+    //   gradient: 'from-gray-500 to-gray-600',
+    //   infoText: "Total expenditure from all previous years combined."
+    // },
     {
       id: 'quarterly-expenditure',
       group: 'budget',
@@ -990,7 +1068,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: PiggyBank,
       color: 'emerald',
       gradient: 'from-emerald-500 to-emerald-600',
-      infoText: "Expenditure in the current quarter. Helps track spending pace within the quarter."
+      infoText: "Expenditure in the current quarter."
     },
     {
       id: 'remaining',
@@ -1001,7 +1079,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Database,
       color: 'amber',
       gradient: 'from-amber-500 to-amber-600',
-      infoText: "The amount of money left to be spent. This is the difference between allocated budget and what has been spent so far."
+      infoText: "The amount of money left to be spent."
     },
     {
       id: 'unutilized',
@@ -1013,7 +1091,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       color: 'orange',
       gradient: 'from-orange-500 to-orange-600',
       alert: displayMetrics.unutilizedBudget > displayMetrics.totalBudget * 0.05,
-      infoText: "Budget remaining unutilized after project completion. This represents potential savings or underutilization."
+      infoText: "Budget remaining unutilized after project completion."
     },
     {
       id: 'over-budget',
@@ -1027,12 +1105,43 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       alert: displayMetrics.overBudgetProjects > 0,
       infoText: "Number of projects where actual expenditure has exceeded the sanctioned budget."
     },
+    {
+      id: 'high-budget',
+      group: 'budget',
+      title: 'High Budget Projects',
+      value: displayMetrics.highBudget || 0,
+      subtitle: '>₹5 Cr',
+      icon: IndianRupee,
+      color: 'purple',
+      gradient: 'from-purple-500 to-purple-600',
+      infoText: "Projects with budget exceeding ₹5 crores."
+    },
     
     // Integrate patch data metrics here
     ...(showPatchData && !patchLoading && patchMetrics ? generatePatchBudgetMetrics(patchMetrics, darkMode) : []),
   ];
 
   const progressMetrics = [
+    {
+      id: 'tender-progress',
+      group: 'progress',
+      title: 'Tender Progress',
+      value: displayMetrics.tenderProgress || 0,
+      icon: Activity,
+      color: 'slate',
+      gradient: 'from-slate-500 to-slate-600',
+      infoText: "Projects in the tender preparation stage."
+    },
+    {
+      id: 'tendered-not-awarded',
+      group: 'progress',
+      title: 'Tendered Not Awarded',
+      value: displayMetrics.tenderedNotAwarded || 0,
+      icon: PauseCircle,
+      color: 'yellow',
+      gradient: 'from-yellow-500 to-yellow-600',
+      infoText: "Projects where bidding is complete but no contractor selected yet."
+    },
     {
       id: 'awarded-not-started',
       group: 'progress',
@@ -1041,7 +1150,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: PlayCircle,
       color: 'orange',
       gradient: 'from-orange-500 to-orange-600',
-      infoText: "Projects where a contractor has been selected but physical work hasn't begun. This could be due to site preparation or material procurement."
+      infoText: "Projects where contractor is selected but physical work hasn't begun."
     },
     {
       id: 'progress-1-50',
@@ -1051,7 +1160,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Activity,
       color: 'red',
       gradient: 'from-red-500 to-orange-500',
-      infoText: "Projects in early to mid-stage of completion. These require monitoring to ensure they stay on track."
+      infoText: "Projects in early to mid-stage of completion."
     },
     {
       id: 'progress-51-71',
@@ -1061,7 +1170,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Activity,
       color: 'yellow',
       gradient: 'from-yellow-500 to-green-500',
-      infoText: "Projects that are more than halfway done. These are progressing well but need attention to ensure timely completion."
+      infoText: "Projects that are more than halfway done."
     },
     {
       id: 'progress-71-99',
@@ -1071,7 +1180,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Target,
       color: 'blue',
       gradient: 'from-blue-500 to-green-500',
-      infoText: "Projects nearing completion. These need final push and quality checks before handover."
+      infoText: "Projects nearing completion."
     },
     {
       id: 'progress-completed',
@@ -1084,7 +1193,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       gradient: 'from-green-500 to-green-600',
       sparkline: generateTrendData(displayMetrics.completed || 0, 2),
       percentage: safeNumber((displayMetrics.completed / Math.max(1, displayMetrics.totalProjects)) * 100),
-      infoText: "Projects that have finished all work (100% progress). These are ready for handover or already in use."
+      infoText: "Projects that have finished all work."
     },
     {
       id: 'recently-awarded',
@@ -1095,7 +1204,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Award,
       color: 'purple',
       gradient: 'from-purple-500 to-purple-600',
-      infoText: "Projects where contracts were signed in the last 30 days. These are new projects beginning their execution phase."
+      infoText: "Projects where contracts were signed in the last 30 days."
     },
     {
       id: 'awarded-year',
@@ -1106,7 +1215,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Calendar,
       color: 'indigo',
       gradient: 'from-indigo-500 to-indigo-600',
-      infoText: "All projects that received contractor awards in the current year. Shows the pace of new project initiation."
+      infoText: "All projects that received contractor awards in the current year."
     },
     {
       id: 'completed-recently',
@@ -1117,7 +1226,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: CheckCircle,
       color: 'teal',
       gradient: 'from-teal-500 to-teal-600',
-      infoText: "Projects finished in the last 90 days. These may be in handover or warranty phase."
+      infoText: "Projects finished in the last 90 days."
     },
     {
       id: 'old-projects',
@@ -1128,27 +1237,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Clock,
       color: 'gray',
       gradient: 'from-gray-500 to-gray-600',
-      infoText: "Projects that were started more than a year ago but aren't complete. These may need special attention or intervention."
-    },
-    {
-      id: 'tender-progress',
-      group: 'progress',
-      title: 'Tender Progress',
-      value: displayMetrics.tenderProgress || 0,
-      icon: Activity,
-      color: 'slate',
-      gradient: 'from-slate-500 to-slate-600',
-      infoText: "Projects in the initial stage where the tender (bidding) process is being prepared or is ongoing."
-    },
-    {
-      id: 'tendered-not-awarded',
-      group: 'progress',
-      title: 'Tendered Not Awarded',
-      value: displayMetrics.tenderedNotAwarded || 0,
-      icon: PauseCircle,
-      color: 'yellow',
-      gradient: 'from-yellow-500 to-yellow-600',
-      infoText: "Projects where bidding is complete but no contractor has been selected yet. This could be due to evaluation delays or re-tendering."
+      infoText: "Projects started more than a year ago but not complete."
     },
   ];
 
@@ -1164,7 +1253,17 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       gradient: 'from-red-500 to-red-600',
       alert: true,
       pulse: displayMetrics.critical > 10,
-      infoText: "Projects facing severe issues like major delays, budget overruns, or quality problems. These need immediate management attention."
+      infoText: "Projects facing severe issues that need immediate attention."
+    },
+    {
+      id: 'high-risk',
+      group: 'health',
+      title: 'High Risk',
+      value: displayMetrics.highRisk || 0,
+      icon: AlertCircle,
+      color: 'orange',
+      gradient: 'from-orange-500 to-orange-600',
+      infoText: "Projects with significant risk factors."
     },
     {
       id: 'delayed',
@@ -1175,7 +1274,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Clock,
       color: 'yellow',
       gradient: 'from-yellow-500 to-yellow-600',
-      infoText: "Projects running behind their planned schedule. The delay could affect project costs and benefits."
+      infoText: "Projects running behind their planned schedule."
     },
     {
       id: 'completed',
@@ -1186,7 +1285,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: CheckCircle,
       color: 'green',
       gradient: 'from-green-500 to-green-600',
-      infoText: "Projects that have finished all work (100% progress). These are ready for handover or already in use."
+      infoText: "Projects that have finished all work."
     },
     {
       id: 'ongoing',
@@ -1196,7 +1295,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Activity,
       color: 'blue',
       gradient: 'from-blue-500 to-blue-600',
-      infoText: "Projects where work has started and is in progress. These are actively being executed at various stages."
+      infoText: "Projects where work is actively in progress."
     },
     {
       id: 'notstarted',
@@ -1206,18 +1305,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Package,
       color: 'gray',
       gradient: 'from-gray-500 to-gray-600',
-      infoText: "Projects with zero physical progress. These are in planning or preparation stage."
-    },
-    {
-      id: 'high-budget',
-      group: 'health',
-      title: 'High Budget',
-      value: displayMetrics.highBudget || 0,
-      subtitle: '>₹500L',
-      icon: IndianRupee,
-      color: 'purple',
-      gradient: 'from-purple-500 to-purple-600',
-      infoText: "Projects with budget exceeding ₹500 lakhs (5 crores). These are major projects requiring close monitoring."
+      infoText: "Projects with zero physical progress."
     },
     {
       id: 'low-health',
@@ -1228,7 +1316,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Heart,
       color: 'red',
       gradient: 'from-red-500 to-red-600',
-      infoText: "Projects with poor overall performance based on progress, efficiency, and delays. These need improvement strategies."
+      infoText: "Projects with poor overall performance."
     },
     {
       id: 'high-efficiency',
@@ -1239,7 +1327,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Zap,
       color: 'emerald',
       gradient: 'from-emerald-500 to-emerald-600',
-      infoText: "Projects performing excellently with good progress relative to time and money spent. These are model projects."
+      infoText: "Projects performing excellently."
     },
     {
       id: 'overdue',
@@ -1251,7 +1339,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       color: 'red',
       gradient: 'from-red-600 to-red-700',
       alert: true,
-      infoText: "Projects delayed by more than 90 days from their planned completion date. These may face penalties or cost escalation."
+      infoText: "Projects delayed by more than 90 days."
     },
     {
       id: 'near-completion',
@@ -1262,7 +1350,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Target,
       color: 'cyan',
       gradient: 'from-cyan-500 to-cyan-600',
-      infoText: "Projects in final stages of completion. These need focused effort to finish on time."
+      infoText: "Projects in final stages of completion."
     },
     {
       id: 'perfect-pace',
@@ -1272,7 +1360,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Gauge,
       color: 'green',
       gradient: 'from-green-500 to-emerald-600',
-      infoText: "Projects progressing exactly as planned or ahead of schedule. These are performing optimally."
+      infoText: "Projects progressing as planned or ahead of schedule."
     },
     {
       id: 'slow-pace',
@@ -1282,7 +1370,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: Timer,
       color: 'yellow',
       gradient: 'from-yellow-500 to-amber-600',
-      infoText: "Projects progressing slower than planned (75-95% of expected progress). These need minor adjustments."
+      infoText: "Projects progressing slower than planned (75-95% of expected)."
     },
     {
       id: 'bad-pace',
@@ -1292,7 +1380,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: AlertCircle,
       color: 'orange',
       gradient: 'from-orange-500 to-red-500',
-      infoText: "Projects significantly behind schedule (50-75% of expected progress). These need corrective action."
+      infoText: "Projects significantly behind schedule (50-75% of expected)."
     },
     {
       id: 'sleep-pace',
@@ -1302,7 +1390,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: PauseCircle,
       color: 'red',
       gradient: 'from-red-500 to-red-700',
-      infoText: "Projects moving extremely slowly or stalled (less than 50% of expected progress). These need urgent intervention."
+      infoText: "Projects moving extremely slowly (<50% of expected)."
     },
     {
       id: 'payment-pending',
@@ -1312,7 +1400,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: CreditCard,
       color: 'amber',
       gradient: 'from-amber-500 to-orange-600',
-      infoText: "Completed projects where full payment hasn't been made to contractors. This could delay project closure."
+      infoText: "Completed projects where full payment hasn't been made."
     }
   ];
 
@@ -1327,7 +1415,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       color: 'indigo',
       gradient: 'from-indigo-500 to-indigo-600',
       sparkline: generateTrendData(displayMetrics.currentYearProjects || 0, 5),
-      infoText: "Projects started in the current financial year. Shows the volume of new work undertaken this year."
+      infoText: "Projects started in the current financial year."
     },
     {
       id: 'last-quarter',
@@ -1338,7 +1426,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: CalendarClock,
       color: 'purple',
       gradient: 'from-purple-500 to-purple-600',
-      infoText: "Projects initiated in the previous quarter (3-month period). Helps track recent project initiation trends."
+      infoText: "Projects initiated in the previous quarter."
     },
     {
       id: 'last-year',
@@ -1349,7 +1437,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       icon: CalendarCheck,
       color: 'cyan',
       gradient: 'from-cyan-500 to-cyan-600',
-      infoText: "Projects from the previous financial year. These should ideally be nearing completion or completed."
+      infoText: "Projects from the previous financial year."
     }
   ];
 
@@ -1450,8 +1538,8 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
 
           {/* Patch Data Indicator */}
           {metric.isPatchData && (
-            <div className="absolute top-20 right-3">
-              <span className="text-[10px] px-1.6 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-medium bottom-0">
+            <div className="absolute top-2 right-3">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-medium">
                 CY
               </span>
             </div>
@@ -1640,7 +1728,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     );
   };
 
-  // Drill-down Modal Component - Updated for patch data
+  // Drill-down Modal Component
   const DrillDownModal = () => {
     if (!showDrillDown) return null;
 
@@ -1649,7 +1737,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       closeDrillDown();
     };
 
-    // Handle row selection (only for project data)
+    // Handle row selection
     const handleRowClick = (row) => {
       // Only handle clicks for project data, not patch data
       if (!selectedMetric?.isPatchData) {
@@ -1722,8 +1810,8 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
               onRowClick={handleRowClick}
               compareMode={false}
               selectedProjects={[]}
-              isEmbedded={false}
-              maxHeight="calc(85vh - 200px)"
+              isEmbedded={true}
+              maxHeight="calc(85vh - 80px)"
               maxWidth="100%"
             />
           </div>
@@ -1771,7 +1859,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
                   ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-sm'
                   : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
-              title="Toggle Current Year Budget patch data from enggcurrentyear.csv"
+              title="Toggle Current Year Budget patch data"
             >
               <DollarSign size={12} />
               CY Patch
@@ -1804,7 +1892,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
                 ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm'
                 : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
-            title="Toggle information tooltips that explain what each metric means"
+            title="Toggle information tooltips"
           >
             <Info size={12} />
             Help
@@ -1889,7 +1977,8 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
             </div>
           </div>
 
-          {/* Budget Section - ENHANCED WITH PATCH DATA */}
+          {/* Similar sections for Budget, Progress, Health, and Timeline */}
+          {/* Budget Section */}
           <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
             darkMode ? 'border-gray-700' : 'border-gray-100'
           } overflow-hidden`}>
@@ -1904,30 +1993,6 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
                 }`}>
                   {budgetMetrics.length} metrics
                 </span>
-                
-                {/* Patch Data Status Indicator */}
-                {showPatchData && (
-                  <div className="flex items-center gap-2 ml-2">
-                    {patchLoading && (
-                      <span className="flex items-center gap-1 text-xs text-indigo-500">
-                        <RefreshCw size={12} className="animate-spin" />
-                        Loading CY patch...
-                      </span>
-                    )}
-                    {!patchLoading && !patchError && patchMetrics && (
-                      <span className="flex items-center gap-1 text-xs text-green-500">
-                        <CheckCircle size={12} />
-                        CY patch: {patchMetrics.totalRecords} records
-                      </span>
-                    )}
-                    {patchError && (
-                      <span className="flex items-center gap-1 text-xs text-red-500" title={patchError}>
-                        <AlertCircle size={12} />
-                        CY patch error
-                      </span>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
             <div className={`p-4 grid gap-3 ${
@@ -1947,7 +2012,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
           <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
             darkMode ? 'border-gray-700' : 'border-gray-100'
           } overflow-hidden`}>
-            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-purple-50 border-purple-100'} border-b flex items-center justify-between`}>
+            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-purple-50 border-purple-100'} border-b`}>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
                   <Activity size={16} className="text-white" />
@@ -1977,7 +2042,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
           <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
             darkMode ? 'border-gray-700' : 'border-gray-100'
           } overflow-hidden`}>
-            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-red-50 border-red-100'} border-b flex items-center justify-between`}>
+            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-red-50 border-red-100'} border-b`}>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center">
                   <Heart size={16} className="text-white" />
@@ -2007,7 +2072,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
           <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
             darkMode ? 'border-gray-700' : 'border-gray-100'
           } overflow-hidden`}>
-            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-indigo-50 border-indigo-100'} border-b flex items-center justify-between`}>
+            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-indigo-50 border-indigo-100'} border-b`}>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
                   <CalendarDays size={16} className="text-white" />

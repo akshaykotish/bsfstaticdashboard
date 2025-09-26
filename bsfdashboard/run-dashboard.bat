@@ -113,6 +113,19 @@ if %errorLevel% neq 0 (
 )
 echo.
 
+:: Run node edit.js in a new terminal window
+echo Running edit.js in a new terminal...
+if exist "%PROJECT_DIR%edit.js" (
+    start "BSF Edit Script" cmd /k "cd /d %PROJECT_DIR% && node edit.js && echo. && echo Edit script completed. && pause"
+    echo [OK] edit.js launched in new terminal
+) else if exist "%BUILD_DIR%\edit.js" (
+    start "BSF Edit Script" cmd /k "cd /d %BUILD_DIR% && node edit.js && echo. && echo Edit script completed. && pause"
+    echo [OK] edit.js launched in new terminal
+) else (
+    echo [INFO] edit.js not found, skipping...
+)
+echo.
+
 echo [5/5] Starting production server...
 echo.
 

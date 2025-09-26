@@ -13,10 +13,10 @@ export const useFilters = () => {
   const [selectedLocations, setSelectedLocations] = useState([]);
   const [selectedSchemes, setSelectedSchemes] = useState([]);
   
-  // NEW: Physical progress categories filter
+  // Physical progress categories filter
   const [selectedProgressCategories, setSelectedProgressCategories] = useState([]);
   
-  // NEW: Health status filter
+  // Health status filter
   const [selectedHealthStatuses, setSelectedHealthStatuses] = useState([]);
   
   // Range filters
@@ -26,17 +26,18 @@ export const useFilters = () => {
   const [efficiencyRange, setEfficiencyRange] = useState([0, 100]);
   const [healthRange, setHealthRange] = useState([0, 100]);
   
-  // NEW: Expected progress range filter
+  // Expected progress range filter
   const [expectedProgressRange, setExpectedProgressRange] = useState([0, 100]);
   
-  // Date range filters
+  // Date range filters - updated for new column names
   const [dateFilters, setDateFilters] = useState({
     tenderDate: { enabled: false, start: null, end: null },
     awardDate: { enabled: false, start: null, end: null },
     acceptanceDate: { enabled: false, start: null, end: null },
     pdcDate: { enabled: false, start: null, end: null },
     revisedPdcDate: { enabled: false, start: null, end: null },
-    completionDate: { enabled: false, start: null, end: null }
+    completionDate: { enabled: false, start: null, end: null },
+    tsDate: { enabled: false, start: null, end: null } // New field for ts_date
   });
   
   // Store raw data for filtering
@@ -98,11 +99,12 @@ export const useFilters = () => {
       acceptanceDate: { enabled: false, start: null, end: null },
       pdcDate: { enabled: false, start: null, end: null },
       revisedPdcDate: { enabled: false, start: null, end: null },
-      completionDate: { enabled: false, start: null, end: null }
+      completionDate: { enabled: false, start: null, end: null },
+      tsDate: { enabled: false, start: null, end: null }
     });
   }, []);
 
-  // Get date range bounds from data
+  // Get date range bounds from data - updated for new columns
   const getDateBounds = useCallback((data, field) => {
     const dates = data
       .map(item => parseDate(item[field]))
@@ -119,17 +121,18 @@ export const useFilters = () => {
     };
   }, [parseDate]);
 
-  // Calculate date statistics
+  // Calculate date statistics - updated for new columns
   const dateStatistics = useMemo(() => {
     if (!rawData || rawData.length === 0) return {};
     
     return {
-      tenderDate: getDateBounds(rawData, 'date_tender'),
-      awardDate: getDateBounds(rawData, 'date_award'),
-      acceptanceDate: getDateBounds(rawData, 'date_acceptance'),
+      tenderDate: getDateBounds(rawData, 'tender_date'),
+      awardDate: getDateBounds(rawData, 'award_date'),
+      acceptanceDate: getDateBounds(rawData, 'acceptance_date'),
       pdcDate: getDateBounds(rawData, 'pdc_agreement'),
       revisedPdcDate: getDateBounds(rawData, 'revised_pdc'),
-      completionDate: getDateBounds(rawData, 'actual_completion_date')
+      completionDate: getDateBounds(rawData, 'completion_date_actual'),
+      tsDate: getDateBounds(rawData, 'ts_date')
     };
   }, [rawData, getDateBounds]);
 
@@ -158,7 +161,7 @@ export const useFilters = () => {
     const applyFiltersExcept = (data, exceptFilters = []) => {
       let filtered = [...data];
 
-      // Text search
+      // Text search - updated for new column names
       if (searchTerm && !exceptFilters.includes('search')) {
         const searchLower = searchTerm.toLowerCase();
         filtered = filtered.filter(item =>
@@ -212,7 +215,7 @@ export const useFilters = () => {
         });
       }
 
-      // FIXED: Enhanced scheme filtering with better matching
+      // Enhanced scheme filtering with better matching
       if (selectedSchemes.length > 0 && !exceptFilters.includes('scheme')) {
         console.log('[applyFiltersExcept] Filtering by schemes:', selectedSchemes);
         const beforeCount = filtered.length;
@@ -229,12 +232,12 @@ export const useFilters = () => {
         console.log(`[applyFiltersExcept] Scheme filter: ${beforeCount} -> ${filtered.length} items`);
       }
 
-      // NEW: Progress categories filter
+      // Progress categories filter
       if (selectedProgressCategories.length > 0 && !exceptFilters.includes('progressCategory')) {
         filtered = filtered.filter(item => selectedProgressCategories.includes(item.progress_category));
       }
 
-      // NEW: Health status filter
+      // Health status filter
       if (selectedHealthStatuses.length > 0 && !exceptFilters.includes('healthStatus')) {
         filtered = filtered.filter(item => selectedHealthStatuses.includes(item.health_status));
       }
@@ -265,28 +268,28 @@ export const useFilters = () => {
         return health >= healthRange[0] && health <= healthRange[1];
       });
 
-      // NEW: Expected progress range filter
+      // Expected progress range filter
       filtered = filtered.filter(item => {
         const expectedProgress = item.expected_progress || 0;
         return expectedProgress >= expectedProgressRange[0] && expectedProgress <= expectedProgressRange[1];
       });
 
-      // Apply date filters
+      // Apply date filters - updated for new column names
       if (dateFilters.tenderDate.enabled && !exceptFilters.includes('dates')) {
         filtered = filtered.filter(item => 
-          isDateInRange(item.date_tender, dateFilters.tenderDate.start, dateFilters.tenderDate.end)
+          isDateInRange(item.tender_date, dateFilters.tenderDate.start, dateFilters.tenderDate.end)
         );
       }
 
       if (dateFilters.awardDate.enabled && !exceptFilters.includes('dates')) {
         filtered = filtered.filter(item =>
-          isDateInRange(item.date_award, dateFilters.awardDate.start, dateFilters.awardDate.end)
+          isDateInRange(item.award_date, dateFilters.awardDate.start, dateFilters.awardDate.end)
         );
       }
 
       if (dateFilters.acceptanceDate.enabled && !exceptFilters.includes('dates')) {
         filtered = filtered.filter(item =>
-          isDateInRange(item.date_acceptance, dateFilters.acceptanceDate.start, dateFilters.acceptanceDate.end)
+          isDateInRange(item.acceptance_date, dateFilters.acceptanceDate.start, dateFilters.acceptanceDate.end)
         );
       }
 
@@ -304,7 +307,13 @@ export const useFilters = () => {
 
       if (dateFilters.completionDate.enabled && !exceptFilters.includes('dates')) {
         filtered = filtered.filter(item =>
-          isDateInRange(item.actual_completion_date, dateFilters.completionDate.start, dateFilters.completionDate.end)
+          isDateInRange(item.completion_date_actual, dateFilters.completionDate.start, dateFilters.completionDate.end)
+        );
+      }
+
+      if (dateFilters.tsDate && dateFilters.tsDate.enabled && !exceptFilters.includes('dates')) {
+        filtered = filtered.filter(item =>
+          isDateInRange(item.ts_date, dateFilters.tsDate.start, dateFilters.tsDate.end)
         );
       }
 
@@ -355,12 +364,12 @@ export const useFilters = () => {
         .filter(Boolean)
         .sort(),
       
-      // FIXED: Ensure scheme names are properly extracted and trimmed
+      // Ensure scheme names are properly extracted and trimmed
       schemes: [...new Set(schemeFiltered.map(d => d.scheme_name?.trim()))]
         .filter(Boolean)
         .sort(),
       
-      // NEW: Progress categories
+      // Progress categories
       progressCategories: [
         'TENDER_PROGRESS', 
         'TENDERED_NOT_AWARDED', 
@@ -372,7 +381,7 @@ export const useFilters = () => {
         'COMPLETED'
       ].filter(category => progressCategoryFiltered.some(item => item.progress_category === category)),
       
-      // NEW: Health statuses
+      // Health statuses
       healthStatuses: [
         'PERFECT_PACE',
         'SLOW_PACE',
@@ -523,7 +532,7 @@ export const useFilters = () => {
       console.log('[applyFilters] After search:', filtered.length, 'items');
     }
 
-    // FIXED: Enhanced scheme name filter with debugging
+    // Enhanced scheme name filter with debugging
     if (selectedSchemes.length > 0) {
       console.log('[applyFilters] Filtering by schemes:', selectedSchemes);
       const beforeCount = filtered.length;
@@ -601,13 +610,13 @@ export const useFilters = () => {
       console.log('[applyFilters] After location filter:', filtered.length, 'items');
     }
 
-    // NEW: Progress category filter
+    // Progress category filter
     if (selectedProgressCategories.length > 0) {
       filtered = filtered.filter(item => selectedProgressCategories.includes(item.progress_category));
       console.log('[applyFilters] After progress category filter:', filtered.length, 'items');
     }
 
-    // NEW: Health status filter
+    // Health status filter
     if (selectedHealthStatuses.length > 0) {
       filtered = filtered.filter(item => selectedHealthStatuses.includes(item.health_status));
       console.log('[applyFilters] After health status filter:', filtered.length, 'items');
@@ -639,28 +648,28 @@ export const useFilters = () => {
       return health >= healthRange[0] && health <= healthRange[1];
     });
 
-    // NEW: Expected progress range filter
+    // Expected progress range filter
     filtered = filtered.filter(item => {
       const expectedProgress = item.expected_progress || 0;
       return expectedProgress >= expectedProgressRange[0] && expectedProgress <= expectedProgressRange[1];
     });
 
-    // Date filters
+    // Date filters - updated for new column names
     if (dateFilters.tenderDate.enabled) {
       filtered = filtered.filter(item =>
-        isDateInRange(item.date_tender, dateFilters.tenderDate.start, dateFilters.tenderDate.end)
+        isDateInRange(item.tender_date, dateFilters.tenderDate.start, dateFilters.tenderDate.end)
       );
     }
 
     if (dateFilters.awardDate.enabled) {
       filtered = filtered.filter(item =>
-        isDateInRange(item.date_award, dateFilters.awardDate.start, dateFilters.awardDate.end)
+        isDateInRange(item.award_date, dateFilters.awardDate.start, dateFilters.awardDate.end)
       );
     }
 
     if (dateFilters.acceptanceDate.enabled) {
       filtered = filtered.filter(item =>
-        isDateInRange(item.date_acceptance, dateFilters.acceptanceDate.start, dateFilters.acceptanceDate.end)
+        isDateInRange(item.acceptance_date, dateFilters.acceptanceDate.start, dateFilters.acceptanceDate.end)
       );
     }
 
@@ -678,7 +687,13 @@ export const useFilters = () => {
 
     if (dateFilters.completionDate.enabled) {
       filtered = filtered.filter(item =>
-        isDateInRange(item.actual_completion_date, dateFilters.completionDate.start, dateFilters.completionDate.end)
+        isDateInRange(item.completion_date_actual, dateFilters.completionDate.start, dateFilters.completionDate.end)
+      );
+    }
+
+    if (dateFilters.tsDate && dateFilters.tsDate.enabled) {
+      filtered = filtered.filter(item =>
+        isDateInRange(item.ts_date, dateFilters.tsDate.start, dateFilters.tsDate.end)
       );
     }
 
@@ -714,7 +729,7 @@ export const useFilters = () => {
     return result;
   }, [rawData, applyFilters]);
 
-  // ENHANCED: Wrapped setSelectedSchemes to add logging
+  // Wrapped setSelectedSchemes to add logging
   const wrappedSetSelectedSchemes = useCallback((newSchemes) => {
     console.log('[useFilters] setSelectedSchemes called with:', newSchemes);
     setSelectedSchemes(newSchemes);
@@ -849,6 +864,7 @@ export const useFilters = () => {
         setProgressRange([1, 99]);
         break;
       case 'notStarted':
+      case 'not-started':
         setSelectedStatuses(['NOT_STARTED']);
         break;
       case 'highBudget':
@@ -867,9 +883,13 @@ export const useFilters = () => {
         setDelayRange([90, 365]);
         break;
       case 'nearCompletion':
+      case 'near-completion':
         setProgressRange([75, 99]);
         break;
-      // NEW: Health-based quick filters
+      case 'high-risk':
+        setSelectedRiskLevels(['HIGH']);
+        break;
+      // Health-based quick filters
       case 'perfectPace':
         setSelectedHealthStatuses(['PERFECT_PACE']);
         break;
@@ -1006,7 +1026,7 @@ export const useFilters = () => {
     );
   }, []);
 
-  // NEW: Toggle progress category
+  // Toggle progress category
   const toggleProgressCategory = useCallback((category) => {
     setSelectedProgressCategories(prev =>
       prev.includes(category)
@@ -1015,7 +1035,7 @@ export const useFilters = () => {
     );
   }, []);
 
-  // NEW: Toggle health status
+  // Toggle health status
   const toggleHealthStatus = useCallback((status) => {
     setSelectedHealthStatuses(prev =>
       prev.includes(status)
@@ -1076,7 +1096,7 @@ export const useFilters = () => {
     setSelectedSectorHQs([]);
   }, []);
 
-  // NEW: Progress category batch operations
+  // Progress category batch operations
   const selectAllProgressCategories = useCallback(() => {
     setSelectedProgressCategories([
       'TENDER_PROGRESS',
@@ -1094,7 +1114,7 @@ export const useFilters = () => {
     setSelectedProgressCategories([]);
   }, []);
 
-  // NEW: Health status batch operations
+  // Health status batch operations
   const selectAllHealthStatuses = useCallback(() => {
     setSelectedHealthStatuses([
       'PERFECT_PACE',

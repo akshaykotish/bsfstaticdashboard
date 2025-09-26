@@ -16,7 +16,7 @@ const Edit = ({
   isNewProject = false,
   onSaveSuccess = () => {},
   onDeleteSuccess = () => {},
-  onRefreshData = () => {} // Prop for refreshing data
+  onRefreshData = () => {}
 }) => {
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(false);
@@ -27,18 +27,20 @@ const Edit = ({
   
   const formRef = useRef(null);
 
-  // All fields from CSV - organized into groups
+  // All fields from new CSV structure - organized into groups
   const fieldGroups = [
     {
       title: 'Basic Information',
       icon: FileText,
       fields: [
         { key: 'serial_no', label: 'Serial No', type: 'text', required: true, width: 'col-span-1' },
+        { key: 's_no', label: 'S.No (Alternative)', type: 'text', width: 'col-span-1' },
         { key: 'source_sheet', label: 'Source Sheet', type: 'text', width: 'col-span-1' },
         { key: 'budget_head', label: 'Budget Head', type: 'text', required: true, width: 'col-span-1' },
-        { key: 'scheme_name', label: 'Scheme Name', type: 'text', required: true, width: 'col-span-3' },
-        { key: 'aa_es_ref', label: 'AA/ES Reference', type: 'text', width: 'col-span-2' },
-        { key: 'aa_es_pending_with', label: 'AA/ES Pending With', type: 'text', width: 'col-span-1' },
+        { key: 'scheme_name', label: 'Scheme Code', type: 'number', width: 'col-span-1', step: 'any' },
+        { key: 'scheme_name_1', label: 'Scheme Name', type: 'text', required: true, width: 'col-span-3' },
+        { key: 'aa_es_reference', label: 'AA/ES Reference', type: 'text', width: 'col-span-2' },
+        { key: 'location', label: 'Location ID', type: 'number', width: 'col-span-1', step: 'any' },
       ]
     },
     {
@@ -56,25 +58,25 @@ const Edit = ({
       title: 'Financial Details',
       icon: DollarSign,
       fields: [
-        { key: 'sanctioned_amount', label: 'Sanctioned Amount (Lakhs)', type: 'number', required: true, min: 0, width: 'col-span-1', step: 'any' },
-        { key: 'expdr_upto_31mar25', label: 'Expenditure upto 31 Mar 25', type: 'number', min: 0, width: 'col-span-1', step: 'any' },
-        { key: 'expdr_cfy', label: 'Current FY Expenditure', type: 'number', min: 0, width: 'col-span-1', step: 'any' },
-        { key: 'total_expdr', label: 'Total Expenditure', type: 'number', min: 0, width: 'col-span-1', readonly: true, step: 'any' },
-        { key: 'percent_expdr', label: 'Expenditure %', type: 'number', min: 0, max: 200, width: 'col-span-1', readonly: true, step: 'any' },
-        { key: 'remaining_amount', label: 'Remaining Amount', type: 'number', width: 'col-span-1', readonly: true, step: 'any' },
+        { key: 'sd_amount_lakh', label: 'Sanctioned Amount (Lakhs)', type: 'number', required: true, min: 0, width: 'col-span-1', step: 'any' },
+        { key: 'expenditure_previous_fy', label: 'Expenditure Previous FY', type: 'number', min: 0, width: 'col-span-1', step: 'any' },
+        { key: 'expenditure_current_fy', label: 'Current FY Expenditure', type: 'number', min: 0, width: 'col-span-1', step: 'any' },
+        { key: 'expenditure_total', label: 'Total Expenditure', type: 'number', min: 0, width: 'col-span-1', readonly: true, step: 'any' },
+        { key: 'expenditure_percent', label: 'Expenditure %', type: 'text', width: 'col-span-1' },
       ]
     },
     {
       title: 'Timeline & Dates',
       icon: Calendar,
       fields: [
-        { key: 'date_ts', label: 'Date TS', type: 'date', width: 'col-span-1' },
-        { key: 'date_tender', label: 'Tender Date', type: 'date', width: 'col-span-1' },
-        { key: 'date_acceptance', label: 'Acceptance Date', type: 'date', width: 'col-span-1' },
-        { key: 'date_award', label: 'Award Date', type: 'date', width: 'col-span-1' },
+        { key: 'ts_date', label: 'TS Date', type: 'date', width: 'col-span-1' },
+        { key: 'tender_date', label: 'Tender Date', type: 'date', width: 'col-span-1' },
+        { key: 'acceptance_date', label: 'Acceptance Date', type: 'date', width: 'col-span-1' },
+        { key: 'award_date', label: 'Award Date', type: 'date', width: 'col-span-1' },
         { key: 'pdc_agreement', label: 'PDC Agreement', type: 'date', width: 'col-span-1' },
+        { key: 'pdc_agreement_1', label: 'PDC Agreement (Alt)', type: 'date', width: 'col-span-1' },
         { key: 'revised_pdc', label: 'Revised PDC', type: 'date', width: 'col-span-1' },
-        { key: 'actual_completion_date', label: 'Actual Completion Date', type: 'date', width: 'col-span-1' },
+        { key: 'completion_date_actual', label: 'Actual Completion Date', type: 'date', width: 'col-span-1' },
         { key: 'time_allowed_days', label: 'Time Allowed (Days)', type: 'number', min: 0, width: 'col-span-1' },
       ]
     },
@@ -83,7 +85,7 @@ const Edit = ({
       icon: Hash,
       fields: [
         { key: 'physical_progress', label: 'Physical Progress (%)', type: 'number', min: 0, max: 100, width: 'col-span-1', step: 'any' },
-        { key: 'progress_status', label: 'Progress Status', type: 'number', min: 0, width: 'col-span-1', step: 'any' },
+        { key: 'current_status', label: 'Current Status', type: 'number', min: 0, width: 'col-span-1', step: 'any' },
         { key: 'remarks', label: 'Remarks', type: 'textarea', width: 'col-span-3' },
       ]
     }
@@ -96,24 +98,25 @@ const Edit = ({
         // Set default values for new project
         const defaults = {
           serial_no: '',
+          s_no: '',
           source_sheet: '',
-          scheme_name: '',
+          scheme_name: 0,
+          scheme_name_1: '',
           budget_head: '',
           ftr_hq: '',
           shq: '',
           work_site: '',
           executive_agency: '',
           firm_name: '',
-          aa_es_ref: '',
-          aa_es_pending_with: '',
-          sanctioned_amount: 0,
-          expdr_upto_31mar25: 0,
-          expdr_cfy: 0,
-          total_expdr: 0,
-          percent_expdr: 0,
-          remaining_amount: 0,
+          aa_es_reference: '',
+          location: 0,
+          sd_amount_lakh: 0,
+          expenditure_previous_fy: 0,
+          expenditure_current_fy: 0,
+          expenditure_total: 0,
+          expenditure_percent: '0',
           physical_progress: 0,
-          progress_status: 0,
+          current_status: 0,
           time_allowed_days: 0,
           remarks: ''
         };
@@ -123,9 +126,9 @@ const Edit = ({
         const data = { ...projectData };
         
         // Ensure numeric fields are numbers
-        const numericFields = ['sanctioned_amount', 'expdr_upto_31mar25', 'expdr_cfy', 
-                               'total_expdr', 'percent_expdr', 'remaining_amount',
-                               'physical_progress', 'progress_status', 'time_allowed_days'];
+        const numericFields = ['sd_amount_lakh', 'expenditure_previous_fy', 'expenditure_current_fy', 
+                               'expenditure_total', 'scheme_name', 'location',
+                               'physical_progress', 'current_status', 'time_allowed_days'];
         
         numericFields.forEach(field => {
           if (data[field] !== undefined && data[field] !== null && data[field] !== '') {
@@ -135,9 +138,16 @@ const Edit = ({
           }
         });
         
+        // Handle expenditure_percent (might have % symbol)
+        if (data.expenditure_percent) {
+          data.expenditure_percent = String(data.expenditure_percent).replace('%', '');
+        } else {
+          data.expenditure_percent = '0';
+        }
+        
         // Format dates for input fields
-        const dateFields = ['date_ts', 'date_tender', 'date_acceptance', 'date_award', 
-                           'pdc_agreement', 'revised_pdc', 'actual_completion_date'];
+        const dateFields = ['ts_date', 'tender_date', 'acceptance_date', 'award_date', 
+                           'pdc_agreement', 'pdc_agreement_1', 'revised_pdc', 'completion_date_actual'];
         
         dateFields.forEach(field => {
           if (data[field] && data[field] !== 'N/A' && data[field] !== '') {
@@ -200,8 +210,8 @@ const Edit = ({
         const value = formData[field.key];
         
         // Required field validation
-        if (field.required && (!value || value === '' || (field.type === 'number' && value === 0))) {
-          if (field.key === 'sanctioned_amount' && value === 0) {
+        if (field.required && (!value || value === '' || (field.type === 'number' && field.key === 'sd_amount_lakh' && value === 0))) {
+          if (field.key === 'sd_amount_lakh' && value === 0) {
             errors[field.key] = `${field.label} must be greater than 0`;
           } else if (!value || value === '') {
             errors[field.key] = `${field.label} is required`;
@@ -251,9 +261,9 @@ const Edit = ({
       const submitData = { ...formData };
       
       // Ensure numeric fields are numbers
-      const numericFields = ['sanctioned_amount', 'expdr_upto_31mar25', 'expdr_cfy', 
-                             'total_expdr', 'percent_expdr', 'remaining_amount',
-                             'physical_progress', 'progress_status', 'time_allowed_days'];
+      const numericFields = ['sd_amount_lakh', 'expenditure_previous_fy', 'expenditure_current_fy', 
+                             'expenditure_total', 'scheme_name', 'location',
+                             'physical_progress', 'current_status', 'time_allowed_days'];
       
       numericFields.forEach(field => {
         if (submitData[field] !== undefined) {
@@ -261,9 +271,14 @@ const Edit = ({
         }
       });
       
+      // Add % back to expenditure_percent if needed
+      if (submitData.expenditure_percent && !submitData.expenditure_percent.includes('%')) {
+        submitData.expenditure_percent = submitData.expenditure_percent + '%';
+      }
+      
       // Convert empty date strings to null
-      const dateFields = ['date_ts', 'date_tender', 'date_acceptance', 'date_award', 
-                         'pdc_agreement', 'revised_pdc', 'actual_completion_date'];
+      const dateFields = ['ts_date', 'tender_date', 'acceptance_date', 'award_date', 
+                         'pdc_agreement', 'pdc_agreement_1', 'revised_pdc', 'completion_date_actual'];
       
       dateFields.forEach(field => {
         if (submitData[field] === '') {
@@ -387,35 +402,29 @@ const Edit = ({
     }
   };
 
-  // Auto-calculate total expenditure and remaining amount
+  // Auto-calculate total expenditure
   useEffect(() => {
-    const expdr31mar = parseFloat(formData.expdr_upto_31mar25) || 0;
-    const expdrCfy = parseFloat(formData.expdr_cfy) || 0;
-    const total = expdr31mar + expdrCfy;
+    const prevFy = parseFloat(formData.expenditure_previous_fy) || 0;
+    const currFy = parseFloat(formData.expenditure_current_fy) || 0;
+    const total = prevFy + currFy;
     
-    if (formData.total_expdr !== total) {
-      setFormData(prev => ({ ...prev, total_expdr: total }));
+    if (formData.expenditure_total !== total) {
+      setFormData(prev => ({ ...prev, expenditure_total: total }));
     }
     
     // Calculate percentage
-    const sanctioned = parseFloat(formData.sanctioned_amount) || 0;
+    const sanctioned = parseFloat(formData.sd_amount_lakh) || 0;
     if (sanctioned > 0) {
-      const percentage = (total / sanctioned) * 100;
-      if (formData.percent_expdr !== percentage) {
-        setFormData(prev => ({ ...prev, percent_expdr: parseFloat(percentage.toFixed(2)) }));
+      const percentage = ((total / sanctioned) * 100).toFixed(2);
+      if (formData.expenditure_percent !== percentage) {
+        setFormData(prev => ({ ...prev, expenditure_percent: percentage }));
       }
     } else {
-      if (formData.percent_expdr !== 0) {
-        setFormData(prev => ({ ...prev, percent_expdr: 0 }));
+      if (formData.expenditure_percent !== '0') {
+        setFormData(prev => ({ ...prev, expenditure_percent: '0' }));
       }
     }
-    
-    // Calculate remaining amount
-    const remaining = sanctioned - total;
-    if (formData.remaining_amount !== remaining) {
-      setFormData(prev => ({ ...prev, remaining_amount: remaining }));
-    }
-  }, [formData.expdr_upto_31mar25, formData.expdr_cfy, formData.sanctioned_amount]);
+  }, [formData.expenditure_previous_fy, formData.expenditure_current_fy, formData.sd_amount_lakh]);
 
   if (!isOpen) return null;
 
@@ -449,9 +458,9 @@ const Edit = ({
               <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
                 {isNewProject ? 'Add New Project' : 'Edit Project'}
               </h2>
-              {!isNewProject && formData.scheme_name && (
+              {!isNewProject && formData.scheme_name_1 && (
                 <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
-                  {formData.scheme_name} | Serial No: {formData.serial_no}
+                  {formData.scheme_name_1} | Serial No: {formData.serial_no || formData.s_no}
                 </p>
               )}
             </div>

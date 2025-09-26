@@ -8,42 +8,30 @@ import {
   FileText, Briefcase, CreditCard, PieChart, Database, Eye,
   Activity, Heart, Gauge, PauseCircle, PlayCircle,
   AlertCircle, CheckCircle, XCircle, Timer, CalendarDays,
-  Edit, Plus // Added Edit and Plus icons
+  Edit, Plus, Home, Building, Award, IndianRupee,
+  TrendingDown, BarChart, Percent, CalendarClock,
+  GitBranch, Shield, ThermometerSun
 } from 'lucide-react';
 
-// Import the Report component directly (not the openProjectReport function)
+// Import the Report and Edit components
 import Report from './Reports';
-// Import the new Edit component
 import EditComponent from './Edit';
 
-// Modal Component for Report - A4 Optimized
+// ReportModal Component
 const ReportModal = ({ isOpen, onClose, projectData, darkMode }) => {
   const modalRef = useRef(null);
   const modalContentRef = useRef(null);
   
-  // Handle click outside to close (optional - commented out to prevent accidental closes)
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (modalRef.current && !modalRef.current.contains(event.target)) {
-        // Don't close on outside click for reports to prevent data loss
-        // Uncomment below line if you want to enable click-outside-to-close
-        // onClose();
-      }
-    };
-
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
-  // Handle ESC key to close
   useEffect(() => {
     const handleEsc = (event) => {
       if (event.keyCode === 27) {
@@ -64,44 +52,34 @@ const ReportModal = ({ isOpen, onClose, projectData, darkMode }) => {
 
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center animate-fadeIn">
-      {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose} // Allow backdrop click to close
+        onClick={onClose}
       />
       
-      {/* Modal Container - A4 optimized */}
       <div 
         ref={modalRef}
         className="relative w-full h-full max-w-[900px] max-h-[95vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slideUp m-4"
         style={{
-          // Ensure modal doesn't exceed A4 proportions
           maxWidth: 'min(900px, calc(100vw - 2rem))',
           maxHeight: 'calc(100vh - 2rem)',
         }}
       >
-
-        
-        {/* Modal Body with Report Component - Scrollable */}
         <div 
           ref={modalContentRef}
           className="flex-1 overflow-auto bg-white dark:bg-gray-900"
           style={{
-            // Ensure smooth scrolling
             WebkitOverflowScrolling: 'touch',
-            // Add padding to prevent content from touching edges
             scrollPaddingTop: '20px',
             scrollPaddingBottom: '20px'
           }}
         >
-          {/* Report Container with proper A4 sizing */}
           <div className="w-full flex justify-center">
             <div 
               className="w-full max-w-[794px]" 
               style={{
-                // Ensure report maintains A4 proportions
                 width: '100%',
-                maxWidth: '794px', // A4 width at 96 DPI
+                maxWidth: '794px',
                 margin: '0 auto'
               }}
             >
@@ -120,7 +98,6 @@ const ReportModal = ({ isOpen, onClose, projectData, darkMode }) => {
   );
 };
 
-
 const DataTable = ({ 
   data, 
   darkMode, 
@@ -128,7 +105,9 @@ const DataTable = ({
   compareMode, 
   selectedProjects,
   maxHeight = '100%',
-  maxWidth = '100%'
+  maxWidth = '100%',
+  isEmbedded = false,
+  onRefreshData
 }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
@@ -144,11 +123,9 @@ const DataTable = ({
   const tableContainerRef = useRef(null);
   const [isSticky, setIsSticky] = useState(false);
   
-  // State for Report Modal
+  // Modal states for Report and Edit
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedProjectForReport, setSelectedProjectForReport] = useState(null);
-
-  // State for Edit Modal - NEW
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedProjectForEdit, setSelectedProjectForEdit] = useState(null);
   const [isNewProject, setIsNewProject] = useState(false);
@@ -165,7 +142,6 @@ const DataTable = ({
         return { days: 0, formatted: 'Invalid Date', status: 'error' };
       }
 
-      // Use revised PDC if available, otherwise use original PDC
       let targetDate = null;
       let dateType = 'none';
       
@@ -182,7 +158,6 @@ const DataTable = ({
       }
 
       if (!targetDate) {
-        // If no PDC dates, use time_allowed_days if available
         if (row.time_allowed_days && row.time_allowed_days > 0) {
           return { 
             days: row.time_allowed_days, 
@@ -193,7 +168,6 @@ const DataTable = ({
         return { days: 0, formatted: 'No PDC Set', status: 'no_pdc' };
       }
 
-      // Calculate days between award date and PDC
       const diffTime = targetDate - awardDate;
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -211,14 +185,86 @@ const DataTable = ({
     }
   };
 
-  // Get progress status display based on actual progress categories
+  // Calculate time elapsed and additional timeline metrics
+  const calculateTimelineMetrics = (row) => {
+    const metrics = {
+      timeElapsed: 0,
+      timeElapsedFormatted: 'N/A',
+      timeRemaining: 0,
+      timeRemainingFormatted: 'N/A',
+      percentTimeUsed: 0,
+      isOverdue: false,
+      overdueByDays: 0
+    };
+
+    if (!row.date_award || row.date_award === '' || row.date_award === 'N/A') {
+      return metrics;
+    }
+
+    try {
+      const awardDate = new Date(row.date_award);
+      const today = new Date();
+      
+      if (isNaN(awardDate.getTime())) {
+        return metrics;
+      }
+
+      // Calculate time elapsed
+      const elapsedMs = today - awardDate;
+      const elapsedDays = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
+      metrics.timeElapsed = elapsedDays;
+      metrics.timeElapsedFormatted = `${elapsedDays} days`;
+
+      // Get PDC date
+      let pdcDate = null;
+      if (row.revised_pdc && row.revised_pdc !== '' && row.revised_pdc !== 'N/A') {
+        pdcDate = new Date(row.revised_pdc);
+        if (isNaN(pdcDate.getTime())) pdcDate = null;
+      }
+      
+      if (!pdcDate && row.pdc_agreement && row.pdc_agreement !== '' && row.pdc_agreement !== 'N/A') {
+        pdcDate = new Date(row.pdc_agreement);
+        if (isNaN(pdcDate.getTime())) pdcDate = null;
+      }
+
+      if (pdcDate) {
+        const totalDays = Math.floor((pdcDate - awardDate) / (1000 * 60 * 60 * 24));
+        
+        if (today <= pdcDate) {
+          // Project is not overdue
+          const remainingMs = pdcDate - today;
+          const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+          metrics.timeRemaining = remainingDays;
+          metrics.timeRemainingFormatted = `${remainingDays} days`;
+        } else {
+          // Project is overdue
+          const overdueMs = today - pdcDate;
+          const overdueDays = Math.floor(overdueMs / (1000 * 60 * 60 * 24));
+          metrics.isOverdue = true;
+          metrics.overdueByDays = overdueDays;
+          metrics.timeRemainingFormatted = `Overdue by ${overdueDays} days`;
+        }
+        
+        // Calculate percent of time used
+        if (totalDays > 0) {
+          metrics.percentTimeUsed = Math.min(100, (elapsedDays / totalDays) * 100);
+        }
+      }
+    } catch (err) {
+      console.warn('Error calculating timeline metrics:', err);
+    }
+
+    return metrics;
+  };
+
+  // Get progress status display
   const getProgressStatusDisplay = (row) => {
     const progress = parseFloat(row.physical_progress) || 0;
-    const category = row.progress_category || row.progress_status || '';
-    const healthStatus = row.health_status || '';
+    const category = row.progress_category || 'UNKNOWN';
+    const healthStatus = row.health_status || 'NOT_APPLICABLE';
     
-    // Map progress categories to display values
     const categoryMap = {
+      'NOT_SANCTIONED': { label: 'Not Sanctioned', color: 'text-gray-600', icon: XCircle },
       'TENDER_PROGRESS': { label: 'Tender in Progress', color: 'text-gray-600', icon: FileText },
       'TENDERED_NOT_AWARDED': { label: 'Tendered (Not Awarded)', color: 'text-yellow-600', icon: PauseCircle },
       'AWARDED_NOT_STARTED': { label: 'Awarded (Not Started)', color: 'text-orange-600', icon: PlayCircle },
@@ -226,43 +272,100 @@ const DataTable = ({
       'PROGRESS_1_TO_50': { label: `Progress: ${progress.toFixed(0)}%`, color: 'text-red-500', icon: Activity },
       'PROGRESS_51_TO_71': { label: `Progress: ${progress.toFixed(0)}%`, color: 'text-yellow-500', icon: Activity },
       'PROGRESS_71_TO_99': { label: `Progress: ${progress.toFixed(0)}%`, color: 'text-blue-500', icon: Target },
-      'COMPLETED': { label: 'Completed', color: 'text-green-600', icon: CheckCircle }
+      'COMPLETED': { label: 'Completed', color: 'text-green-600', icon: CheckCircle },
+      'UNKNOWN': { label: 'Unknown', color: 'text-gray-600', icon: AlertCircle }
     };
 
-    // Map health status for additional context
     const healthMap = {
       'PERFECT_PACE': { label: 'Perfect Pace', color: 'text-green-500', icon: Zap },
       'SLOW_PACE': { label: 'Slow Pace', color: 'text-yellow-500', icon: Timer },
       'BAD_PACE': { label: 'Bad Pace', color: 'text-orange-500', icon: AlertTriangle },
       'SLEEP_PACE': { label: 'Sleep Pace', color: 'text-red-500', icon: PauseCircle },
-      'PAYMENT_PENDING': { label: 'Payment Pending', color: 'text-amber-600', icon: CreditCard }
+      'PAYMENT_PENDING': { label: 'Payment Pending', color: 'text-amber-600', icon: CreditCard },
+      'NOT_APPLICABLE': { label: 'N/A', color: 'text-gray-400', icon: Info }
     };
 
-    const categoryInfo = categoryMap[category] || { 
-      label: `Progress: ${progress.toFixed(0)}%`, 
-      color: 'text-gray-600', 
-      icon: Activity 
-    };
-    
-    const healthInfo = healthMap[healthStatus] || null;
+    const categoryInfo = categoryMap[category] || categoryMap['UNKNOWN'];
+    const healthInfo = healthMap[healthStatus] || healthMap['NOT_APPLICABLE'];
 
     return {
       primary: categoryInfo,
       secondary: healthInfo,
-      progress: progress
+      progress: progress,
+      category: category,
+      health: healthStatus
     };
   };
 
+  // Helper function to determine progress status if not present
+  const determineProgressStatus = (row) => {
+    const progress = parseFloat(row.physical_progress) || 0;
+    
+    if (!row.date_tender) return 'TENDER_PROGRESS';
+    if (row.date_tender && !row.date_award) return 'TENDERED_NOT_AWARDED';
+    if (row.date_award && progress === 0) return 'AWARDED_NOT_STARTED';
+    if (progress === 0) return 'NOT_STARTED';
+    if (progress > 0 && progress <= 50) return 'PROGRESS_1_TO_50';
+    if (progress > 50 && progress <= 71) return 'PROGRESS_51_TO_71';
+    if (progress > 71 && progress < 100) return 'PROGRESS_71_TO_99';
+    if (progress >= 100) return 'COMPLETED';
+    
+    return 'UNKNOWN';
+  };
+
+  // Helper function for calculating expected progress
+  const calculateExpectedProgress = (row) => {
+    if (!row.date_award || row.date_award === '' || row.date_award === 'N/A') {
+      return 0;
+    }
+
+    try {
+      const awardDate = new Date(row.date_award);
+      if (isNaN(awardDate.getTime())) return 0;
+
+      const today = new Date();
+      let pdcDate = null;
+      
+      if (row.revised_pdc && row.revised_pdc !== '' && row.revised_pdc !== 'N/A') {
+        pdcDate = new Date(row.revised_pdc);
+      } else if (row.pdc_agreement && row.pdc_agreement !== '' && row.pdc_agreement !== 'N/A') {
+        pdcDate = new Date(row.pdc_agreement);
+      }
+      
+      if (!pdcDate || isNaN(pdcDate.getTime())) {
+        if (row.time_allowed_days && row.time_allowed_days > 0) {
+          pdcDate = new Date(awardDate);
+          pdcDate.setDate(pdcDate.getDate() + parseInt(row.time_allowed_days));
+        } else {
+          pdcDate = new Date(awardDate);
+          pdcDate.setFullYear(pdcDate.getFullYear() + 1);
+        }
+      }
+
+      const totalDurationMs = pdcDate - awardDate;
+      const elapsedMs = today - awardDate;
+      
+      if (today >= pdcDate) return 100;
+      
+      const progressPercentage = (elapsedMs / totalDurationMs) * 100;
+      return Math.min(100, Math.max(0, progressPercentage));
+    } catch (err) {
+      console.warn('Error calculating expected progress:', err);
+      return 0;
+    }
+  };
+
+  // Updated columns mapping to match processed data structure
   const columns = [
     { key: 'serial_no', label: 'S.No', width: '60px', align: 'center' },
     { key: 'scheme_name', label: 'Scheme Name', width: '250px', sticky: true },
     { key: 'budget_head', label: 'Budget Head', width: '150px' },
-    { key: 'ftr_hq', label: 'FHQ', width: '80px' },
-    { key: 'shq', label: 'SHQ', width: '80px' },
+    { key: 'ftr_hq', label: 'Frontier HQ', width: '80px' },
+    { key: 'shq', label: 'Sector HQ', width: '80px' },
     { key: 'work_site', label: 'Location', width: '200px' },
     { key: 'executive_agency', label: 'Agency', width: '180px' },
     { key: 'firm_name', label: 'Contractor', width: '180px' },
-    { key: 'sanctioned_amount', label: 'Budget Allocated', width: '120px', align: 'right', format: 'currency' },
+    { key: 'sanctioned_amount', label: 'Project Cost', width: '120px', align: 'right', format: 'currency' },
     { key: 'total_expdr', label: 'Expenditure', width: '120px', align: 'right', format: 'currency' },
     { key: 'physical_progress', label: 'Progress', width: '120px', align: 'center', format: 'progress' },
     { key: 'progress_status_display', label: 'Progress Status', width: '180px', align: 'center', format: 'progress_status' },
@@ -270,11 +373,16 @@ const DataTable = ({
     { key: 'percent_expdr', label: 'Spent %', width: '80px', align: 'center', format: 'percent' },
     { key: 'status', label: 'Status', width: '120px', align: 'center', format: 'status' },
     { key: 'health_status', label: 'Health', width: '120px', align: 'center', format: 'health' },
+    { key: 'risk_level', label: 'Risk', width: '100px', align: 'center', format: 'risk' },
     { key: 'date_award', label: 'Award Date', width: '100px', format: 'date' },
     { key: 'pdc_agreement', label: 'PDC', width: '100px', format: 'date' },
     { key: 'revised_pdc', label: 'Revised PDC', width: '100px', format: 'date' },
     { key: 'time_allowed_days', label: 'Contract Days', width: '90px', align: 'center' },
-    { key: 'delay_days', label: 'Delay', width: '80px', align: 'center', format: 'delay' }
+    { key: 'delay_days', label: 'Delay', width: '80px', align: 'center', format: 'delay' },
+    { key: 'expdr_cfy', label: 'Current FY Expdr', width: '120px', align: 'right', format: 'currency' },
+    { key: 'expdr_upto_31mar25', label: 'Previous FY Expdr', width: '120px', align: 'right', format: 'currency' },
+    { key: 'efficiency_score', label: 'Efficiency', width: '80px', align: 'center', format: 'percent' },
+    { key: 'expected_progress', label: 'Expected %', width: '80px', align: 'center', format: 'percent' }
   ];
 
   useEffect(() => {
@@ -298,7 +406,8 @@ const DataTable = ({
     let processed = data.map(item => ({
       ...item,
       calculated_time_allowed: calculateTimeAllowed(item),
-      progress_status_display: getProgressStatusDisplay(item)
+      progress_status_display: getProgressStatusDisplay(item),
+      timeline_metrics: calculateTimelineMetrics(item)
     }));
 
     // Apply search filter
@@ -399,6 +508,7 @@ const DataTable = ({
     switch (format) {
       case 'currency':
         const amount = typeof value === 'number' ? value : parseFloat(value) || 0;
+        // Values are already in lakhs from useData.js
         return (
           <span className="font-semibold text-gray-900 dark:text-gray-100">
             ₹{amount >= 100 ? `${(amount / 100).toFixed(2)} Cr` : `${amount.toFixed(2)} L`}
@@ -489,7 +599,7 @@ const DataTable = ({
         );
 
       case 'health':
-        const healthStatus = value;
+        const healthStatus = value || 'NOT_APPLICABLE';
         const healthColors = {
           'PERFECT_PACE': 'text-green-600 bg-green-100 dark:bg-green-900/20',
           'SLOW_PACE': 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/20',
@@ -517,8 +627,23 @@ const DataTable = ({
           </span>
         );
 
+      case 'risk':
+        const riskLevel = value || 'LOW';
+        const riskColors = {
+          'CRITICAL': 'text-red-600 bg-red-100 dark:bg-red-900/20',
+          'HIGH': 'text-orange-600 bg-orange-100 dark:bg-orange-900/20',
+          'MEDIUM': 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/20',
+          'LOW': 'text-green-600 bg-green-100 dark:bg-green-900/20'
+        };
+        
+        return (
+          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${riskColors[riskLevel] || riskColors['LOW']}`}>
+            {riskLevel}
+          </span>
+        );
+
       case 'percent':
-        const percentValue = parseFloat(value) || 0;
+        const percentValue = typeof value === 'number' ? value : parseFloat(value) || 0;
         return (
           <span className={`font-medium ${
             percentValue > 80 ? 'text-green-600' :
@@ -530,9 +655,11 @@ const DataTable = ({
         );
 
       case 'status':
+        const statusValue = value || 'UNKNOWN';
         const statusIcons = {
           NOT_STARTED: <XCircle size={14} className="text-gray-500" />,
-          INITIAL: <Clock size={14} className="text-red-500" />,
+          TENDER_PROGRESS: <FileText size={14} className="text-gray-500" />,
+          TENDERED: <PauseCircle size={14} className="text-yellow-500" />,
           IN_PROGRESS: <TrendingUp size={14} className="text-orange-500" />,
           ADVANCED: <TrendingUp size={14} className="text-blue-500" />,
           NEAR_COMPLETION: <AlertTriangle size={14} className="text-yellow-500" />,
@@ -540,9 +667,9 @@ const DataTable = ({
         };
         return (
           <div className="flex items-center gap-1 justify-center">
-            {statusIcons[value] || <Clock size={14} className="text-gray-500" />}
+            {statusIcons[statusValue] || <Clock size={14} className="text-gray-500" />}
             <span className="text-xs text-gray-700 dark:text-gray-300">
-              {(value || 'UNKNOWN').replace(/_/g, ' ')}
+              {statusValue.replace(/_/g, ' ')}
             </span>
           </div>
         );
@@ -576,51 +703,72 @@ const DataTable = ({
     if (!selectedProjects || !Array.isArray(selectedProjects)) return false;
     return selectedProjects.some(p => p?.id === project?.id);
   };
-  
-  // Add this function near the other handler functions
-const handleRefreshData = () => {
-  // If you have a refetch function from parent component, call it
-  // Otherwise, you can implement a state update to trigger re-render
-  
-  // Option 1: If you have access to a refetch function from parent
-  // if (props.onRefresh) {
-  //   props.onRefresh();
-  // }
-  
-  // Option 2: Force component to re-render by updating a state
-  setCurrentPage(1); // Reset to first page
-  // You might need to pass a key prop to force re-render
-  // or implement a more sophisticated refresh mechanism
-  
-  console.log('Data refresh requested');
-};
 
-
-  const handleRowClick = (row, event) => {
-    if (event.target.closest('button')) return;
-    
-    // Open the report in modal
-    openReportModal(row);
-    
-    // Also call the original onRowClick if it exists
-    if (onRowClick && typeof onRowClick === 'function') {
-      openReportModal(row);
+  const handleRefreshData = () => {
+    setCurrentPage(1);
+    if (onRefreshData && typeof onRefreshData === 'function') {
+      onRefreshData();
     }
+    console.log('Data refresh requested');
   };
 
-  // Function to open report modal
+  const handleRowClick = (row, event) => {
+    // Don't open modal if clicking on action buttons
+    if (event.target.closest('button')) return;
+    
+    // Open Report modal when row is clicked
+    openReportModal(row);
+  };
+
   const openReportModal = (row) => {
+    // Ensure all required fields are present in the row data
     const rowWithCalculatedFields = {
       ...row,
-      calculated_time_allowed: row.calculated_time_allowed,
-      progress_status_display: row.progress_status_display
+      calculated_time_allowed: row.calculated_time_allowed || calculateTimeAllowed(row),
+      progress_status_display: row.progress_status_display || getProgressStatusDisplay(row),
+      expected_progress: calculateExpectedProgress(row),
+      // Add timeline metrics if not present
+      timeline_metrics: row.timeline_metrics || calculateTimelineMetrics(row),
+      // Ensure all required fields have default values
+      serial_no: row.serial_no || 'N/A',
+      scheme_name: row.scheme_name || 'Unknown Project',
+      budget_head: row.budget_head || 'N/A',
+      work_site: row.work_site || 'N/A',
+      executive_agency: row.executive_agency || 'N/A',
+      firm_name: row.firm_name || 'N/A',
+      ftr_hq: row.ftr_hq || 'N/A',
+      shq: row.shq || 'N/A',
+      physical_progress: row.physical_progress || 0,
+      efficiency_score: row.efficiency_score || 0,
+      health_score: row.health_score || 0,
+      health_status: row.health_status || 'NOT_APPLICABLE',
+      delay_days: row.delay_days || 0,
+      risk_level: row.risk_level || 'LOW',
+      status: row.status || 'NOT_STARTED',
+      priority: row.priority || 'LOW',
+      sanctioned_amount: row.sanctioned_amount || 0,
+      total_expdr: row.total_expdr || 0,
+      percent_expdr: row.percent_expdr || 0,
+      remaining_amount: row.remaining_amount || 0,
+      expdr_cfy: row.expdr_cfy || 0,
+      expdr_upto_31mar25: row.expdr_upto_31mar25 || 0,
+      date_tender: row.date_tender || row.tender_date || '',
+      date_award: row.date_award || row.award_date || '',
+      pdc_agreement: row.pdc_agreement || '',
+      revised_pdc: row.revised_pdc || '',
+      actual_completion_date: row.actual_completion_date || row.completion_date_actual || '',
+      date_acceptance: row.date_acceptance || row.acceptance_date || '',
+      date_ts: row.date_ts || row.ts_date || '',
+      remarks: row.remarks || '',
+      aa_es_ref: row.aa_es_ref || row.aa_es_reference || '',
+      source_sheet: row.source_sheet || '',
+      progress_category: row.progress_category || determineProgressStatus(row)
     };
     
     setSelectedProjectForReport(rowWithCalculatedFields);
     setReportModalOpen(true);
   };
 
-  // Function to open edit modal - NEW
   const openEditModal = (row, isNew = false) => {
     if (isNew) {
       setSelectedProjectForEdit(null);
@@ -628,8 +776,10 @@ const handleRefreshData = () => {
     } else {
       const rowWithCalculatedFields = {
         ...row,
-        calculated_time_allowed: row.calculated_time_allowed,
-        progress_status_display: row.progress_status_display
+        calculated_time_allowed: row.calculated_time_allowed || calculateTimeAllowed(row),
+        progress_status_display: row.progress_status_display || getProgressStatusDisplay(row),
+        expected_progress: calculateExpectedProgress(row),
+        rowIndex: row.id - 1 // Add rowIndex for Edit component
       };
       setSelectedProjectForEdit(rowWithCalculatedFields);
       setIsNewProject(false);
@@ -637,21 +787,14 @@ const handleRefreshData = () => {
     setEditModalOpen(true);
   };
 
-  // Handler for save success - NEW
   const handleEditSaveSuccess = (savedData) => {
-    // You might want to refresh the data here
-    // For example, call a refetch function if available
     console.log('Project saved:', savedData);
-    // Add notification or refresh logic here
-    window.location.reload(); // Simple refresh for now
+    handleRefreshData();
   };
 
-  // Handler for delete success - NEW
   const handleEditDeleteSuccess = (deletedData) => {
-    // You might want to refresh the data here
     console.log('Project deleted:', deletedData);
-    // Add notification or refresh logic here
-    window.location.reload(); // Simple refresh for now
+    handleRefreshData();
   };
 
   const exportTableData = () => {
@@ -670,7 +813,6 @@ const handleRefreshData = () => {
           }
           return value || '';
         });
-        // Add calculated time allowed days as last column
         values.push(row.calculated_time_allowed?.days || 0);
         return values.join(',');
       })
@@ -686,9 +828,59 @@ const handleRefreshData = () => {
   };
 
   const formatAmount = (value) => {
-    if (!value || isNaN(value)) return '₹0';
-    if (value >= 100) return `₹${(value / 100).toFixed(2)} Cr`;
-    return `₹${value.toFixed(2)} L`;
+    // Handle null, undefined, or empty values
+    if (value === null || value === undefined || value === '') return '₹0 L';
+    
+    // Convert to number - handle all types
+    let numValue;
+    
+    if (typeof value === 'number') {
+      numValue = value;
+    } else if (typeof value === 'string') {
+      // Remove any non-numeric characters except decimal point and minus
+      const cleanedValue = value.replace(/[^0-9.-]/g, '');
+      numValue = cleanedValue === '' ? 0 : parseFloat(cleanedValue);
+    } else if (value && typeof value === 'object' && value.toString) {
+      // If it's an object with toString method, try to convert
+      const strValue = value.toString();
+      const cleanedValue = strValue.replace(/[^0-9.-]/g, '');
+      numValue = cleanedValue === '' ? 0 : parseFloat(cleanedValue);
+    } else {
+      // Last resort - try Number conversion
+      numValue = Number(value);
+    }
+    
+    // Check if conversion resulted in a valid number
+    if (typeof numValue !== 'number' || isNaN(numValue) || !isFinite(numValue)) {
+      return '₹0 L';
+    }
+    
+    // Ensure numValue is definitely a number before calling toFixed
+    numValue = Number(numValue);
+    
+    // Format based on value with extra safety check
+    try {
+      if (numValue >= 100) {
+        return `₹${(numValue / 100).toFixed(2)} Cr`;
+      }
+      return `₹${numValue.toFixed(2)} L`;
+    } catch (e) {
+      console.error('Error formatting amount:', value, numValue, e);
+      return '₹0 L';
+    }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr || dateStr === 'N/A' || dateStr === '') return 'N/A';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch {
+      return dateStr;
+    }
   };
 
   if (!data || data.length === 0) {
@@ -711,9 +903,9 @@ const handleRefreshData = () => {
         className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm border ${darkMode ? 'border-gray-700' : 'border-gray-100'} overflow-hidden flex flex-col h-full`}
         style={{ maxWidth }}
       >
-        {/* Compact Header with Stats and Controls */}
+        {/* Header with Stats and Controls */}
         <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-          {/* Compact Statistics Row */}
+          {/* Statistics Row */}
           <div className="flex flex-wrap items-center gap-4 mb-3 text-sm">
             <div className="flex items-center gap-2">
               <Briefcase size={16} className="text-blue-500" />
@@ -846,7 +1038,7 @@ const handleRefreshData = () => {
               )}
             </div>
 
-            {/* Add New Project Button - NEW */}
+            {/* Add New Project Button */}
             <button
               onClick={() => openEditModal(null, true)}
               className="px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:opacity-90 flex items-center gap-2 text-sm transition-all shadow-sm whitespace-nowrap"
@@ -870,7 +1062,7 @@ const handleRefreshData = () => {
         <div 
           ref={tableContainerRef}
           className="flex-1 overflow-auto"
-          style={{ maxHeight: 'calc(100vh - 240px)' }}
+          style={{ maxHeight: isEmbedded ? maxHeight : 'calc(100vh - 240px)' }}
         >
           <table className="w-full">
             <thead className={`${darkMode ? 'bg-gray-900' : 'bg-gray-50'} sticky top-0 z-10 ${
@@ -913,7 +1105,7 @@ const handleRefreshData = () => {
             
             <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
               {paginatedData.map((row, index) => (
-                <React.Fragment key={row.id || row.serial_no || index}>
+                <React.Fragment key={row.id || index}>
                   <tr
                     className={`${
                       darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-50'
@@ -970,7 +1162,6 @@ const handleRefreshData = () => {
                           <Eye size={14} className="text-blue-500" />
                         </button>
                         
-                        {/* Edit Button - NEW */}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -985,12 +1176,12 @@ const handleRefreshData = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleRowExpansion(row.id || row.serial_no || index);
+                            toggleRowExpansion(row.id || index);
                           }}
                           className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                           title="Expand"
                         >
-                          {expandedRows.includes(row.id || row.serial_no || index) ? 
+                          {expandedRows.includes(row.id || index) ? 
                             <ChevronUp size={14} className="text-gray-600 dark:text-gray-400" /> : 
                             <ChevronDown size={14} className="text-gray-600 dark:text-gray-400" />
                           }
@@ -999,255 +1190,355 @@ const handleRefreshData = () => {
                     </td>
                   </tr>
                   
-                  {/* Expanded Row Details */}
-                  {expandedRows.includes(row.id || row.serial_no || index) && (
+                  {/* Expanded Row Content - remains the same */}
+                  {expandedRows.includes(row.id || index) && (
                     <tr>
                       <td colSpan={selectedColumns.length + (compareMode ? 2 : 1)} 
-                          className={`px-6 py-6 ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-                        <div className="space-y-6">
+                          className={`px-3 py-4 ${darkMode ? 'bg-gray-750' : 'bg-gray-50'}`}>
+                        <div className="space-y-4">
                           {/* Header Section */}
-                          <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                            <h3 className="font-bold text-lg mb-3 text-blue-600 dark:text-blue-400">
+                          <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                            <h3 className="font-semibold text-base mb-1 text-blue-600 dark:text-blue-400">
                               {row.scheme_name || 'Project Details'}
                             </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              Serial No: {row.serial_no} | Budget Head: {row.budget_head || 'N/A'}
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              S.No: {row.serial_no} | Budget Head: {row.budget_head || 'N/A'} | AA/ES: {row.aa_es_ref || 'N/A'}
                             </p>
                           </div>
 
-                          {/* Details Grid */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            
-                            {/* Basic Information */}
-                            <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                              <h4 className="font-semibold mb-3 text-sm text-blue-600 dark:text-blue-400 flex items-center gap-2">
-                                <FileText size={16} />
-                                Basic Information
-                              </h4>
-                              <dl className="space-y-2">
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Source Sheet:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{row.source_sheet || '-'}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Umbrella Scheme:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{row.umberella_scheme || '-'}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Scheme:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{row.scheme || '-'}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">AA/ES Ref:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{row.aa_es_ref || '-'}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">AA/ES Pending:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{row.aa_es_pending_with || '-'}</dd>
-                                </div>
-                              </dl>
-                            </div>
-
-                            {/* Location & Organizations */}
-                            <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                              <h4 className="font-semibold mb-3 text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
-                                <MapPin size={16} />
-                                Location & Organizations
-                              </h4>
-                              <dl className="space-y-2">
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">FHQ:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{row.ftr_hq || '-'}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">SHQ:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{row.shq || '-'}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Work Site:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100 text-right max-w-[150px] truncate" title={row.work_site}>
-                                    {row.work_site || '-'}
-                                  </dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Executive Agency:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100 text-right max-w-[150px] truncate" title={row.executive_agency}>
-                                    {row.executive_agency || '-'}
-                                  </dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Contractor:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100 text-right max-w-[150px] truncate" title={row.firm_name}>
-                                    {row.firm_name || '-'}
-                                  </dd>
-                                </div>
-                              </dl>
-                            </div>
-
-                            {/* Financial Details */}
-                            <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                              <h4 className="font-semibold mb-3 text-sm text-purple-600 dark:text-purple-400 flex items-center gap-2">
-                                <DollarSign size={16} />
-                                Financial Details
-                              </h4>
-                              <dl className="space-y-2">
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Sanctioned Amount:</dt>
-                                  <dd className="text-xs font-bold text-blue-600">{formatAmount(row.sanctioned_amount)}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Expdr (31 Mar 25):</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{formatAmount(row.expdr_upto_31mar25)}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Current FY Expdr:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{formatAmount(row.expdr_cfy)}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Total Expenditure:</dt>
-                                  <dd className="text-xs font-bold text-green-600">{formatAmount(row.total_expdr)}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Expenditure %:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{row.percent_expdr?.toFixed(1) || 0}%</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Remaining:</dt>
-                                  <dd className="text-xs font-bold text-orange-600">{formatAmount(row.remaining_amount)}</dd>
-                                </div>
-                              </dl>
-                            </div>
-
-                            {/* Timeline & Dates */}
-                            <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                              <h4 className="font-semibold mb-3 text-sm text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
-                                <Calendar size={16} />
-                                Timeline & Dates
-                              </h4>
-                              <dl className="space-y-2">
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Date TS:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{formatCellValue(row.date_ts, 'date')}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Tender Date:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{formatCellValue(row.date_tender, 'date')}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Acceptance Date:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{formatCellValue(row.date_acceptance, 'date')}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Award Date:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{formatCellValue(row.date_award, 'date')}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">PDC Agreement:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{formatCellValue(row.pdc_agreement, 'date')}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Revised PDC:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{formatCellValue(row.revised_pdc, 'date')}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Completion Date:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{formatCellValue(row.actual_completion_date, 'date')}</dd>
-                                </div>
-                              </dl>
-                            </div>
-
-                            {/* Progress & Performance */}
-                            <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                              <h4 className="font-semibold mb-3 text-sm text-cyan-600 dark:text-cyan-400 flex items-center gap-2">
-                                <TrendingUp size={16} />
-                                Progress & Performance
-                              </h4>
-                              <dl className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Physical Progress:</dt>
-                                  <dd className="flex items-center gap-2">
-                                    <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-                                      <div 
-                                        className="h-1.5 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
-                                        style={{ width: `${Math.min(100, Math.max(0, row.physical_progress || 0))}%` }}
-                                      />
-                                    </div>
-                                    <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{row.physical_progress?.toFixed(0) || 0}%</span>
-                                  </dd>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Progress Status:</dt>
-                                  <dd className="text-xs">
-                                    {row.progress_status_display && (
-                                      <div className="flex flex-col items-end gap-1">
-                                        <span className={`font-medium ${row.progress_status_display.primary.color}`}>
-                                          {row.progress_status_display.primary.label}
-                                        </span>
-                                        {row.progress_status_display.secondary && (
-                                          <span className={`text-[10px] ${row.progress_status_display.secondary.color}`}>
-                                            ({row.progress_status_display.secondary.label})
-                                          </span>
-                                        )}
-                                      </div>
-                                    )}
-                                  </dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Category:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">
-                                    {(row.progress_category || 'UNKNOWN').replace(/_/g, ' ')}
-                                  </dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Health Status:</dt>
-                                  <dd className="text-xs font-medium">
-                                    {formatCellValue(row.health_status, 'health', row)}
-                                  </dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Expected Progress:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">
-                                    {row.expected_progress?.toFixed(1) || 0}%
-                                  </dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Status:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{row.status || '-'}</dd>
-                                </div>
-                                <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-700">
-                                  <dt className="text-xs font-semibold text-gray-600 dark:text-gray-400">Time Allowed:</dt>
-                                  <dd className={`text-xs font-bold ${
-                                    row.calculated_time_allowed?.status === 'overdue' ? 'text-red-600' : 'text-gray-900 dark:text-gray-100'
-                                  }`}>
-                                    {row.calculated_time_allowed?.formatted || 'N/A'}
-                                  </dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Contract Days:</dt>
-                                  <dd className="text-xs font-medium text-gray-900 dark:text-gray-100">{row.time_allowed_days || 0} days</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Delay Days:</dt>
-                                  <dd className={`text-xs font-bold ${(row.delay_days || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                    {row.delay_days || 0} days
-                                  </dd>
-                                </div>
-                                <div className="flex justify-between">
-                                  <dt className="text-xs text-gray-600 dark:text-gray-400">Risk Level:</dt>
-                                  <dd className="text-xs font-bold text-gray-900 dark:text-gray-100">{row.risk_level || '-'}</dd>
-                                </div>
-                              </dl>
-                            </div>
-
-                            {/* Remarks */}
-                            {row.remarks && (
-                              <div className={`p-4 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'} md:col-span-2 lg:col-span-3`}>
-                                <h4 className="font-semibold mb-2 text-sm text-gray-600 dark:text-gray-400">Remarks</h4>
-                                <p className="text-xs text-gray-700 dark:text-gray-300">
-                                  {row.remarks}
-                                </p>
+                          {/* Main 4 Cards Grid */}
+                          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+                            {/* 1. Basic Information */}
+                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                              <div className="flex items-center gap-2 mb-3">
+                                <FileText size={14} className="text-blue-500" />
+                                <h4 className="font-semibold text-sm text-gray-900 dark:text-gray-100">Basic Information</h4>
                               </div>
-                            )}
+                              <div className="space-y-2 text-xs">
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">Serial:</span>
+                                  <span className="font-medium">{row.serial_no || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">Budget Head:</span>
+                                  <span className="font-medium text-[11px]">{row.budget_head || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">AA/ES Ref:</span>
+                                  <span className="font-medium text-[11px]">{row.aa_es_ref || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">Status:</span>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                                    row.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                                    row.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' :
+                                    'bg-gray-100 text-gray-700'
+                                  }`}>{row.status || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between py-1">
+                                  <span className="text-gray-600 dark:text-gray-400">Priority:</span>
+                                  <span className={`font-medium ${
+                                    row.priority === 'HIGH' ? 'text-red-600' :
+                                    row.priority === 'MEDIUM' ? 'text-yellow-600' :
+                                    'text-green-600'
+                                  }`}>{row.priority || 'N/A'}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 2. Location & Organization */}
+                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                              <div className="flex items-center gap-2 mb-3">
+                                <MapPin size={14} className="text-green-500" />
+                                <h4 className="font-semibold text-sm text-gray-900 dark:text-gray-100">Location & Organization</h4>
+                              </div>
+                              <div className="space-y-2 text-xs">
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">Frontier HQ:</span>
+                                  <span className="font-medium">{row.ftr_hq || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">Sector HQ:</span>
+                                  <span className="font-medium">{row.shq || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">Location:</span>
+                                  <span className="font-medium text-right text-[11px] max-w-[120px] truncate" title={row.location || 'N/A'}>
+                                    {row.location || 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">Agency:</span>
+                                  <span className="font-medium text-right text-[11px] max-w-[120px] truncate" title={row.executive_agency || 'N/A'}>
+                                    {row.executive_agency || 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between py-1">
+                                  <span className="text-gray-600 dark:text-gray-400">Contractor:</span>
+                                  <span className="font-medium text-right text-[11px] max-w-[120px] truncate" title={row.firm_name || 'N/A'}>
+                                    {row.firm_name || 'N/A'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 3. Timeline & Dates */}
+                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                              <div className="flex items-center gap-2 mb-3">
+                                <Calendar size={14} className="text-purple-500" />
+                                <h4 className="font-semibold text-sm text-gray-900 dark:text-gray-100">Timeline & Dates</h4>
+                              </div>
+                              <div className="space-y-2 text-xs">
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">Tender:</span>
+                                  <span className="font-medium text-[11px]">{formatDate(row.date_tender)}</span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">Award:</span>
+                                  <span className="font-medium text-[11px]">{formatDate(row.date_award)}</span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">PDC:</span>
+                                  <span className="font-medium text-[11px]">{formatDate(row.pdc_agreement)}</span>
+                                </div>
+                                {row.revised_pdc && (
+                                  <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                    <span className="text-gray-600 dark:text-gray-400">Rev PDC:</span>
+                                    <span className="font-medium text-orange-600 text-[11px]">{formatDate(row.revised_pdc)}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between py-1">
+                                  <span className="text-gray-600 dark:text-gray-400">Delay:</span>
+                                  <span className={`font-medium ${
+                                    row.delay_days > 0 ? 'text-red-600' : 'text-green-600'
+                                  }`}>{row.delay_days > 0 ? `${row.delay_days}d` : 'On Time'}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 4. Financial Details */}
+                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                              <div className="flex items-center gap-2 mb-3">
+                                <IndianRupee size={14} className="text-green-500" />
+                                <h4 className="font-semibold text-sm text-gray-900 dark:text-gray-100">Financial Details</h4>
+                              </div>
+                              <div className="space-y-2 text-xs">
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">Project Cost:</span>
+                                  <span className="font-bold text-blue-600">{formatAmount(row.sanctioned_amount)}</span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">Spent:</span>
+                                  <span className="font-bold text-green-600">{formatAmount(row.total_expdr)}</span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">Current FY:</span>
+                                  <span className="font-medium">{formatAmount(row.expdr_cfy)}</span>
+                                </div>
+                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
+                                  <span className="text-gray-600 dark:text-gray-400">Prev FY:</span>
+                                  <span className="font-medium">{formatAmount(row.expdr_upto_31mar25)}</span>
+                                </div>
+                                <div className="flex justify-between py-1">
+                                  <span className="text-gray-600 dark:text-gray-400">Spent %:</span>
+                                  <span className={`font-medium ${
+                                    parseFloat(row.percent_expdr) > 80 ? 'text-green-600' :
+                                    parseFloat(row.percent_expdr) > 50 ? 'text-blue-600' :
+                                    'text-orange-600'
+                                  }`}>{row.percent_expdr || 0}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Progress & Performance - Full Width */}
+                          <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                            <div className="flex items-center gap-2 mb-3">
+                              <Activity size={14} className="text-orange-500" />
+                              <h4 className="font-semibold text-sm text-gray-900 dark:text-gray-100">Progress & Performance</h4>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              {/* Physical Progress */}
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs text-gray-600 dark:text-gray-400">Physical Progress:</span>
+                                  <span className="text-sm font-bold text-blue-600">{row.physical_progress || 0}%</span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                  <div 
+                                    className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all"
+                                    style={{ width: `${Math.min(100, Math.max(0, row.physical_progress || 0))}%` }}
+                                  />
+                                </div>
+                                <div className="text-[10px] text-gray-500">
+                                  {row.progress_category?.replace(/_/g, ' ') || 'N/A'}
+                                </div>
+                              </div>
+
+                              {/* Expected vs Actual */}
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs text-gray-600 dark:text-gray-400">Expected:</span>
+                                  <span className="text-sm font-bold text-purple-600">{row.expected_progress?.toFixed(1) || 0}%</span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 relative">
+                                  <div 
+                                    className="h-2 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 opacity-50"
+                                    style={{ width: `${Math.min(100, Math.max(0, row.expected_progress || 0))}%` }}
+                                  />
+                                  <div 
+                                    className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 absolute top-0"
+                                    style={{ 
+                                      width: `${Math.min(100, Math.max(0, row.physical_progress || 0))}%`,
+                                      opacity: 0.8
+                                    }}
+                                  />
+                                </div>
+                                <div className="text-[10px] text-gray-500">
+                                  Variance: {((row.physical_progress || 0) - (row.expected_progress || 0)).toFixed(1)}%
+                                </div>
+                              </div>
+
+                              {/* Efficiency Score */}
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs text-gray-600 dark:text-gray-400">Efficiency:</span>
+                                  <span className={`text-sm font-bold ${
+                                    row.efficiency_score > 80 ? 'text-green-600' :
+                                    row.efficiency_score > 60 ? 'text-yellow-600' :
+                                    'text-red-600'
+                                  }`}>{row.efficiency_score?.toFixed(1) || 0}%</span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                  <div 
+                                    className={`h-2 rounded-full transition-all ${
+                                      row.efficiency_score > 80 ? 'bg-gradient-to-r from-green-500 to-green-600' :
+                                      row.efficiency_score > 60 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
+                                      'bg-gradient-to-r from-red-500 to-red-600'
+                                    }`}
+                                    style={{ width: `${Math.min(100, Math.max(0, row.efficiency_score || 0))}%` }}
+                                  />
+                                </div>
+                                <div className="text-[10px] text-gray-500">
+                                  Progress/Expenditure Ratio
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Performance Indicators Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                              {/* Health Status */}
+                              <div className="text-center">
+                                <div className="text-[10px] text-gray-600 dark:text-gray-400 mb-1">Health</div>
+                                <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ${
+                                  row.health_status === 'PERFECT_PACE' ? 'bg-green-100 text-green-700 dark:bg-green-900/30' :
+                                  row.health_status === 'SLOW_PACE' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30' :
+                                  row.health_status === 'BAD_PACE' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30' :
+                                  row.health_status === 'SLEEP_PACE' ? 'bg-red-100 text-red-700 dark:bg-red-900/30' :
+                                  row.health_status === 'PAYMENT_PENDING' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30' :
+                                  'bg-gray-100 text-gray-700 dark:bg-gray-900/30'
+                                }`}>
+                                  {row.health_status === 'PERFECT_PACE' && <Zap size={10} />}
+                                  {row.health_status === 'SLOW_PACE' && <Timer size={10} />}
+                                  {row.health_status === 'BAD_PACE' && <AlertTriangle size={10} />}
+                                  {row.health_status === 'SLEEP_PACE' && <PauseCircle size={10} />}
+                                  {row.health_status === 'PAYMENT_PENDING' && <CreditCard size={10} />}
+                                  <span>{row.health_status?.replace(/_/g, ' ').substring(0, 12) || 'N/A'}</span>
+                                </div>
+                                <div className="text-[9px] text-gray-500 mt-1">
+                                  Score: {row.health_score?.toFixed(0) || 0}/100
+                                </div>
+                              </div>
+
+                              {/* Risk Level */}
+                              <div className="text-center">
+                                <div className="text-[10px] text-gray-600 dark:text-gray-400 mb-1">Risk</div>
+                                <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ${
+                                  row.risk_level === 'CRITICAL' ? 'bg-red-100 text-red-700 dark:bg-red-900/30' :
+                                  row.risk_level === 'HIGH' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30' :
+                                  row.risk_level === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30' :
+                                  'bg-green-100 text-green-700 dark:bg-green-900/30'
+                                }`}>
+                                  {row.risk_level === 'CRITICAL' && <AlertCircle size={10} />}
+                                  {row.risk_level === 'HIGH' && <AlertTriangle size={10} />}
+                                  {row.risk_level === 'MEDIUM' && <Shield size={10} />}
+                                  {row.risk_level === 'LOW' && <CheckCircle size={10} />}
+                                  <span>{row.risk_level || 'LOW'}</span>
+                                </div>
+                              </div>
+
+                              {/* Quality Score */}
+                              <div className="text-center">
+                                <div className="text-[10px] text-gray-600 dark:text-gray-400 mb-1">Quality</div>
+                                <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ${
+                                  row.quality_score > 80 ? 'bg-green-100 text-green-700 dark:bg-green-900/30' :
+                                  row.quality_score > 60 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30' :
+                                  row.quality_score > 40 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30' :
+                                  'bg-red-100 text-red-700 dark:bg-red-900/30'
+                                }`}>
+                                  <ThermometerSun size={10} />
+                                  <span>{row.quality_score?.toFixed(0) || 0}%</span>
+                                </div>
+                                <div className="text-[9px] text-gray-500 mt-1">
+                                  {row.quality_score > 80 ? 'Excellent' :
+                                   row.quality_score > 60 ? 'Good' :
+                                   row.quality_score > 40 ? 'Fair' :
+                                   'Poor'}
+                                </div>
+                              </div>
+
+                              {/* Forecast */}
+                              <div className="text-center">
+                                <div className="text-[10px] text-gray-600 dark:text-gray-400 mb-1">Forecast</div>
+                                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30">
+                                  <CalendarClock size={10} />
+                                  <span className="text-[10px]">
+                                    {row.forecast_completion === 'Completed' ? 'Done' :
+                                     row.forecast_completion === 'Not Started' ? 'N/A' :
+                                     row.forecast_completion === 'Unable to forecast' ? 'Unknown' :
+                                     formatDate(row.forecast_completion).substring(0, 11)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Remarks Section (if available) */}
+                          {row.remarks && (
+                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                              <div className="flex items-center gap-2 mb-2">
+                                <FileText size={12} className="text-gray-500" />
+                                <h4 className="font-semibold text-xs text-gray-900 dark:text-gray-100">Remarks</h4>
+                              </div>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                                {row.remarks}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Quick Actions */}
+                          <div className="flex gap-2 justify-center pt-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openReportModal(row);
+                              }}
+                              className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-md hover:opacity-90 flex items-center gap-1 text-xs transition-all shadow-sm"
+                            >
+                              <Eye size={12} />
+                              View Report
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(row, false);
+                              }}
+                              className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-md hover:opacity-90 flex items-center gap-1 text-xs transition-all shadow-sm"
+                            >
+                              <Edit size={12} />
+                              Edit
+                            </button>
                           </div>
                         </div>
                       </td>
@@ -1266,11 +1557,11 @@ const handleRefreshData = () => {
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, processedData.length)} of {processedData.length} entries
             </div>
             
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className={`px-2 py-1 text-xs rounded-lg ${
+                className={`px-2 py-1 text-xs rounded-md ${
                   currentPage === 1
                     ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm'
@@ -1282,7 +1573,7 @@ const handleRefreshData = () => {
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className={`px-2 py-1 text-xs rounded-lg ${
+                className={`px-2 py-1 text-xs rounded-md ${
                   currentPage === 1
                     ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm'
@@ -1291,14 +1582,14 @@ const handleRefreshData = () => {
                 Prev
               </button>
               
-              <span className="px-2 py-1 text-xs text-gray-700 dark:text-gray-300">
+              <span className="px-3 py-1 text-xs text-gray-700 dark:text-gray-300">
                 Page {currentPage} of {totalPages || 1}
               </span>
               
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages || totalPages === 0}
-                className={`px-2 py-1 text-xs rounded-lg ${
+                className={`px-2 py-1 text-xs rounded-md ${
                   currentPage === totalPages || totalPages === 0
                     ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm'
@@ -1310,7 +1601,7 @@ const handleRefreshData = () => {
               <button
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages || totalPages === 0}
-                className={`px-2 py-1 text-xs rounded-lg ${
+                className={`px-2 py-1 text-xs rounded-md ${
                   currentPage === totalPages || totalPages === 0
                     ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm'
@@ -1334,7 +1625,7 @@ const handleRefreshData = () => {
         darkMode={darkMode}
       />
 
-      {/* Edit Modal - NEW */}
+      {/* Edit Modal */}
       <EditComponent 
         isOpen={editModalOpen}
         onClose={() => {
@@ -1347,18 +1638,14 @@ const handleRefreshData = () => {
         isNewProject={isNewProject}
         onSaveSuccess={handleEditSaveSuccess}
         onDeleteSuccess={handleEditDeleteSuccess}
-        onRefreshData={handleRefreshData} // Add this new prop
+        onRefreshData={handleRefreshData}
       />
 
-      {/* Add animation styles */}
+      {/* Animation styles */}
       <style jsx>{`
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         
         @keyframes slideUp {

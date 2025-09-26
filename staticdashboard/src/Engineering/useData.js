@@ -2,45 +2,135 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 // Helper functions for data processing
 
-// NEW: Calculate expected progress based on time elapsed
-const calculateExpectedProgress = (row) => {
-  // If no date_award, can't calculate expected progress
-  if (!row.date_award || row.date_award === '' || row.date_award === 'N/A') {
-    return 0;
+// Enhanced date parser to handle multiple formats including short year formats
+const parseMultiFormatDate = (dateValue) => {
+  if (!dateValue || dateValue === '' || dateValue === 'N/A' || dateValue === 'NA') {
+    return null;
+  }
+
+  // If it's already a Date object, validate it
+  if (dateValue instanceof Date) {
+    return isNaN(dateValue.getTime()) ? null : dateValue.toISOString().split('T')[0];
+  }
+
+  // Convert to string and trim
+  const dateStr = String(dateValue).trim();
+  
+  // Return null for empty or invalid strings
+  if (!dateStr || dateStr === '0' || dateStr === 'null' || dateStr === 'undefined') {
+    return null;
   }
 
   try {
-    const awardDate = new Date(row.date_award);
-    if (isNaN(awardDate.getTime())) return 0;
+    let parsedDate = null;
 
+    // Format 1: DD.MM.YY (e.g., "18.09.24")
+    if (/^\d{1,2}\.\d{1,2}\.\d{2}$/.test(dateStr)) {
+      const [day, month, year] = dateStr.split('.');
+      // Assume 20xx for years 00-30, 19xx for years 31-99
+      const fullYear = parseInt(year) <= 30 ? 2000 + parseInt(year) : 1900 + parseInt(year);
+      parsedDate = new Date(fullYear, parseInt(month) - 1, parseInt(day));
+    }
+    // Format 2: DD.MM.YYYY (e.g., "31.05.2024")
+    else if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(dateStr)) {
+      const [day, month, year] = dateStr.split('.');
+      parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+    // Format 3: DD/MM/YY
+    else if (/^\d{1,2}\/\d{1,2}\/\d{2}$/.test(dateStr)) {
+      const [day, month, year] = dateStr.split('/');
+      const fullYear = parseInt(year) <= 30 ? 2000 + parseInt(year) : 1900 + parseInt(year);
+      parsedDate = new Date(fullYear, parseInt(month) - 1, parseInt(day));
+    }
+    // Format 4: DD/MM/YYYY (e.g., "31/05/2024")
+    else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
+      const [day, month, year] = dateStr.split('/');
+      parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+    // Format 5: DD-MM-YY
+    else if (/^\d{1,2}-\d{1,2}-\d{2}$/.test(dateStr)) {
+      const [day, month, year] = dateStr.split('-');
+      const fullYear = parseInt(year) <= 30 ? 2000 + parseInt(year) : 1900 + parseInt(year);
+      parsedDate = new Date(fullYear, parseInt(month) - 1, parseInt(day));
+    }
+    // Format 6: DD-MM-YYYY (e.g., "31-05-2024")
+    else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(dateStr)) {
+      const [day, month, year] = dateStr.split('-');
+      parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+    // Format 7: YYYY-MM-DD (ISO format)
+    else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(dateStr)) {
+      parsedDate = new Date(dateStr);
+    }
+    // Format 8: YYYY/MM/DD
+    else if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(dateStr)) {
+      const [year, month, day] = dateStr.split('/');
+      parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+    // Format 9: DD Mon YYYY or DD Month YYYY (e.g., "25 Sep 2025", "4 December 2025")
+    else if (/^\d{1,2}\s+[A-Za-z]+\s+\d{4}$/.test(dateStr)) {
+      parsedDate = new Date(dateStr);
+    }
+    // Format 10: Mon DD, YYYY or Month DD, YYYY (e.g., "Sep 25, 2025", "December 4, 2025")
+    else if (/^[A-Za-z]+\s+\d{1,2},?\s+\d{4}$/.test(dateStr)) {
+      parsedDate = new Date(dateStr);
+    }
+    // Try direct parsing as last resort
+    else {
+      parsedDate = new Date(dateStr);
+    }
+
+    // Validate the parsed date
+    if (parsedDate && !isNaN(parsedDate.getTime())) {
+      // Check if the date is reasonable (between 1900 and 2100)
+      const year = parsedDate.getFullYear();
+      if (year >= 1900 && year <= 2100) {
+        // Return in ISO format (YYYY-MM-DD)
+        return parsedDate.toISOString().split('T')[0];
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.warn('Error parsing date:', dateStr, err);
+    return null;
+  }
+};
+
+// Calculate expected progress based on time elapsed
+const calculateExpectedProgress = (row) => {
+  const awardDate = parseMultiFormatDate(row.award_date || row.date_award);
+  if (!awardDate) return 0;
+
+  try {
+    const award = new Date(awardDate);
     const today = new Date();
     
     // Get PDC date (use revised if available, otherwise original)
-    let pdcDate = null;
-    if (row.revised_pdc && row.revised_pdc !== '' && row.revised_pdc !== 'N/A') {
-      pdcDate = new Date(row.revised_pdc);
-    } else if (row.pdc_agreement && row.pdc_agreement !== '' && row.pdc_agreement !== 'N/A') {
-      pdcDate = new Date(row.pdc_agreement);
-    }
+    let pdcDateStr = parseMultiFormatDate(row.revised_pdc) || 
+                     parseMultiFormatDate(row.pdc_agreement) || 
+                     parseMultiFormatDate(row.pdc_agreement_1);
+    
+    let pdcDate = pdcDateStr ? new Date(pdcDateStr) : null;
     
     // If no PDC date or invalid, use time_allowed_days
     if (!pdcDate || isNaN(pdcDate.getTime())) {
       if (row.time_allowed_days && row.time_allowed_days > 0) {
-        pdcDate = new Date(awardDate);
+        pdcDate = new Date(award);
         pdcDate.setDate(pdcDate.getDate() + parseInt(row.time_allowed_days));
       } else {
         // Default to 365 days if no timeline info
-        pdcDate = new Date(awardDate);
+        pdcDate = new Date(award);
         pdcDate.setFullYear(pdcDate.getFullYear() + 1);
       }
     }
 
     // Calculate total project duration in months
-    const totalDurationMs = pdcDate - awardDate;
-    const totalMonths = totalDurationMs / (1000 * 60 * 60 * 24 * 30.44); // Average days per month
+    const totalDurationMs = pdcDate - award;
+    const totalMonths = totalDurationMs / (1000 * 60 * 60 * 24 * 30.44);
     
     // Calculate elapsed time in months
-    const elapsedMs = today - awardDate;
+    const elapsedMs = today - award;
     const elapsedMonths = elapsedMs / (1000 * 60 * 60 * 24 * 30.44);
     
     // If project should be completed by now
@@ -48,7 +138,7 @@ const calculateExpectedProgress = (row) => {
       return 100;
     }
     
-    // Calculate expected progress (100% / total months * elapsed months)
+    // Calculate expected progress
     if (totalMonths > 0) {
       const monthlyProgress = 100 / totalMonths;
       const expectedProgress = monthlyProgress * elapsedMonths;
@@ -62,42 +152,42 @@ const calculateExpectedProgress = (row) => {
   }
 };
 
-// NEW: Enhanced health calculation based on pace
+// Enhanced health calculation based on pace
 const calculateHealthScore = (row) => {
   const actualProgress = parseFloat(row.physical_progress) || 0;
   const expectedProgress = calculateExpectedProgress(row);
   
   // Special case: Payment Pending (completed but not fully paid)
-  if (actualProgress >= 100 && row.percent_expdr < 100) {
+  if (actualProgress >= 100 && row.expenditure_percent < 100) {
     return 'PAYMENT_PENDING';
   }
   
   // If project hasn't started yet and no award date
-  if (!row.date_award || row.date_award === '' || row.date_award === 'N/A') {
+  const awardDate = parseMultiFormatDate(row.award_date || row.date_award);
+  if (!awardDate) {
     return 'NOT_APPLICABLE';
   }
   
-  // Calculate progress difference
-  const progressDiff = actualProgress - expectedProgress;
+  // Calculate progress ratio
   const progressRatio = expectedProgress > 0 ? (actualProgress / expectedProgress) : 0;
   
   // Categorize based on pace
   if (progressRatio >= 0.95) {
-    return 'PERFECT_PACE'; // Within 5% of expected or ahead
+    return 'PERFECT_PACE';
   } else if (progressRatio >= 0.75) {
-    return 'SLOW_PACE'; // 75-95% of expected progress
+    return 'SLOW_PACE';
   } else if (progressRatio >= 0.50) {
-    return 'BAD_PACE'; // 50-75% of expected progress
+    return 'BAD_PACE';
   } else if (actualProgress > 0) {
-    return 'SLEEP_PACE'; // Less than 50% of expected but started
+    return 'SLEEP_PACE';
   } else if (expectedProgress > 10) {
-    return 'SLEEP_PACE'; // Should have started by now but hasn't
+    return 'SLEEP_PACE';
   } else {
-    return 'SLOW_PACE'; // Recently awarded, give some buffer
+    return 'SLOW_PACE';
   }
 };
 
-// NEW: Convert health status to numeric score for averaging
+// Convert health status to numeric score
 const getHealthScoreNumeric = (healthStatus) => {
   const scores = {
     'PERFECT_PACE': 100,
@@ -110,20 +200,23 @@ const getHealthScoreNumeric = (healthStatus) => {
   return scores[healthStatus] ?? 50;
 };
 
-// NEW: Enhanced physical progress categorization
+// Enhanced physical progress categorization
 const determineProgressStatus = (row) => {
   const progress = parseFloat(row.physical_progress) || 0;
   
   // Check tender and award status first
-  if (!row.date_tender || row.date_tender === '' || row.date_tender === 'N/A') {
+  const tenderDate = parseMultiFormatDate(row.tender_date || row.date_tender);
+  const awardDate = parseMultiFormatDate(row.award_date || row.date_award);
+  
+  if (!tenderDate) {
     return 'TENDER_PROGRESS';
   }
   
-  if (row.date_tender && (!row.date_award || row.date_award === '' || row.date_award === 'N/A')) {
+  if (tenderDate && !awardDate) {
     return 'TENDERED_NOT_AWARDED';
   }
   
-  if (row.date_award && progress === 0) {
+  if (awardDate && progress === 0) {
     return 'AWARDED_NOT_STARTED';
   }
   
@@ -143,7 +236,24 @@ const determineProgressStatus = (row) => {
   return 'UNKNOWN';
 };
 
-// Enhanced risk calculation based on new health scores
+// Calculate delay with proper date parsing
+const calculateDelay = (row) => {
+  if (row.physical_progress >= 100) return 0;
+  
+  const pdcStr = parseMultiFormatDate(row.revised_pdc) || 
+                 parseMultiFormatDate(row.pdc_agreement) || 
+                 parseMultiFormatDate(row.pdc_agreement_1);
+  
+  if (!pdcStr) return 0;
+  
+  const pdc = new Date(pdcStr);
+  const today = new Date();
+  const diffTime = today - pdc;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays);
+};
+
+// Enhanced risk calculation
 const calculateRiskLevel = (row) => {
   const progress = parseFloat(row.physical_progress) || 0;
   const healthStatus = row.health_status || calculateHealthScore(row);
@@ -166,29 +276,20 @@ const calculateRiskLevel = (row) => {
   if (healthStatus === 'SLOW_PACE' && delay > 30) return 'MEDIUM';
   if (delay > 30 || efficiency < 70) return 'MEDIUM';
   
-  // Low risk
   return 'LOW';
 };
 
-// Keep existing helper functions
+// Calculate efficiency
 const calculateEfficiency = (row) => {
   const progress = parseFloat(row.physical_progress) || 0;
-  const expdr = parseFloat(row.percent_expdr) || 0;
+  const expdr = parseFloat(row.expenditure_percent) || 0;
   if (expdr === 0) return progress > 0 ? 100 : 0;
   return Math.min(100, (progress / expdr) * 100);
 };
 
-const calculateDelay = (row) => {
-  if (!row.pdc_agreement || row.physical_progress >= 100) return 0;
-  const pdc = new Date(row.pdc_agreement);
-  const today = new Date();
-  const diffTime = today - pdc;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return Math.max(0, diffDays);
-};
-
+// Determine priority
 const determinePriority = (row) => {
-  const amount = parseFloat(row.sanctioned_amount) || 0;
+  const amount = parseFloat(row.sanctioned_amount) || parseFloat(row.sd_amount_lakh) || 0;
   const progress = parseFloat(row.physical_progress) || 0;
   const delay = calculateDelay(row);
   
@@ -197,7 +298,7 @@ const determinePriority = (row) => {
   return 'LOW';
 };
 
-// Updated determineStatus to use new progress categories
+// Determine status
 const determineStatus = (progressStatus) => {
   const statusMap = {
     'TENDER_PROGRESS': 'TENDER_PROGRESS',
@@ -214,6 +315,7 @@ const determineStatus = (progressStatus) => {
   return statusMap[progressStatus] || 'UNKNOWN';
 };
 
+// Calculate quality score
 const calculateQualityScore = (row) => {
   let score = 100;
   
@@ -225,22 +327,48 @@ const calculateQualityScore = (row) => {
   return Math.max(0, Math.min(100, score));
 };
 
+// Forecast completion with proper date handling
 const forecastCompletion = (row) => {
-  if (row.physical_progress >= 100) return row.actual_completion_date;
+  if (row.physical_progress >= 100) {
+    return parseMultiFormatDate(row.completion_date_actual) || 'Completed';
+  }
   if (row.physical_progress === 0) return 'Not Started';
   
-  const remainingProgress = 100 - row.physical_progress;
-  const avgProgressRate = row.date_award 
-    ? row.physical_progress / Math.max(1, Math.floor((new Date() - new Date(row.date_award)) / (1000 * 60 * 60 * 24)))
-    : 5;
+  const awardDateStr = parseMultiFormatDate(row.award_date || row.date_award);
+  if (!awardDateStr) {
+    return 'No start date';
+  }
   
-  if (avgProgressRate === 0) return 'Unable to forecast';
-  
-  const daysToComplete = Math.ceil(remainingProgress / avgProgressRate);
-  const forecastDate = new Date();
-  forecastDate.setDate(forecastDate.getDate() + daysToComplete);
-  
-  return forecastDate.toISOString().split('T')[0];
+  try {
+    const awardDate = new Date(awardDateStr);
+    const today = new Date();
+    const daysSinceAward = Math.floor((today - awardDate) / (1000 * 60 * 60 * 24));
+    
+    if (daysSinceAward <= 0) {
+      return 'Project not started';
+    }
+    
+    const remainingProgress = 100 - row.physical_progress;
+    const avgProgressRate = row.physical_progress / daysSinceAward;
+    
+    if (avgProgressRate === 0 || !isFinite(avgProgressRate)) {
+      return 'Unable to forecast';
+    }
+    
+    const daysToComplete = Math.ceil(remainingProgress / avgProgressRate);
+    
+    if (!isFinite(daysToComplete) || daysToComplete < 0) {
+      return 'Unable to forecast';
+    }
+    
+    const forecastDate = new Date();
+    forecastDate.setDate(forecastDate.getDate() + daysToComplete);
+    
+    return forecastDate.toISOString().split('T')[0];
+  } catch (err) {
+    console.warn('Error in forecastCompletion:', err);
+    return 'Unable to forecast';
+  }
 };
 
 // Safe string conversion helper
@@ -248,6 +376,12 @@ const safeString = (value) => {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value;
   return String(value);
+};
+
+// Safe number conversion helper (ensures amounts are in lakhs)
+const safeNumber = (value, defaultValue = 0) => {
+  const parsed = parseFloat(value);
+  return isNaN(parsed) ? defaultValue : parsed;
 };
 
 // Main data hook
@@ -261,10 +395,10 @@ export const useData = () => {
   const retryCount = useRef(0);
   const maxRetries = 3;
 
-  // Process raw CSV data with proper type checking
+  // Process raw CSV data with enhanced date processing
   const processData = useCallback((data) => {
     return data
-      .filter(row => row && (row.serial_no || row.scheme_name))
+      .filter(row => row && (row.serial_no || row.s_no || row.scheme_name || row.scheme_name_1))
       .map((row, index) => {
         const cleanRow = {};
         
@@ -276,72 +410,134 @@ export const useData = () => {
           }
         });
 
-        // Process each field with safe string conversion where needed
+        // Get scheme name
+        const schemeName = safeString(
+          cleanRow.scheme_name_1 || 
+          cleanRow.scheme_name || 
+          'Unnamed Scheme'
+        );
+
+        // Get sanctioned amount (already in lakhs from sd_amount_lakh)
+        const sanctionedAmount = safeNumber(cleanRow.sd_amount_lakh) || 0;
+
+        // Process location field
+        let locationValue = '';
+        if (cleanRow.location !== undefined && cleanRow.location !== null) {
+          if (typeof cleanRow.location === 'number') {
+            locationValue = cleanRow.location.toString();
+          } else if (typeof cleanRow.location === 'string') {
+            locationValue = cleanRow.location;
+          } else if (cleanRow.location && typeof cleanRow.location === 'object' && cleanRow.location.toString) {
+            locationValue = cleanRow.location.toString();
+          } else {
+            locationValue = '';
+          }
+        }
+
+        // Process all date fields with enhanced parser
         const processedRow = {
           id: index + 1,
-          serial_no: safeString(cleanRow.serial_no || index + 1),
+          serial_no: safeString(cleanRow.serial_no || cleanRow.s_no || index + 1),
           budget_head: safeString(cleanRow.budget_head || 'N/A'),
-          scheme_name: safeString(cleanRow.scheme_name || 'Unnamed Scheme'),
+          scheme_name: schemeName,
           ftr_hq: safeString(cleanRow.ftr_hq || 'Unknown'),
           shq: safeString(cleanRow.shq || 'Unknown'),
-          work_site: safeString(cleanRow.work_site || 'Unknown Location'),
+          location: safeString(locationValue || 'N/A'),
+          work_site: safeString(cleanRow.work_site || locationValue || 'Unknown Location'),
           executive_agency: safeString(cleanRow.executive_agency || 'Unknown Agency'),
-          sanctioned_amount: parseFloat(cleanRow.sanctioned_amount) || 0,
-          date_award: safeString(cleanRow.date_award || ''),
-          date_tender: safeString(cleanRow.date_tender || ''),
-          pdc_agreement: safeString(cleanRow.pdc_agreement || ''),
-          revised_pdc: safeString(cleanRow.revised_pdc || ''),
-          actual_completion_date: safeString(cleanRow.actual_completion_date || ''),
+          sanctioned_amount: sanctionedAmount, // Already in lakhs
+          
+          // Process all date fields with the enhanced parser
+          award_date: parseMultiFormatDate(cleanRow.award_date) || '',
+          date_award: parseMultiFormatDate(cleanRow.award_date) || '',
+          tender_date: parseMultiFormatDate(cleanRow.tender_date) || '',
+          date_tender: parseMultiFormatDate(cleanRow.tender_date) || '',
+          pdc_agreement: parseMultiFormatDate(cleanRow.pdc_agreement || cleanRow.pdc_agreement_1) || '',
+          revised_pdc: parseMultiFormatDate(cleanRow.revised_pdc) || '',
+          completion_date_actual: parseMultiFormatDate(cleanRow.completion_date_actual) || '',
+          actual_completion_date: parseMultiFormatDate(cleanRow.completion_date_actual) || '',
+          acceptance_date: parseMultiFormatDate(cleanRow.acceptance_date) || '',
+          date_acceptance: parseMultiFormatDate(cleanRow.acceptance_date) || '',
+          ts_date: parseMultiFormatDate(cleanRow.ts_date) || '',
+          date_ts: parseMultiFormatDate(cleanRow.ts_date) || '',
+          
           firm_name: safeString(cleanRow.firm_name || 'Unknown Contractor'),
-          physical_progress: parseFloat(cleanRow.physical_progress) || 0,
-          progress_status: safeString(cleanRow.progress_status || 'Unknown'),
-          expdr_upto_31mar25: parseFloat(cleanRow.expdr_upto_31mar25) || 0,
-          expdr_cfy: parseFloat(cleanRow.expdr_cfy) || 0,
-          total_expdr: parseFloat(cleanRow.total_expdr) || 0,
-          percent_expdr: parseFloat(cleanRow.percent_expdr) || 0,
-          time_allowed_days: parseInt(cleanRow.time_allowed_days) || 0,
+          physical_progress: safeNumber(cleanRow.physical_progress, 0),
+          current_status: safeNumber(cleanRow.current_status, 0),
+          
+          // Expenditure fields (ensure they're in lakhs)
+          expenditure_previous_fy: safeNumber(cleanRow.expenditure_previous_fy, 0),
+          expenditure_current_fy: safeNumber(cleanRow.expenditure_current_fy, 0),
+          expenditure_total: safeNumber(cleanRow.expenditure_total, 0),
+          
+          expenditure_percent: safeString(cleanRow.expenditure_percent || '0').replace('%', ''),
+          time_allowed_days: safeNumber(cleanRow.time_allowed_days, 0),
           remarks: safeString(cleanRow.remarks || ''),
-          aa_es_ref: safeString(cleanRow.aa_es_ref || ''),
-          date_acceptance: safeString(cleanRow.date_acceptance || ''),
-          aa_es_pending_with: safeString(cleanRow.aa_es_pending_with || '')
+          aa_es_reference: safeString(cleanRow.aa_es_reference || ''),
+          source_sheet: safeString(cleanRow.source_sheet || '')
         };
 
-        // Calculate derived fields with new logic
+        // Parse expenditure percent
+        processedRow.percent_expdr = safeNumber(processedRow.expenditure_percent, 0);
+        
+        // Map fields for compatibility
+        processedRow.aa_es_ref = processedRow.aa_es_reference;
+        
+        // Calculate total expenditure (in lakhs)
+        processedRow.total_expdr = processedRow.expenditure_total || 
+          (processedRow.expenditure_previous_fy + processedRow.expenditure_current_fy);
+        
+        // Map current FY expenditure
+        processedRow.expdr_cfy = processedRow.expenditure_current_fy;
+        processedRow.expdr_upto_31mar25 = processedRow.expenditure_previous_fy;
+        
+        // Calculate derived fields
         processedRow.remaining_amount = processedRow.sanctioned_amount - processedRow.total_expdr;
         processedRow.efficiency_score = calculateEfficiency(processedRow);
         processedRow.delay_days = calculateDelay(processedRow);
         
-        // NEW: Calculate expected progress
+        // Calculate expected progress
         processedRow.expected_progress = calculateExpectedProgress(processedRow);
         
-        // NEW: Calculate health status (pace-based)
+        // Calculate health status
         processedRow.health_status = calculateHealthScore(processedRow);
         processedRow.health_score = getHealthScoreNumeric(processedRow.health_status);
         
-        // NEW: Determine progress status
+        // Determine progress status
         processedRow.progress_category = determineProgressStatus(processedRow);
         
-        // Calculate risk with new health logic
+        // Calculate risk
         processedRow.risk_level = calculateRiskLevel(processedRow);
         processedRow.priority = determinePriority(processedRow);
         
-        // Map progress category to status for compatibility
+        // Map status
         processedRow.status = determineStatus(processedRow.progress_category);
+        processedRow.progress_status = processedRow.current_status || processedRow.status;
         
+        // Calculate budget variance
         processedRow.budget_variance = processedRow.sanctioned_amount > 0 
           ? ((processedRow.total_expdr - processedRow.sanctioned_amount) / processedRow.sanctioned_amount * 100).toFixed(2)
           : 0;
         
+        // Calculate completion ratio
         processedRow.completion_ratio = processedRow.time_allowed_days > 0
           ? (processedRow.physical_progress / 100 * processedRow.time_allowed_days).toFixed(0)
           : 0;
         
-        processedRow.monthly_burn_rate = processedRow.date_award
-          ? (processedRow.total_expdr / Math.max(1, Math.floor((new Date() - new Date(processedRow.date_award)) / (1000 * 60 * 60 * 24 * 30)))).toFixed(2)
-          : 0;
+        // Calculate monthly burn rate (in lakhs)
+        if (processedRow.award_date) {
+          const awardDate = new Date(processedRow.award_date);
+          const monthsElapsed = Math.max(1, Math.floor((new Date() - awardDate) / (1000 * 60 * 60 * 24 * 30)));
+          processedRow.monthly_burn_rate = (processedRow.total_expdr / monthsElapsed).toFixed(2);
+        } else {
+          processedRow.monthly_burn_rate = 0;
+        }
         
         processedRow.quality_score = calculateQualityScore(processedRow);
         processedRow.forecast_completion = forecastCompletion(processedRow);
+        
+        // Add placeholder for missing field
+        processedRow.aa_es_pending_with = '';
         
         return processedRow;
       });
@@ -362,10 +558,7 @@ export const useData = () => {
         }
       });
       
-      if (!isMountedRef.current) {
-        console.log('Component unmounted, cancelling data processing');
-        return;
-      }
+      if (!isMountedRef.current) return;
       
       if (!response.ok) {
         throw new Error(`Failed to load data: ${response.status} ${response.statusText}`);
@@ -374,10 +567,7 @@ export const useData = () => {
       const fileContent = await response.text();
       console.log('CSV file loaded, processing...');
       
-      if (!isMountedRef.current) {
-        console.log('Component unmounted, cancelling CSV parsing');
-        return;
-      }
+      if (!isMountedRef.current) return;
       
       // Parse CSV using dynamic import
       const Papa = await import('papaparse');
@@ -388,57 +578,61 @@ export const useData = () => {
         skipEmptyLines: true,
         delimitersToGuess: [',', '\t', '|', ';'],
         transformHeader: (header) => {
-          // Safely transform headers
           if (!header) return '';
           return header.trim().toLowerCase().replace(/\s+/g, '_');
         }
       });
       
-      if (!isMountedRef.current) {
-        console.log('Component unmounted, cancelling data processing');
-        return;
-      }
+      if (!isMountedRef.current) return;
       
       if (result.errors.length > 0) {
         console.warn('CSV parsing warnings:', result.errors);
       }
       
-      // Process data with error handling
+      // Process data with enhanced date handling
       const processedData = processData(result.data);
       console.log(`Processed ${processedData.length} records`);
       
-      // Log health status distribution for debugging
-      const healthDistribution = processedData.reduce((acc, item) => {
-        acc[item.health_status] = (acc[item.health_status] || 0) + 1;
-        return acc;
-      }, {});
-      console.log('Health Status Distribution:', healthDistribution);
+      // Log sample date formats for debugging
+      if (processedData.length > 0) {
+        console.log('Sample processed dates:', {
+          award_date: processedData[0].award_date,
+          tender_date: processedData[0].tender_date,
+          pdc_agreement: processedData[0].pdc_agreement,
+          completion_date: processedData[0].completion_date_actual
+        });
+      }
       
       // Calculate data statistics
       const stats = {
         totalRecords: processedData.length,
         dateRange: {
           earliest: processedData
-            .filter(d => d.date_award)
+            .filter(d => d.date_award && d.date_award !== '')
             .reduce((min, d) => {
               try {
                 const date = new Date(d.date_award);
-                return date < min ? date : min;
+                if (!isNaN(date.getTime())) {
+                  return !min || date < min ? date : min;
+                }
+                return min;
               } catch {
                 return min;
               }
-            }, new Date()),
+            }, null) || new Date(),
           latest: new Date()
         },
         completenessScore: calculateDataCompleteness(processedData),
         lastUpdate: new Date(),
-        healthDistribution
+        healthDistribution: processedData.reduce((acc, item) => {
+          acc[item.health_status] = (acc[item.health_status] || 0) + 1;
+          return acc;
+        }, {}),
+        sourceSheets: [...new Set(processedData.map(d => d.source_sheet).filter(Boolean))],
+        uniqueLocations: [...new Set(processedData.map(d => d.location).filter(l => l && l !== 'N/A'))]
       };
       
-      if (!isMountedRef.current) {
-        console.log('Component unmounted, not updating state');
-        return;
-      }
+      if (!isMountedRef.current) return;
       
       setRawData(processedData);
       setDataStats(stats);
@@ -449,10 +643,7 @@ export const useData = () => {
       return processedData;
       
     } catch (err) {
-      if (!isMountedRef.current) {
-        console.log('Component unmounted, ignoring error');
-        return;
-      }
+      if (!isMountedRef.current) return;
       
       console.error('Error loading data:', err);
       
@@ -478,7 +669,8 @@ export const useData = () => {
     
     const requiredFields = [
       'serial_no', 'scheme_name', 'budget_head', 'work_site',
-      'executive_agency', 'sanctioned_amount', 'physical_progress'
+      'executive_agency', 'sanctioned_amount', 'physical_progress',
+      'location'
     ];
     
     let totalCompleteness = 0;
@@ -532,7 +724,7 @@ export const useData = () => {
     setRawData(prevData => prevData.filter(record => !ids.includes(record.id)));
   }, []);
 
-  // Get aggregate statistics with safe string handling
+  // Get aggregate statistics
   const getAggregateStats = useCallback(() => {
     if (!rawData || rawData.length === 0) return null;
     
@@ -574,13 +766,22 @@ export const useData = () => {
       const locations = {};
       
       data.forEach(item => {
+        const locationField = safeString(item.location);
         const workSite = safeString(item.work_site);
-        const location = workSite ? workSite.split(',')[0].trim() : 'Unknown';
+        
+        let location = 'Unknown';
+        if (locationField && locationField !== 'N/A' && locationField !== '') {
+          location = locationField;
+        } else if (workSite && workSite !== 'Unknown Location') {
+          location = workSite.split(',')[0].trim();
+        }
         
         if (!locations[location]) {
           locations[location] = {
             count: 0,
             totalBudget: 0,
+            totalExpenditure: 0,
+            avgProgress: 0,
             coords: null,
             projects: []
           };
@@ -588,7 +789,15 @@ export const useData = () => {
         
         locations[location].count++;
         locations[location].totalBudget += item.sanctioned_amount || 0;
+        locations[location].totalExpenditure += item.total_expdr || 0;
+        locations[location].avgProgress += item.physical_progress || 0;
         locations[location].projects.push(item.id);
+      });
+      
+      Object.keys(locations).forEach(key => {
+        if (locations[key].count > 0) {
+          locations[key].avgProgress /= locations[key].count;
+        }
       });
       
       return locations;
@@ -630,54 +839,20 @@ export const useData = () => {
       return timeline;
     };
     
-    // NEW: Aggregate by health status
-    const aggregateByHealthStatus = (data) => {
-      const healthGroups = {
-        'PERFECT_PACE': { count: 0, projects: [] },
-        'SLOW_PACE': { count: 0, projects: [] },
-        'BAD_PACE': { count: 0, projects: [] },
-        'SLEEP_PACE': { count: 0, projects: [] },
-        'PAYMENT_PENDING': { count: 0, projects: [] },
-        'NOT_APPLICABLE': { count: 0, projects: [] }
-      };
-      
-      data.forEach(item => {
-        const status = item.health_status || 'NOT_APPLICABLE';
-        if (healthGroups[status]) {
-          healthGroups[status].count++;
-          healthGroups[status].projects.push(item.id);
-        }
-      });
-      
-      return healthGroups;
-    };
-    
-    // NEW: Aggregate by progress category
-    const aggregateByProgressCategory = (data) => {
-      const categories = {};
-      
-      data.forEach(item => {
-        const category = item.progress_category || 'UNKNOWN';
-        if (!categories[category]) {
-          categories[category] = { count: 0, projects: [] };
-        }
-        categories[category].count++;
-        categories[category].projects.push(item.id);
-      });
-      
-      return categories;
-    };
-    
     return {
       byAgency: aggregateByField(rawData, 'executive_agency'),
       byBudgetHead: aggregateByField(rawData, 'budget_head'),
       byRiskLevel: aggregateByField(rawData, 'risk_level'),
       byStatus: aggregateByField(rawData, 'status'),
       byLocation: aggregateByLocation(rawData),
+      byLocationField: aggregateByField(rawData, 'location'),
       byContractor: aggregateByField(rawData, 'firm_name'),
+      byFrontierHQ: aggregateByField(rawData, 'ftr_hq'),
+      bySectorHQ: aggregateByField(rawData, 'shq'),
       timeline: generateTimelineStats(rawData),
-      byHealthStatus: aggregateByHealthStatus(rawData),
-      byProgressCategory: aggregateByProgressCategory(rawData)
+      byHealthStatus: aggregateByField(rawData, 'health_status'),
+      byProgressCategory: aggregateByField(rawData, 'progress_category'),
+      bySourceSheet: aggregateByField(rawData, 'source_sheet')
     };
   }, [rawData]);
 
@@ -686,7 +861,6 @@ export const useData = () => {
     isMountedRef.current = true;
     loadData();
     
-    // Cleanup on unmount
     return () => {
       isMountedRef.current = false;
     };

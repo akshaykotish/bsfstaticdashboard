@@ -8,7 +8,7 @@ import {
   FileText, Briefcase, Globe, Navigation, Link2, GitBranch,
   CalendarDays, CalendarClock, CalendarCheck, CalendarX,
   Activity, Heart, Gauge, PauseCircle, CreditCard, AlertCircle,
-  PlayCircle, Award, Timer, Layers
+  PlayCircle, Award, Timer, Layers, FileCheck
 } from 'lucide-react';
 
 // Portal component for dropdown
@@ -294,7 +294,7 @@ const MultiSelect = ({
   );
 };
 
-// Date Range Picker Component
+// Date Range Picker Component - Updated for new columns
 const DateRangePicker = ({
   label,
   icon: Icon,
@@ -410,7 +410,7 @@ const DateRangePicker = ({
   );
 };
 
-// Range Slider component
+// Range Slider component - no changes needed as it uses processed data
 const RangeSlider = ({ 
   min = 0, 
   max = 100, 
@@ -621,7 +621,7 @@ const RangeSlider = ({
   );
 };
 
-// Main FilterPanel Component
+// Main FilterPanel Component with updated column support
 const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
   const [expandedSections, setExpandedSections] = useState({
     basic: true,
@@ -633,7 +633,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
   const [showRelatedInfo, setShowRelatedInfo] = useState(false);
   const [showFilterDetails, setShowFilterDetails] = useState(true);
 
-  // Filter presets
+  // Filter presets - no changes needed
   const [filterPresets] = useState([
     { 
       name: 'Critical Projects', 
@@ -910,7 +910,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
     if (filters.selectedHealthStatuses?.length > 0) count++;
     if (selectedSchemes.length > 0) count++;
     
-    // Check if ranges are modified from defaults (0 to max)
+    // Check if ranges are modified from defaults
     if (filters.progressRange && (filters.progressRange[0] > 0 || filters.progressRange[1] < dataRanges.progressMax)) count++;
     if (filters.amountRange && (filters.amountRange[0] > 0 || filters.amountRange[1] < dataRanges.amountMax)) count++;
     if (filters.delayRange && (filters.delayRange[0] > 0 || filters.delayRange[1] < dataRanges.delayMax)) count++;
@@ -1081,7 +1081,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
         </div>
       </div>
 
-      {/* Category Filters Section (REARRANGED) */}
+      {/* Category Filters Section */}
       <div className="border-b border-gray-100 dark:border-gray-700">
         <button
           onClick={() => toggleSection('basic')}
@@ -1237,8 +1237,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
               isFiltered={uniqueValues.locations?.length < allOptions.locations?.length}
             />
 
-            {/* Additional filters that weren't in the list but exist in original code */}
-            {/* Health Status (Pace) */}
+            {/* 10. Health Status (Pace) */}
             <MultiSelect
               options={uniqueValues.healthStatuses}
               value={filters.selectedHealthStatuses || []}
@@ -1252,7 +1251,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
               isFiltered={uniqueValues.healthStatuses?.length < allOptions.healthStatuses?.length}
             />
 
-            {/* Risk Levels */}
+            {/* 11. Risk Levels */}
             <MultiSelect
               options={uniqueValues.riskLevels}
               value={filters.selectedRiskLevels || []}
@@ -1269,7 +1268,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
         )}
       </div>
 
-      {/* Date Filters Section */}
+      {/* Date Filters Section - Updated for new column names */}
       <div className="border-b border-gray-100 dark:border-gray-700">
         <button
           onClick={() => toggleSection('dates')}
@@ -1280,7 +1279,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
           <span className="text-sm font-semibold flex items-center gap-2 text-gray-900 dark:text-gray-100">
             <Calendar size={14} className="text-purple-500" />
             Date Filters
-            {filters.dateFilters && Object.values(filters.dateFilters).some(f => f.enabled) && (
+            {filters.dateFilters && Object.values(filters.dateFilters).some(f => f?.enabled) && (
               <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded">
                 Active
               </span>
@@ -1296,6 +1295,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
           <div className="p-4 space-y-4 bg-gray-50/50 dark:bg-gray-900/20">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               
+              {/* Tender Date */}
               <DateRangePicker
                 label="Tender Date"
                 icon={CalendarDays}
@@ -1331,6 +1331,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
                 darkMode={darkMode}
               />
 
+              {/* Award Date */}
               <DateRangePicker
                 label="Award Date"
                 icon={CalendarCheck}
@@ -1366,6 +1367,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
                 darkMode={darkMode}
               />
 
+              {/* PDC Agreement */}
               <DateRangePicker
                 label="PDC Agreement"
                 icon={CalendarClock}
@@ -1401,6 +1403,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
                 darkMode={darkMode}
               />
 
+              {/* Revised PDC */}
               <DateRangePicker
                 label="Revised PDC"
                 icon={CalendarClock}
@@ -1436,6 +1439,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
                 darkMode={darkMode}
               />
 
+              {/* Completion Date */}
               <DateRangePicker
                 label="Completion Date"
                 icon={CalendarCheck}
@@ -1471,6 +1475,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
                 darkMode={darkMode}
               />
 
+              {/* Acceptance Date */}
               <DateRangePicker
                 label="Acceptance Date"
                 icon={CalendarDays}
@@ -1505,10 +1510,48 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
                 }}
                 darkMode={darkMode}
               />
+
+              {/* TS Date (Tender Submission) - New field */}
+              {filters.dateFilters.tsDate && (
+                <DateRangePicker
+                  label="Tender Submission Date"
+                  icon={FileCheck}
+                  startDate={filters.dateFilters.tsDate?.start}
+                  endDate={filters.dateFilters.tsDate?.end}
+                  onStartDateChange={(date) => {
+                    const updatedFilter = {
+                      enabled: filters.dateFilters.tsDate?.enabled || true,
+                      start: date,
+                      end: filters.dateFilters.tsDate?.end
+                    };
+                    filters.setDateFilter('tsDate', updatedFilter);
+                  }}
+                  onEndDateChange={(date) => {
+                    const updatedFilter = {
+                      enabled: filters.dateFilters.tsDate?.enabled || true,
+                      start: filters.dateFilters.tsDate?.start,
+                      end: date
+                    };
+                    filters.setDateFilter('tsDate', updatedFilter);
+                  }}
+                  minDate={filters.dateStatistics?.tsDate?.min}
+                  maxDate={filters.dateStatistics?.tsDate?.max}
+                  enabled={filters.dateFilters.tsDate?.enabled || false}
+                  onToggle={(enabled) => {
+                    const updatedFilter = {
+                      enabled: enabled,
+                      start: filters.dateFilters.tsDate?.start || null,
+                      end: filters.dateFilters.tsDate?.end || null
+                    };
+                    filters.setDateFilter('tsDate', updatedFilter);
+                  }}
+                  darkMode={darkMode}
+                />
+              )}
             </div>
 
             {/* Clear all dates button */}
-            {Object.values(filters.dateFilters).some(f => f.enabled) && (
+            {Object.values(filters.dateFilters).some(f => f?.enabled) && (
               <button
                 onClick={() => filters.clearAllDateFilters()}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 ${
@@ -1665,8 +1708,9 @@ const FilterPanel = ({ filters, darkMode, rawData = [] }) => {
             
             {/* Date filter badges */}
             {filters.dateFilters && Object.entries(filters.dateFilters).map(([key, filter]) => {
-              if (!filter.enabled) return null;
-              const label = key.replace(/([A-Z])/g, ' $1').trim();
+              if (!filter?.enabled) return null;
+              const label = key.replace(/([A-Z])/g, ' $1').trim()
+                .replace('ts Date', 'TS Date');
               return (
                 <span key={key} className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded-full">
                   {label}

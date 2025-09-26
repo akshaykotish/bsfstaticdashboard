@@ -45,12 +45,12 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
 
   // Calculate Time Allowed
   const calculateTimeAllowed = useCallback((row) => {
-    if (!row.date_award || row.date_award === '' || row.date_award === 'N/A') {
+    if (!row.award_date || row.award_date === '' || row.award_date === 'N/A') {
       return { days: 0, formatted: 'N/A', status: 'not_started' };
     }
 
     try {
-      const awardDate = new Date(row.date_award);
+      const awardDate = new Date(row.award_date);
       if (isNaN(awardDate.getTime())) {
         return { days: 0, formatted: 'Invalid Date', status: 'error' };
       }
@@ -64,10 +64,13 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
         if (isNaN(targetDate.getTime())) targetDate = null;
       }
       
-      if (!targetDate && row.pdc_agreement && row.pdc_agreement !== '' && row.pdc_agreement !== 'N/A') {
-        targetDate = new Date(row.pdc_agreement);
-        dateType = 'original';
-        if (isNaN(targetDate.getTime())) targetDate = null;
+      if (!targetDate && (row.pdc_agreement || row.pdc_agreement_1)) {
+        const pdcValue = row.pdc_agreement || row.pdc_agreement_1;
+        if (pdcValue && pdcValue !== '' && pdcValue !== 'N/A') {
+          targetDate = new Date(pdcValue);
+          dateType = 'original';
+          if (isNaN(targetDate.getTime())) targetDate = null;
+        }
       }
 
       if (!targetDate) {
@@ -99,12 +102,12 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
 
   // Calculate Expected Progress
   const calculateExpectedProgress = useCallback((row) => {
-    if (!row.date_award || row.date_award === '' || row.date_award === 'N/A') {
+    if (!row.award_date || row.award_date === '' || row.award_date === 'N/A') {
       return 0;
     }
 
     try {
-      const awardDate = new Date(row.date_award);
+      const awardDate = new Date(row.award_date);
       if (isNaN(awardDate.getTime())) return 0;
 
       const today = new Date();
@@ -112,8 +115,11 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
       
       if (row.revised_pdc && row.revised_pdc !== '' && row.revised_pdc !== 'N/A') {
         pdcDate = new Date(row.revised_pdc);
-      } else if (row.pdc_agreement && row.pdc_agreement !== '' && row.pdc_agreement !== 'N/A') {
-        pdcDate = new Date(row.pdc_agreement);
+      } else if (row.pdc_agreement || row.pdc_agreement_1) {
+        const pdcValue = row.pdc_agreement || row.pdc_agreement_1;
+        if (pdcValue && pdcValue !== '' && pdcValue !== 'N/A') {
+          pdcDate = new Date(pdcValue);
+        }
       }
       
       if (!pdcDate || isNaN(pdcDate.getTime())) {
@@ -151,7 +157,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
   // Get Progress Status Display
   const getProgressStatusDisplay = useCallback((row) => {
     const progress = parseFloat(row.physical_progress) || 0;
-    const category = row.progress_category || row.progress_status || '';
+    const category = row.progress_category || row.current_status || '';
     const healthStatus = row.health_status || '';
     
     const categoryMap = {
@@ -230,14 +236,14 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
     const physicalProgress = parseFloat(project.physical_progress) || 0;
     const efficiency = parseFloat(project.efficiency_score) || 0;
     const delayDays = parseInt(project.delay_days) || 0;
-    const sanctionedAmount = parseFloat(project.sanctioned_amount) || 0;
-    const totalExpdr = parseFloat(project.total_expdr) || 0;
-    const percentExpdr = parseFloat(project.percent_expdr) || 0;
+    const sanctionedAmount = parseFloat(project.sd_amount_lakh) || parseFloat(project.sanctioned_amount) || 0;
+    const totalExpdr = parseFloat(project.expenditure_total) || parseFloat(project.total_expdr) || 0;
+    const percentExpdr = parseFloat(project.expenditure_percent?.replace('%', '')) || parseFloat(project.percent_expdr) || 0;
     const remainingAmount = sanctionedAmount - totalExpdr;
     
     let timeElapsed = 0;
-    if (project.date_award && project.date_award !== 'N/A') {
-      const awardDate = new Date(project.date_award);
+    if (project.award_date && project.award_date !== 'N/A') {
+      const awardDate = new Date(project.award_date);
       const today = new Date();
       timeElapsed = Math.floor((today - awardDate) / (1000 * 60 * 60 * 24));
     }
@@ -267,7 +273,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
       : 0;
 
     let monthlyBurnRate = 0;
-    if (project.date_award && timeElapsed > 0) {
+    if (project.award_date && timeElapsed > 0) {
       const monthsElapsed = Math.max(1, Math.floor(timeElapsed / 30));
       monthlyBurnRate = totalExpdr / monthsElapsed;
     }
@@ -299,24 +305,20 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
     const element = reportRef.current;
     if (!element) return null;
 
-    // Apply export styles temporarily
     element.classList.add('export-mode');
     
     try {
       const canvas = await html2canvas(element, {
-        scale: 3, // High quality
+        scale: 3,
         logging: false,
         useCORS: true,
         backgroundColor: '#ffffff',
         windowWidth: 1200,
-        windowHeight: 1697, // A4 ratio
+        windowHeight: 1697,
         onclone: (clonedDoc) => {
-          // Ensure all styles are applied
           const clonedElement = clonedDoc.querySelector('.report-content');
           if (clonedElement) {
-            // Remove shadows and unnecessary elements
             clonedElement.querySelectorAll('.no-print').forEach(el => el.style.display = 'none');
-            // Ensure white background
             clonedElement.style.backgroundColor = '#ffffff';
           }
         }
@@ -339,11 +341,10 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
         throw new Error('Failed to generate image');
       }
 
-      // Cache the canvas for potential PDF/print use
       cachedImageRef.current = canvas;
 
       const link = document.createElement('a');
-      link.download = `Report_${project.serial_no}_${Date.now()}.png`;
+      link.download = `Report_${project.serial_no || project.s_no}_${Date.now()}.png`;
       link.href = canvas.toDataURL('image/png', 1.0);
       link.click();
     } catch (error) {
@@ -352,13 +353,12 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
     } finally {
       setExporting(false);
     }
-  }, [project.serial_no]);
+  }, [project.serial_no, project.s_no]);
 
   // Export as PDF using PNG
   const exportPDF = useCallback(async () => {
     setExporting(true);
     try {
-      // Generate or use cached PNG
       const canvas = cachedImageRef.current || await generatePNG();
       if (!canvas) {
         throw new Error('Failed to generate image');
@@ -372,10 +372,9 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
         format: 'a4'
       });
       
-      const pdfWidth = 210; // A4 width in mm
-      const pdfHeight = 297; // A4 height in mm
+      const pdfWidth = 210;
+      const pdfHeight = 297;
       
-      // Calculate dimensions to fit A4
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
       const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
@@ -383,17 +382,13 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
       const scaledWidth = imgWidth * ratio;
       const scaledHeight = imgHeight * ratio;
       
-      // Center the image on the page
       const xOffset = (pdfWidth - scaledWidth) / 2;
       const yOffset = (pdfHeight - scaledHeight) / 2;
       
-      // Add image to PDF
       pdf.addImage(imgData, 'PNG', xOffset, yOffset, scaledWidth, scaledHeight);
       
-      // Save PDF
-      pdf.save(`Report_${project.serial_no}_${Date.now()}.pdf`);
+      pdf.save(`Report_${project.serial_no || project.s_no}_${Date.now()}.pdf`);
       
-      // Clear cache after use
       cachedImageRef.current = null;
     } catch (error) {
       console.error('Error exporting PDF:', error);
@@ -401,13 +396,12 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
     } finally {
       setExporting(false);
     }
-  }, [project.serial_no]);
+  }, [project.serial_no, project.s_no]);
 
   // Print using PNG
   const handlePrint = useCallback(async () => {
     setExporting(true);
     try {
-      // Generate or use cached PNG
       const canvas = cachedImageRef.current || await generatePNG();
       if (!canvas) {
         throw new Error('Failed to generate image');
@@ -415,18 +409,16 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
 
       const imgData = canvas.toDataURL('image/png', 1.0);
       
-      // Create a new window for printing
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
         throw new Error('Failed to open print window');
       }
 
-      // Write HTML with the image
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
           <head>
-            <title>Print Report - ${project.serial_no}</title>
+            <title>Print Report - ${project.serial_no || project.s_no}</title>
             <style>
               @media print {
                 @page {
@@ -470,7 +462,6 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
 
       printWindow.document.close();
       
-      // Clear cache after use
       cachedImageRef.current = null;
     } catch (error) {
       console.error('Error printing:', error);
@@ -478,7 +469,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
     } finally {
       setExporting(false);
     }
-  }, [project.serial_no]);
+  }, [project.serial_no, project.s_no]);
 
   // Get status color class
   const getStatusColor = (value, type) => {
@@ -532,8 +523,8 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
               <FileText size={16} />
             </div>
             <div>
-              <h1>{project.scheme_name || 'Project Report'}</h1>
-              <p>S.No: {project.serial_no} | {formatDate(new Date())}</p>
+              <h1>{project.scheme_name_1 || project.scheme_name || 'Project Report'}</h1>
+              <p>S.No: {project.serial_no || project.s_no} | {formatDate(new Date())}</p>
             </div>
           </div>
           
@@ -604,9 +595,9 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
             <div className='flag-divider'>
 
             </div>
-            <h2>{project.scheme_name}</h2>
+            <h2>{project.scheme_name_1 || project.scheme_name}</h2>
             <div className="project-meta">
-              <span><Hash size={12} /> {project.serial_no}</span>
+              <span><Hash size={12} /> {project.serial_no || project.s_no}</span>
               <span><MapPin size={12} /> {project.work_site}</span>
               <span><Building2 size={12} /> {project.executive_agency}</span>
               <span><Users size={12} /> {project.firm_name}</span>
@@ -679,13 +670,12 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
               <h3><FileText size={12} /> Basic Information</h3>
               <div className="detail-items">
                 {[
-                  ['Serial No', project.serial_no],
+                  ['Serial No', project.serial_no || project.s_no],
                   ['Budget Head', project.budget_head],
                   ['Source Sheet', project.source_sheet],
-                  ['Umbrella Scheme', project.umberella_scheme],
-                  ['Scheme', project.scheme],
-                  ['AA/ES Ref', project.aa_es_ref],
-                  ['AA/ES Pending', project.aa_es_pending_with]
+                  ['Scheme Name', project.scheme_name_1 || project.scheme_name],
+                  ['AA/ES Ref', project.aa_es_reference],
+                  ['Location', project.location]
                 ].filter(([_, value]) => value && value !== 'N/A').map(([label, value]) => (
                   <div key={label} className="detail-item">
                     <span className="detail-label">{label}:</span>
@@ -720,8 +710,8 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
               <div className="detail-items">
                 {[
                   ['Sanctioned Amount', formatAmount(metrics.sanctionedAmount)],
-                  ['Expdr (31 Mar 25)', formatAmount(project.expdr_upto_31mar25)],
-                  ['Current FY Expdr', formatAmount(project.expdr_cfy)],
+                  ['Expenditure (Previous FY)', formatAmount(project.expenditure_previous_fy)],
+                  ['Current FY Expenditure', formatAmount(project.expenditure_current_fy)],
                   ['Total Expenditure', formatAmount(metrics.totalExpdr)],
                   ['Remaining Amount', formatAmount(metrics.remainingAmount)],
                   ['Utilization', formatPercentage(metrics.percentExpdr)],
@@ -741,13 +731,13 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
               <h3><Calendar size={12} /> Timeline & Dates</h3>
               <div className="detail-items">
                 {[
-                  ['Date TS', formatDate(project.date_ts)],
-                  ['Tender Date', formatDate(project.date_tender)],
-                  ['Acceptance Date', formatDate(project.date_acceptance)],
-                  ['Award Date', formatDate(project.date_award)],
-                  ['PDC Agreement', formatDate(project.pdc_agreement)],
+                  ['Date TS', formatDate(project.ts_date)],
+                  ['Tender Date', formatDate(project.tender_date)],
+                  ['Acceptance Date', formatDate(project.acceptance_date)],
+                  ['Award Date', formatDate(project.award_date)],
+                  ['PDC Agreement', formatDate(project.pdc_agreement || project.pdc_agreement_1)],
                   ['Revised PDC', formatDate(project.revised_pdc)],
-                  ['Completion Date', formatDate(project.actual_completion_date)],
+                  ['Completion Date', formatDate(project.completion_date_actual)],
                   ['Time Allowed', processedProject.calculated_time_allowed?.formatted || 'N/A'],
                   ['Time Elapsed', `${metrics.timeElapsed} days`]
                 ].filter(([_, value]) => value && value !== 'N/A').map(([label, value]) => (
@@ -786,7 +776,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
                 {[
                   ['Health Status', metrics.paceStatus.label],
                   ['Efficiency Score', `${metrics.efficiency.toFixed(1)}%`],
-                  ['Status', project.status]
+                  ['Current Status', project.current_status || project.status]
                 ].filter(([_, value]) => value && value !== 'N/A').map(([label, value]) => (
                   <div key={label} className="detail-item">
                     <span className="detail-label">{label}:</span>
