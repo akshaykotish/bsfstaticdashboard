@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { 
   // Projects Icons
   Briefcase, FileText, CheckCircle, XCircle, Calendar, Award,
@@ -20,7 +20,7 @@ import {
   MoreVertical, X, Maximize2, Filter, RefreshCw, Building2,
   Users, MapPin, Percent, Package, Cpu, ThermometerSun,
   GitBranch, Layers, FileText as FileTextIcon, Bell, Search,
-  HelpCircle, Coins, PiggyBank, Banknote, DollarSign
+  HelpCircle, Coins, PiggyBank, Banknote, DollarSign, Receipt
 } from 'lucide-react';
 
 import {
@@ -30,7 +30,25 @@ import {
 import DataTable from './DataTable';
 import { usePatchEngineeringCYB, generatePatchBudgetMetrics, PatchDataTable } from './patchEngineeringCYB';
 
-const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onProjectSelect, filters }) => {
+// Import database configurations
+let databaseConfigs;
+try {
+  const configModule = require('../System/config');
+  databaseConfigs = configModule.databaseConfigs || configModule.default || configModule;
+} catch (error) {
+  console.warn('Could not load config.js, using fallback configuration');
+  databaseConfigs = {};
+}
+
+const MetricsCards = ({ 
+  metrics, 
+  darkMode, 
+  onMetricClick, 
+  filteredData = [], 
+  onProjectSelect, 
+  filters, 
+  databaseName = 'engineering' 
+}) => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [expandedView, setExpandedView] = useState(false);
   const [selectedMetricGroup, setSelectedMetricGroup] = useState('all');
@@ -48,22 +66,106 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
 
   const [showPatchTable, setShowPatchTable] = useState(false);
 
-  // Load patch data using the hook with filters
+  // Get database configuration
+  const dbConfig = useMemo(() => {
+    return databaseConfigs[databaseName] || databaseConfigs.engineering || {};
+  }, [databaseName]);
+
+  // Create comprehensive filter mapping for patch data
+  const patchFilters = useMemo(() => {
+    if (!filters) return {};
+    
+    
+  console.log(filters, filteredData);
+
+    const mappedFilters = {
+      searchTerm: filters.searchTerm || '',
+      selectedBudgetHeads: [],
+      selectedFrontierHQs: [],
+      selectedSectorHQs: [],
+      selectedRiskLevels: [],
+      selectedHealthStatuses: [],
+      utilizationRange: null
+    };
+
+    // Map budget heads from filters
+    // Note: The patch data uses 'budget_head' field after processing
+    if (filters.selectedBudgetHeads?.length > 0) {
+      mappedFilters.selectedBudgetHeads = filters.selectedBudgetHeads;
+    } else if (filters.columnFilters?.budget_head?.length > 0) {
+      mappedFilters.selectedBudgetHeads = filters.columnFilters.budget_head;
+    } else if (filters.columnFilters?.['Budget head']?.length > 0) {
+      // Handle direct column name from enggcurrentyear
+      mappedFilters.selectedBudgetHeads = filters.columnFilters['Budget head'];
+    }
+
+    // Map frontier HQs - patch data uses 'ftr_hq' field
+    if (filters.selectedFrontierHQs?.length > 0) {
+      mappedFilters.selectedFrontierHQs = filters.selectedFrontierHQs;
+    } else if (filters.columnFilters?.ftr_hq_name?.length > 0) {
+      mappedFilters.selectedFrontierHQs = filters.columnFilters.ftr_hq_name;
+    } else if (filters.columnFilters?.['Name of Ftr HQ']?.length > 0) {
+      // Handle direct column name from enggcurrentyear
+      mappedFilters.selectedFrontierHQs = filters.columnFilters['Name of Ftr HQ'];
+    } else if (filters.columnFilters?.ftr_hq?.length > 0) {
+      // Handle transformed field name
+      mappedFilters.selectedFrontierHQs = filters.columnFilters.ftr_hq;
+    }
+
+    // Map sector HQs if available (not in patch data, but keep for consistency)
+    if (filters.selectedSectorHQs?.length > 0) {
+      mappedFilters.selectedSectorHQs = filters.selectedSectorHQs;
+    } else if (filters.columnFilters?.shq_name?.length > 0) {
+      mappedFilters.selectedSectorHQs = filters.columnFilters.shq_name;
+    }
+
+    // Map risk levels
+    if (filters.selectedRiskLevels?.length > 0) {
+      mappedFilters.selectedRiskLevels = filters.selectedRiskLevels;
+    } else if (filters.columnFilters?.risk_level?.length > 0) {
+      mappedFilters.selectedRiskLevels = filters.columnFilters.risk_level;
+    }
+
+    // Map health statuses
+    if (filters.selectedHealthStatuses?.length > 0) {
+      mappedFilters.selectedHealthStatuses = filters.selectedHealthStatuses;
+    } else if (filters.columnFilters?.health_status?.length > 0) {
+      mappedFilters.selectedHealthStatuses = filters.columnFilters.health_status;
+    }
+
+    // Map utilization range
+    if (filters.rangeFilters?.utilization_rate?.current) {
+      mappedFilters.utilizationRange = filters.rangeFilters.utilization_rate.current;
+    } else if (filters.rangeFilters?.['% Age of total Expdr']?.current) {
+      // Handle direct column name for utilization
+      mappedFilters.utilizationRange = filters.rangeFilters['% Age of total Expdr'].current;
+    }
+
+    // Additional mappings for scheme names if present
+    if (filters.selectedSchemes?.length > 0) {
+      mappedFilters.selectedSchemes = filters.selectedSchemes;
+    } else if (filters.columnFilters?.['Name of scheme']?.length > 0) {
+      mappedFilters.selectedSchemes = filters.columnFilters['Name of scheme'];
+    } else if (filters.columnFilters?.name_of_scheme?.length > 0) {
+      mappedFilters.selectedSchemes = filters.columnFilters.name_of_scheme;
+    }
+
+    console.log('[MetricsCards] Mapped patch filters:', mappedFilters);
+    console.log('[MetricsCards] Original filters:', filters);
+    return mappedFilters;
+  }, [filters]);
+  
+
+  // Load patch data using the hook with mapped filters
   const { 
     patchData,
     patchMetrics, 
     patchLoading, 
     patchError,
     rawPatchData,
-    PatchDataTable: PatchTable
-  } = usePatchEngineeringCYB({
-    searchTerm: filters?.searchTerm,
-    selectedBudgetHeads: filters?.selectedBudgetHeads,
-    selectedFrontierHQs: filters?.selectedFrontierHQs,
-    selectedSectorHQs: filters?.selectedSectorHQs,
-    selectedAgencies: filters?.selectedAgencies,
-    selectedSchemes: filters?.selectedSchemes
-  });
+    PatchDataTable: PatchTable,
+    refreshPatchData
+  } = usePatchEngineeringCYB(patchFilters);
 
   // Store previous metrics to prevent unnecessary recalculations
   const prevMetricsRef = useRef({});
@@ -96,7 +198,72 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     return `₹${num.toFixed(2)} L`;
   };
 
-  // Calculate all metrics from filteredData using the same field names as useData.js
+  // Create field name mappings from config
+  const fieldMappings = useMemo(() => {
+    const mappings = {
+      // Basic fields
+      id: dbConfig.idField || 's_no',
+      aaEsRef: 'aa_es_reference',
+      
+      // Financial fields
+      sanctionedAmount: 'sd_amount_lakh',
+      totalExpdr: 'expenditure_total',
+      expdrCfy: 'expenditure_current_fy',
+      expdrUpto31Mar25: 'expenditure_previous_fy',
+      expenditurePercent: 'expenditure_percent',
+      remainingAmount: 'remaining_amount',
+      
+      // Date fields
+      dateTender: 'tender_date',
+      dateAward: 'award_date',
+      pdcAgreement: 'pdc_agreement',
+      pdcRevised: 'pdc_revised',
+      actualCompletionDate: 'completion_date_actual',
+      
+      // Progress fields
+      physicalProgress: 'physical_progress_percent',
+      timeAllowedDays: 'time_allowed_days',
+      
+      // Organization fields
+      executiveAgency: 'executive_agency',
+      firmName: 'firm_name',
+      workSite: 'location',
+      ftrHq: 'ftr_hq_name',
+      shq: 'shq_name',
+      budgetHead: 'budget_head',
+      nameOfScheme: 'name_of_scheme'
+    };
+
+    // Override mappings based on actual config columns if available
+    if (dbConfig.columns) {
+      dbConfig.columns.forEach(col => {
+        const name = col.name.toLowerCase();
+        
+        // Map common patterns
+        if (name.includes('aa_es') || name.includes('aa/es')) {
+          mappings.aaEsRef = col.name;
+        } else if (name.includes('sanctioned') && name.includes('amount')) {
+          mappings.sanctionedAmount = col.name;
+        } else if (name.includes('total') && name.includes('exp')) {
+          mappings.totalExpdr = col.name;
+        } else if (name.includes('current') && name.includes('exp')) {
+          mappings.expdrCfy = col.name;
+        } else if (name.includes('previous') && name.includes('exp')) {
+          mappings.expdrUpto31Mar25 = col.name;
+        }
+      });
+    }
+
+    return mappings;
+  }, [dbConfig]);
+
+  // Helper function to safely access field values
+  const getFieldValue = (row, fieldKey, defaultValue = null) => {
+    const fieldName = fieldMappings[fieldKey];
+    return row?.[fieldName] ?? defaultValue;
+  };
+
+  // Calculate all metrics from filteredData using field mappings
   const calculatedMetrics = useMemo(() => {
     if (!filteredData || filteredData.length === 0) {
       return {
@@ -177,87 +344,132 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     const currentMonth = now.getMonth();
     const currentQuarter = Math.floor(currentMonth / 3);
     
-    // Projects Metrics - using aa_es_ref field from useData.js
+    // Projects Metrics - using mapped field names
     const totalProjects = filteredData.length;
-    const sanctionedProjects = filteredData.filter(d => d.aa_es_ref && d.aa_es_ref !== '').length;
-    const notSanctioned = filteredData.filter(d => !d.aa_es_ref || d.aa_es_ref === '').length;
-    const tenderNotCalled = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' && 
-        (!d.date_tender || d.date_tender === '') && 
-        d.physical_progress === 0
-    ).length;
-    const underCodalFormality = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' && 
-        (!d.date_award || d.date_award === '')
-    ).length;
-    const awarded = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' && 
-        d.date_award && d.date_award !== ''
-    ).length;
+    const sanctionedProjects = filteredData.filter(d => {
+      const aaEs = getFieldValue(d, 'aaEsRef', '');
+      return aaEs && aaEs !== '';
+    }).length;
+    const notSanctioned = filteredData.filter(d => {
+      const aaEs = getFieldValue(d, 'aaEsRef', '');
+      return !aaEs || aaEs === '';
+    }).length;
+    const tenderNotCalled = filteredData.filter(d => {
+      const aaEs = getFieldValue(d, 'aaEsRef', '');
+      const tenderDate = getFieldValue(d, 'dateTender', '');
+      const progress = getFieldValue(d, 'physicalProgress', 0);
+      return aaEs && aaEs !== '' && 
+        (!tenderDate || tenderDate === '') && 
+        progress === 0;
+    }).length;
+    const underCodalFormality = filteredData.filter(d => {
+      const aaEs = getFieldValue(d, 'aaEsRef', '');
+      const awardDate = getFieldValue(d, 'dateAward', '');
+      return aaEs && aaEs !== '' && 
+        (!awardDate || awardDate === '');
+    }).length;
+    const awarded = filteredData.filter(d => {
+      const aaEs = getFieldValue(d, 'aaEsRef', '');
+      const awardDate = getFieldValue(d, 'dateAward', '');
+      return aaEs && aaEs !== '' && 
+        awardDate && awardDate !== '';
+    }).length;
 
-    // Budget Metrics - using fields from useData.js (already in lakhs)
+    // Budget Metrics - using mapped field names
     const totalBudget = filteredData
-        .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0);
+        .reduce((sum, d) => sum + (getFieldValue(d, 'sanctionedAmount', 0) || 0), 0);
 
     const totalExpenditure = filteredData
-        .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
-        .reduce((sum, d) => sum + (d.total_expdr || 0), 0);
+        .filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return aaEs && aaEs !== '';
+        })
+        .reduce((sum, d) => sum + (getFieldValue(d, 'totalExpdr', 0) || 0), 0);
 
     const currentYearExpenditure = filteredData
-        .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
-        .reduce((sum, d) => sum + (d.expdr_cfy || 0), 0);
+        .filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return aaEs && aaEs !== '';
+        })
+        .reduce((sum, d) => sum + (getFieldValue(d, 'expdrCfy', 0) || 0), 0);
 
     // Current Year Budget (budget for projects started this year)
     const currentYearBudget = filteredData
         .filter(d => {
-            if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-            if (!d.date_award) return false;
-            try {
-                const awardDate = new Date(d.date_award);
-                return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear;
-            } catch {
-                return false;
-            }
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          const awardDate = getFieldValue(d, 'dateAward');
+          if (!aaEs || aaEs === '') return false;
+          if (!awardDate) return false;
+          try {
+            const award = new Date(awardDate);
+            return !isNaN(award.getTime()) && award.getFullYear() === currentYear;
+          } catch {
+            return false;
+          }
         })
-        .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0);
+        .reduce((sum, d) => sum + (getFieldValue(d, 'sanctionedAmount', 0) || 0), 0);
 
-    // Previous Year Expenditure (using expdr_upto_31mar25 from useData.js)
+    // Previous Year Expenditure
     const previousYearExpenditure = filteredData
-        .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
-        .reduce((sum, d) => sum + (d.expdr_upto_31mar25 || 0), 0);
+        .filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return aaEs && aaEs !== '';
+        })
+        .reduce((sum, d) => sum + (getFieldValue(d, 'expdrUpto31Mar25', 0) || 0), 0);
 
     // Quarterly Expenditure (current quarter)
     const quarterStart = new Date(currentYear, currentQuarter * 3, 1);
     const quarterlyExpenditure = filteredData
         .filter(d => {
-            if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-            if (!d.date_award) return false;
-            try {
-                const awardDate = new Date(d.date_award);
-                return awardDate >= quarterStart;
-            } catch {
-                return false;
-            }
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          const awardDate = getFieldValue(d, 'dateAward');
+          if (!aaEs || aaEs === '') return false;
+          if (!awardDate) return false;
+          try {
+            const award = new Date(awardDate);
+            return award >= quarterStart;
+          } catch {
+            return false;
+          }
         })
-        .reduce((sum, d) => sum + (d.total_expdr || 0), 0);
+        .reduce((sum, d) => sum + (getFieldValue(d, 'totalExpdr', 0) || 0), 0);
 
     // Unutilized Budget
     const unutilizedBudget = filteredData
-        .filter(d => d.aa_es_ref && d.aa_es_ref !== '' && d.physical_progress >= 100)
-        .reduce((sum, d) => sum + (d.remaining_amount || 0), 0);
+        .filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          const progress = getFieldValue(d, 'physicalProgress', 0);
+          return aaEs && aaEs !== '' && progress >= 100;
+        })
+        .reduce((sum, d) => sum + (getFieldValue(d, 'remainingAmount', 0) || 0), 0);
 
     // Over Budget Projects
     const overBudgetProjects = filteredData
-        .filter(d => d.aa_es_ref && d.aa_es_ref !== '' && d.total_expdr > d.sanctioned_amount)
+        .filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          const expdr = getFieldValue(d, 'totalExpdr', 0);
+          const sanctioned = getFieldValue(d, 'sanctionedAmount', 0);
+          return aaEs && aaEs !== '' && expdr > sanctioned;
+        })
         .length;
 
     const allocatedBudget = filteredData
-        .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
-        .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0);
+        .filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return aaEs && aaEs !== '';
+        })
+        .reduce((sum, d) => sum + (getFieldValue(d, 'sanctionedAmount', 0) || 0), 0);
 
     const remainingBudget = filteredData
-        .filter(d => d.aa_es_ref && d.aa_es_ref !== '')
-        .reduce((sum, d) => sum + (d.remaining_amount || 0), 0);
+        .filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return aaEs && aaEs !== '';
+        })
+        .reduce((sum, d) => {
+          const sanctioned = getFieldValue(d, 'sanctionedAmount', 0) || 0;
+          const expdr = getFieldValue(d, 'totalExpdr', 0) || 0;
+          return sum + Math.max(0, sanctioned - expdr);
+        }, 0);
 
     // Progress Categories - using progress_category from useData.js
     const tenderProgress = filteredData.filter(d => 
@@ -298,45 +510,54 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     const yearStart = new Date(currentYear, 0, 1);
 
     const recentlyAwarded = filteredData.filter(d => {
-        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-        if (!d.date_award) return false;
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        const awardDate = getFieldValue(d, 'dateAward');
+        if (!aaEs || aaEs === '') return false;
+        if (!awardDate) return false;
         try {
-            const awardDate = new Date(d.date_award);
-            return !isNaN(awardDate.getTime()) && awardDate >= thirtyDaysAgo;
+            const award = new Date(awardDate);
+            return !isNaN(award.getTime()) && award >= thirtyDaysAgo;
         } catch {
             return false;
         }
     }).length;
 
     const awardedThisYear = filteredData.filter(d => {
-        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-        if (!d.date_award) return false;
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        const awardDate = getFieldValue(d, 'dateAward');
+        if (!aaEs || aaEs === '') return false;
+        if (!awardDate) return false;
         try {
-            const awardDate = new Date(d.date_award);
-            return !isNaN(awardDate.getTime()) && awardDate >= yearStart;
+            const award = new Date(awardDate);
+            return !isNaN(award.getTime()) && award >= yearStart;
         } catch {
             return false;
         }
     }).length;
 
     const completedRecently = filteredData.filter(d => {
-        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-        if (!d.actual_completion_date || d.physical_progress < 100) return false;
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        const completionDate = getFieldValue(d, 'actualCompletionDate');
+        const progress = getFieldValue(d, 'physicalProgress', 0);
+        if (!aaEs || aaEs === '') return false;
+        if (!completionDate || progress < 100) return false;
         try {
-            const completionDate = new Date(d.actual_completion_date);
-            return !isNaN(completionDate.getTime()) && completionDate >= ninetyDaysAgo;
+            const completion = new Date(completionDate);
+            return !isNaN(completion.getTime()) && completion >= ninetyDaysAgo;
         } catch {
             return false;
         }
     }).length;
 
     const oldProjects = filteredData.filter(d => {
-        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-        if (!d.date_award) return false;
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        const awardDate = getFieldValue(d, 'dateAward');
+        if (!aaEs || aaEs === '') return false;
+        if (!awardDate) return false;
         try {
-            const awardDate = new Date(d.date_award);
-            if (isNaN(awardDate.getTime())) return false;
-            const ageInDays = (now - awardDate) / (1000 * 60 * 60 * 24);
+            const award = new Date(awardDate);
+            if (isNaN(award.getTime())) return false;
+            const ageInDays = (now - award) / (1000 * 60 * 60 * 24);
             return ageInDays > 365;
         } catch {
             return false;
@@ -344,141 +565,173 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     }).length;
 
     // Health Metrics - using pre-calculated values from useData.js
-    const critical = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.risk_level === 'CRITICAL'
-    ).length;
+    const critical = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '' &&
+        d.risk_level === 'CRITICAL';
+    }).length;
 
-    const highRisk = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.risk_level === 'HIGH'
-    ).length;
+    const highRisk = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '' &&
+        d.risk_level === 'HIGH';
+    }).length;
 
-    const mediumRisk = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.risk_level === 'MEDIUM'
-    ).length;
+    const mediumRisk = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '' &&
+        d.risk_level === 'MEDIUM';
+    }).length;
 
-    const lowRisk = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.risk_level === 'LOW'
-    ).length;
+    const lowRisk = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '' &&
+        d.risk_level === 'LOW';
+    }).length;
 
-    const delayed = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        (d.delay_days || 0) > 0
-    ).length;
+    const delayed = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '' &&
+        (d.delay_days || 0) > 0;
+    }).length;
 
-    const ongoing = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.physical_progress > 0 && d.physical_progress < 100
-    ).length;
+    const ongoing = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        const progress = getFieldValue(d, 'physicalProgress', 0);
+        return aaEs && aaEs !== '' &&
+        progress > 0 && progress < 100;
+    }).length;
 
-    const notStarted = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.physical_progress === 0
-    ).length;
+    const notStarted = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        const progress = getFieldValue(d, 'physicalProgress', 0);
+        return aaEs && aaEs !== '' &&
+        progress === 0;
+    }).length;
 
-    const highBudget = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.sanctioned_amount > 500 // 500 lakhs = 5 crores
-    ).length;
+    const highBudget = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        const amount = getFieldValue(d, 'sanctionedAmount', 0);
+        return aaEs && aaEs !== '' &&
+        amount > 500; // 500 lakhs = 5 crores
+    }).length;
 
-    const lowHealth = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        (d.health_score || 0) < 50
-    ).length;
+    const lowHealth = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '' &&
+        (d.health_score || 0) < 50;
+    }).length;
 
-    const highEfficiency = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        (d.efficiency_score || 0) > 80
-    ).length;
+    const highEfficiency = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '' &&
+        (d.efficiency_score || 0) > 80;
+    }).length;
 
-    const overdue = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.delay_days > 90
-    ).length;
+    const overdue = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '' &&
+        d.delay_days > 90;
+    }).length;
 
-    const nearCompletion = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.physical_progress >= 75 && d.physical_progress < 100
-    ).length;
+    const nearCompletion = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        const progress = getFieldValue(d, 'physicalProgress', 0);
+        return aaEs && aaEs !== '' &&
+        progress >= 75 && progress < 100;
+    }).length;
 
-    const onTrack = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.delay_days === 0 && d.physical_progress > 0
-    ).length;
+    const onTrack = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        const progress = getFieldValue(d, 'physicalProgress', 0);
+        return aaEs && aaEs !== '' &&
+        d.delay_days === 0 && progress > 0;
+    }).length;
 
     // Pace categories - using health_status from useData.js
-    const perfectPace = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.health_status === 'PERFECT_PACE'
-    ).length;
+    const perfectPace = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '' &&
+        d.health_status === 'PERFECT_PACE';
+    }).length;
 
-    const slowPace = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.health_status === 'SLOW_PACE'
-    ).length;
+    const slowPace = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '' &&
+        d.health_status === 'SLOW_PACE';
+    }).length;
 
-    const badPace = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.health_status === 'BAD_PACE'
-    ).length;
+    const badPace = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '' &&
+        d.health_status === 'BAD_PACE';
+    }).length;
 
-    const sleepPace = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.health_status === 'SLEEP_PACE'
-    ).length;
+    const sleepPace = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '' &&
+        d.health_status === 'SLEEP_PACE';
+    }).length;
 
-    const paymentPending = filteredData.filter(d => 
-        d.aa_es_ref && d.aa_es_ref !== '' &&
-        d.health_status === 'PAYMENT_PENDING'
-    ).length;
+    const paymentPending = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '' &&
+        d.health_status === 'PAYMENT_PENDING';
+    }).length;
 
     // Timeline Metrics
     const currentYearProjects = filteredData.filter(d => {
-        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-        if (!d.date_award) return false;
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        const awardDate = getFieldValue(d, 'dateAward');
+        if (!aaEs || aaEs === '') return false;
+        if (!awardDate) return false;
         try {
-            const awardDate = new Date(d.date_award);
-            return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear;
+            const award = new Date(awardDate);
+            return !isNaN(award.getTime()) && award.getFullYear() === currentYear;
         } catch {
             return false;
         }
     }).length;
 
     const lastQuarterProjects = filteredData.filter(d => {
-        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-        if (!d.date_award) return false;
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        const awardDate = getFieldValue(d, 'dateAward');
+        if (!aaEs || aaEs === '') return false;
+        if (!awardDate) return false;
         try {
-            const awardDate = new Date(d.date_award);
-            if (isNaN(awardDate.getTime())) return false;
-            const projectQuarter = Math.floor(awardDate.getMonth() / 3);
+            const award = new Date(awardDate);
+            if (isNaN(award.getTime())) return false;
+            const projectQuarter = Math.floor(award.getMonth() / 3);
             const lastQuarter = currentQuarter === 0 ? 3 : currentQuarter - 1;
             const checkYear = currentQuarter === 0 ? currentYear - 1 : currentYear;
-            return awardDate.getFullYear() === checkYear && projectQuarter === lastQuarter;
+            return award.getFullYear() === checkYear && projectQuarter === lastQuarter;
         } catch {
             return false;
         }
     }).length;
 
     const lastYearProjects = filteredData.filter(d => {
-        if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-        if (!d.date_award) return false;
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        const awardDate = getFieldValue(d, 'dateAward');
+        if (!aaEs || aaEs === '') return false;
+        if (!awardDate) return false;
         try {
-            const awardDate = new Date(d.date_award);
-            return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear - 1;
+            const award = new Date(awardDate);
+            return !isNaN(award.getTime()) && award.getFullYear() === currentYear - 1;
         } catch {
             return false;
         }
     }).length;
 
     // Calculate averages and other metrics (only for sanctioned projects)
-    const sanctionedData = filteredData.filter(d => d.aa_es_ref && d.aa_es_ref !== '');
+    const sanctionedData = filteredData.filter(d => {
+        const aaEs = getFieldValue(d, 'aaEsRef', '');
+        return aaEs && aaEs !== '';
+    });
     const sanctionedCount = sanctionedData.length;
 
     const avgProgress = sanctionedCount > 0 
-        ? sanctionedData.reduce((sum, d) => sum + (d.physical_progress || 0), 0) / sanctionedCount 
+        ? sanctionedData.reduce((sum, d) => sum + (getFieldValue(d, 'physicalProgress', 0) || 0), 0) / sanctionedCount 
         : 0;
 
     const avgEfficiency = sanctionedCount > 0 
@@ -490,9 +743,9 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
         : 0;
 
     // Calculate unique organizations (only for sanctioned projects)
-    const uniqueAgencies = new Set(sanctionedData.map(d => d.executive_agency).filter(Boolean));
-    const uniqueContractors = new Set(sanctionedData.map(d => d.firm_name).filter(Boolean));
-    const uniqueLocations = new Set(sanctionedData.map(d => d.work_site?.split(',')[0]).filter(Boolean));
+    const uniqueAgencies = new Set(sanctionedData.map(d => getFieldValue(d, 'executiveAgency')).filter(Boolean));
+    const uniqueContractors = new Set(sanctionedData.map(d => getFieldValue(d, 'firmName')).filter(Boolean));
+    const uniqueLocations = new Set(sanctionedData.map(d => getFieldValue(d, 'workSite')?.split(',')[0]).filter(Boolean));
 
     return {
       // Projects
@@ -565,7 +818,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       delayRate: totalProjects > 0 ? (delayed / totalProjects * 100).toFixed(1) : 0,
       criticalRate: totalProjects > 0 ? (critical / totalProjects * 100).toFixed(1) : 0
     };
-  }, [filteredData]);
+  }, [filteredData, fieldMappings]);
 
   // Update display metrics only when calculated metrics actually change
   useEffect(() => {
@@ -587,8 +840,8 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
     }
   }, []);
 
-  // Get filtered data based on metric type - using correct field names from useData.js
-  const getMetricData = (metricId) => {
+  // Get filtered data based on metric type - using mapped field names
+  const getMetricData = useCallback((metricId) => {
     if (!filteredData || filteredData.length === 0) return [];
 
     switch (metricId) {
@@ -596,25 +849,38 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       case 'total-projects':
         return filteredData;
       case 'sanctioned':
-        return filteredData.filter(d => d.aa_es_ref && d.aa_es_ref !== '');
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return aaEs && aaEs !== '';
+        });
       case 'not-sanctioned':
-        return filteredData.filter(d => !d.aa_es_ref || d.aa_es_ref === '');
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return !aaEs || aaEs === '';
+        });
       case 'tender-not-called':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          (!d.date_tender || d.date_tender === '') && 
-          d.physical_progress === 0
-        );
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          const tenderDate = getFieldValue(d, 'dateTender', '');
+          const progress = getFieldValue(d, 'physicalProgress', 0);
+          return aaEs && aaEs !== '' &&
+            (!tenderDate || tenderDate === '') && 
+            progress === 0;
+        });
       case 'codal':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          (!d.date_award || d.date_award === '')
-        );
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          const awardDate = getFieldValue(d, 'dateAward', '');
+          return aaEs && aaEs !== '' &&
+            (!awardDate || awardDate === '');
+        });
       case 'awarded':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.date_award && d.date_award !== ''
-        );
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          const awardDate = getFieldValue(d, 'dateAward', '');
+          return aaEs && aaEs !== '' &&
+            awardDate && awardDate !== '';
+        });
         
       // Progress Section - using progress_category from useData.js
       case 'tender-progress':
@@ -636,244 +902,94 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         return filteredData.filter(d => {
-          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-          if (!d.date_award) return false;
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          const awardDate = getFieldValue(d, 'dateAward');
+          if (!aaEs || aaEs === '') return false;
+          if (!awardDate) return false;
           try {
-            const awardDate = new Date(d.date_award);
-            return !isNaN(awardDate.getTime()) && awardDate >= thirtyDaysAgo;
+            const award = new Date(awardDate);
+            return !isNaN(award.getTime()) && award >= thirtyDaysAgo;
           } catch {
             return false;
           }
         });
-      case 'awarded-year':
-        const yearStart = new Date(new Date().getFullYear(), 0, 1);
-        return filteredData.filter(d => {
-          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-          if (!d.date_award) return false;
-          try {
-            const awardDate = new Date(d.date_award);
-            return !isNaN(awardDate.getTime()) && awardDate >= yearStart;
-          } catch {
-            return false;
-          }
-        });
-      case 'completed-recently':
-        const ninetyDaysAgo = new Date();
-        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-        return filteredData.filter(d => {
-          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-          if (!d.actual_completion_date || d.physical_progress < 100) return false;
-          try {
-            const completionDate = new Date(d.actual_completion_date);
-            return !isNaN(completionDate.getTime()) && completionDate >= ninetyDaysAgo;
-          } catch {
-            return false;
-          }
-        });
-      case 'old-projects':
-        const now = new Date();
-        return filteredData.filter(d => {
-          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-          if (!d.date_award) return false;
-          try {
-            const awardDate = new Date(d.date_award);
-            if (isNaN(awardDate.getTime())) return false;
-            const ageInDays = (now - awardDate) / (1000 * 60 * 60 * 24);
-            return ageInDays > 365;
-          } catch {
-            return false;
-          }
-        });
-        
+      
       // Health Section - using pre-calculated fields from useData.js
       case 'critical':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.risk_level === 'CRITICAL'
-        );
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return aaEs && aaEs !== '' &&
+          d.risk_level === 'CRITICAL';
+        });
       case 'high-risk':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.risk_level === 'HIGH'
-        );
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return aaEs && aaEs !== '' &&
+          d.risk_level === 'HIGH';
+        });
       case 'delayed':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          (d.delay_days || 0) > 0
-        );
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return aaEs && aaEs !== '' &&
+          (d.delay_days || 0) > 0;
+        });
       case 'ongoing':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.physical_progress > 0 && d.physical_progress < 100
-        );
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          const progress = getFieldValue(d, 'physicalProgress', 0);
+          return aaEs && aaEs !== '' &&
+          progress > 0 && progress < 100;
+        });
       case 'notstarted':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.physical_progress === 0
-        );
-      case 'overdue':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.delay_days > 90
-        );
-      case 'near-completion':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.physical_progress >= 75 && d.physical_progress < 100
-        );
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          const progress = getFieldValue(d, 'physicalProgress', 0);
+          return aaEs && aaEs !== '' &&
+          progress === 0;
+        });
       case 'perfect-pace':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.health_status === 'PERFECT_PACE'
-        );
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return aaEs && aaEs !== '' &&
+          d.health_status === 'PERFECT_PACE';
+        });
       case 'slow-pace':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.health_status === 'SLOW_PACE'
-        );
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return aaEs && aaEs !== '' &&
+          d.health_status === 'SLOW_PACE';
+        });
       case 'bad-pace':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.health_status === 'BAD_PACE'
-        );
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return aaEs && aaEs !== '' &&
+          d.health_status === 'BAD_PACE';
+        });
       case 'sleep-pace':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.health_status === 'SLEEP_PACE'
-        );
-      case 'payment-pending':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.health_status === 'PAYMENT_PENDING'
-        );
-      case 'low-health':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          (d.health_score || 0) < 50
-        );
-      case 'high-efficiency':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          (d.efficiency_score || 0) > 80
-        );
-      case 'high-budget':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.sanctioned_amount > 500 // 500 lakhs = 5 crores
-        );
+        return filteredData.filter(d => {
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          return aaEs && aaEs !== '' &&
+          d.health_status === 'SLEEP_PACE';
+        });
         
       // Budget Section
       case 'total-budget':
         return filteredData;
       case 'expenditure':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          (d.total_expdr || 0) > 0
-        );
-      case 'allocated':
-        return filteredData.filter(d => d.aa_es_ref && d.aa_es_ref !== '');
-      case 'current-year-budget':
-        const currentYear = new Date().getFullYear();
         return filteredData.filter(d => {
-          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-          if (!d.date_award) return false;
-          try {
-            const awardDate = new Date(d.date_award);
-            return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === currentYear;
-          } catch {
-            return false;
-          }
+          const aaEs = getFieldValue(d, 'aaEsRef', '');
+          const expdr = getFieldValue(d, 'totalExpdr', 0);
+          return aaEs && aaEs !== '' &&
+          (expdr || 0) > 0;
         });
-      case 'current-year-expenditure':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          (d.expdr_cfy || 0) > 0
-        );
-      case 'previous-year-expenditure':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          (d.expdr_upto_31mar25 || 0) > 0
-        );
-      case 'quarterly-expenditure':
-        const currentQuarter = Math.floor(new Date().getMonth() / 3);
-        const quarterStart = new Date(new Date().getFullYear(), currentQuarter * 3, 1);
-        return filteredData.filter(d => {
-          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-          if (!d.date_award) return false;
-          try {
-            const awardDate = new Date(d.date_award);
-            return awardDate >= quarterStart && d.total_expdr > 0;
-          } catch {
-            return false;
-          }
-        });
-      case 'remaining':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          (d.remaining_amount || 0) > 0
-        );
-      case 'unutilized':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.physical_progress >= 100 && 
-          (d.remaining_amount || 0) > 0
-        );
-      case 'over-budget':
-        return filteredData.filter(d => 
-          d.aa_es_ref && d.aa_es_ref !== '' &&
-          d.total_expdr > d.sanctioned_amount
-        );
-        
-      // Timeline Section
-      case 'current-year':
-        const thisYear = new Date().getFullYear();
-        return filteredData.filter(d => {
-          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-          if (!d.date_award) return false;
-          try {
-            const awardDate = new Date(d.date_award);
-            return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === thisYear;
-          } catch {
-            return false;
-          }
-        });
-      case 'last-quarter':
-        const currentMonth = new Date().getMonth();
-        const currentQtr = Math.floor(currentMonth / 3);
-        const lastQtr = currentQtr === 0 ? 3 : currentQtr - 1;
-        const checkYear = currentQtr === 0 ? new Date().getFullYear() - 1 : new Date().getFullYear();
-        return filteredData.filter(d => {
-          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-          if (!d.date_award) return false;
-          try {
-            const awardDate = new Date(d.date_award);
-            if (isNaN(awardDate.getTime())) return false;
-            const projectQuarter = Math.floor(awardDate.getMonth() / 3);
-            return awardDate.getFullYear() === checkYear && projectQuarter === lastQtr;
-          } catch {
-            return false;
-          }
-        });
-      case 'last-year':
-        const lastYear = new Date().getFullYear() - 1;
-        return filteredData.filter(d => {
-          if (!d.aa_es_ref || d.aa_es_ref === '') return false;
-          if (!d.date_award) return false;
-          try {
-            const awardDate = new Date(d.date_award);
-            return !isNaN(awardDate.getTime()) && awardDate.getFullYear() === lastYear;
-          } catch {
-            return false;
-          }
-        });
-        
+      
       default:
         return filteredData;
     }
-  };
+  }, [filteredData, fieldMappings]);
 
   // Handle metric click
-  const handleMetricClick = (metric) => {
+  const handleMetricClick = useCallback((metric) => {
     if (metric.isPatchData) {
       // For patch metrics, show the patch data table
       setSelectedMetric(metric);
@@ -890,18 +1006,18 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       setShowDrillDown(true);
       console.log('[MetricsCard] Opening project data view:', data.length, 'entries for', metric.id);
     }
-  };
+  }, [patchData, getMetricData]);
 
   // Close drill-down modal
-  const closeDrillDown = () => {
+  const closeDrillDown = useCallback(() => {
     setShowDrillDown(false);
     setSelectedMetric(null);
     setDrillDownData([]);
     setDrillDownTitle('');
-  };
+  }, []);
 
   // Define all sections with metrics
-  const projectsMetrics = [
+  const projectsMetrics = useMemo(() => [
     {
       id: 'total-projects',
       group: 'projects',
@@ -983,145 +1099,130 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       gradient: 'from-yellow-500 to-yellow-600',
       infoText: "Projects approved but haven't started the bidding process."
     },
-  ];
+  ], [displayMetrics]);
 
-  const budgetMetrics = [
-    {
-      id: 'total-budget',
-      group: 'budget',
-      title: 'Scheme Amount',
-      value: formatCurrency(displayMetrics.totalBudget || 0),
-      subtitle: `${displayMetrics.totalProjects || 0} projects`,
-      icon: IndianRupee,
-      color: 'green',
-      gradient: 'from-green-500 to-green-600',
-      sparkline: generateTrendData(displayMetrics.totalBudget || 0, 100),
-      infoText: "The total amount of money allocated for all projects."
-    },
-    {
-      id: 'allocated',
-      group: 'budget',
-      title: 'Sanctioned Issue',
-      value: formatCurrency(displayMetrics.allocatedBudget || 0),
-      subtitle: 'Sanctioned projects',
-      icon: Wallet,
-      color: 'purple',
-      gradient: 'from-purple-500 to-purple-600',
-      infoText: "Budget assigned to projects that have received official approval."
-    },
-    {
-      id: 'expenditure',
-      group: 'budget',
-      title: 'Total Expenditure',
-      value: formatCurrency(displayMetrics.totalExpenditure || 0),
-      subtitle: `${safeNumber(displayMetrics.utilizationRate || 0).toFixed(1)}% utilized`,
-      icon: CreditCard,
-      color: 'blue',
-      gradient: 'from-blue-500 to-blue-600',
-      percentage: displayMetrics.utilizationRate || 0,
-      infoText: "The actual amount of money spent so far on all projects."
-    },
-    // {
-    //   id: 'current-year-budget',
-    //   group: 'budget',
-    //   title: 'Current Year Budget',
-    //   value: formatCurrency(displayMetrics.currentYearBudget || 0),
-    //   subtitle: `FY ${new Date().getFullYear()}`,
-    //   icon: Calendar,
-    //   color: 'indigo',
-    //   gradient: 'from-indigo-500 to-indigo-600',
-    //   infoText: "Total budget allocated for projects started in the current financial year."
-    // },
-    {
-      id: 'current-year-expenditure',
-      group: 'budget',
-      title: 'Expenditure Current FY',
-      value: formatCurrency(displayMetrics.currentYearExpenditure || 0),
-      subtitle: `${displayMetrics.currentYearBudget ? 
-        ((displayMetrics.currentYearExpenditure / displayMetrics.currentYearBudget) * 100).toFixed(1) : 0}% utilized`,
-      icon: Coins,
-      color: 'cyan',
-      gradient: 'from-cyan-500 to-cyan-600',
-      percentage: displayMetrics.currentYearBudget > 0 
-        ? ((displayMetrics.currentYearExpenditure / displayMetrics.currentYearBudget) * 100)
-        : 0,
-      sparkline: generateTrendData(displayMetrics.currentYearExpenditure || 0, 20),
-      infoText: "Actual expenditure in the current financial year."
-    },
-    // {
-    //   id: 'previous-year-expenditure',
-    //   group: 'budget',
-    //   title: 'Previous Years Spent',
-    //   value: formatCurrency(displayMetrics.previousYearExpenditure || 0),
-    //   subtitle: 'Cumulative',
-    //   icon: Banknote,
-    //   color: 'gray',
-    //   gradient: 'from-gray-500 to-gray-600',
-    //   infoText: "Total expenditure from all previous years combined."
-    // },
-    {
-      id: 'quarterly-expenditure',
-      group: 'budget',
-      title: 'Quarterly Spending',
-      value: formatCurrency(displayMetrics.quarterlyExpenditure || 0),
-      subtitle: `Q${Math.floor(new Date().getMonth() / 3) + 1} ${new Date().getFullYear()}`,
-      icon: PiggyBank,
-      color: 'emerald',
-      gradient: 'from-emerald-500 to-emerald-600',
-      infoText: "Expenditure in the current quarter."
-    },
-    {
-      id: 'remaining',
-      group: 'budget',
-      title: 'Remaining Budget',
-      value: formatCurrency(displayMetrics.remainingBudget || 0),
-      subtitle: 'Available',
-      icon: Database,
-      color: 'amber',
-      gradient: 'from-amber-500 to-amber-600',
-      infoText: "The amount of money left to be spent."
-    },
-    {
-      id: 'unutilized',
-      group: 'budget',
-      title: 'Unutilized Budget',
-      value: formatCurrency(displayMetrics.unutilizedBudget || 0),
-      subtitle: 'Completed projects',
-      icon: AlertCircle,
-      color: 'orange',
-      gradient: 'from-orange-500 to-orange-600',
-      alert: displayMetrics.unutilizedBudget > displayMetrics.totalBudget * 0.05,
-      infoText: "Budget remaining unutilized after project completion."
-    },
-    {
-      id: 'over-budget',
-      group: 'budget',
-      title: 'Over Budget Projects',
-      value: displayMetrics.overBudgetProjects || 0,
-      subtitle: 'Cost overrun',
-      icon: AlertTriangle,
-      color: 'red',
-      gradient: 'from-red-500 to-red-600',
-      alert: displayMetrics.overBudgetProjects > 0,
-      infoText: "Number of projects where actual expenditure has exceeded the sanctioned budget."
-    },
-    {
-      id: 'high-budget',
-      group: 'budget',
-      title: 'High Budget Projects',
-      value: displayMetrics.highBudget || 0,
-      subtitle: '>₹5 Cr',
-      icon: IndianRupee,
-      color: 'purple',
-      gradient: 'from-purple-500 to-purple-600',
-      infoText: "Projects with budget exceeding ₹5 crores."
-    },
+  const budgetMetrics = useMemo(() => {
+    const baseMetrics = [
+      {
+        id: 'total-budget',
+        group: 'budget',
+        title: 'Scheme Amount',
+        value: formatCurrency(displayMetrics.totalBudget || 0),
+        subtitle: `${displayMetrics.totalProjects || 0} projects`,
+        icon: IndianRupee,
+        color: 'green',
+        gradient: 'from-green-500 to-green-600',
+        sparkline: generateTrendData(displayMetrics.totalBudget || 0, 100),
+        infoText: "The total amount of money allocated for all projects."
+      },
+      {
+        id: 'allocated',
+        group: 'budget',
+        title: 'Sanctioned Issue',
+        value: formatCurrency(displayMetrics.allocatedBudget || 0),
+        subtitle: 'Sanctioned projects',
+        icon: Wallet,
+        color: 'purple',
+        gradient: 'from-purple-500 to-purple-600',
+        infoText: "Budget assigned to projects that have received official approval."
+      },
+      {
+        id: 'expenditure',
+        group: 'budget',
+        title: 'Total Expenditure',
+        value: formatCurrency(displayMetrics.totalExpenditure || 0),
+        subtitle: `${safeNumber(displayMetrics.utilizationRate || 0).toFixed(1)}% utilized`,
+        icon: CreditCard,
+        color: 'blue',
+        gradient: 'from-blue-500 to-blue-600',
+        percentage: displayMetrics.utilizationRate || 0,
+        infoText: "The actual amount of money spent so far on all projects."
+      },
+      {
+        id: 'current-year-expenditure',
+        group: 'budget',
+        title: 'Expenditure Current FY',
+        value: formatCurrency(displayMetrics.currentYearExpenditure || 0),
+        subtitle: `${displayMetrics.currentYearBudget ? 
+          ((displayMetrics.currentYearExpenditure / displayMetrics.currentYearBudget) * 100).toFixed(1) : 0}% utilized`,
+        icon: Coins,
+        color: 'cyan',
+        gradient: 'from-cyan-500 to-cyan-600',
+        percentage: displayMetrics.currentYearBudget > 0 
+          ? ((displayMetrics.currentYearExpenditure / displayMetrics.currentYearBudget) * 100)
+          : 0,
+        sparkline: generateTrendData(displayMetrics.currentYearExpenditure || 0, 20),
+        infoText: "Actual expenditure in the current financial year."
+      },
+      {
+        id: 'quarterly-expenditure',
+        group: 'budget',
+        title: 'Quarterly Spending',
+        value: formatCurrency(displayMetrics.quarterlyExpenditure || 0),
+        subtitle: `Q${Math.floor(new Date().getMonth() / 3) + 1} ${new Date().getFullYear()}`,
+        icon: PiggyBank,
+        color: 'emerald',
+        gradient: 'from-emerald-500 to-emerald-600',
+        infoText: "Expenditure in the current quarter."
+      },
+      {
+        id: 'remaining',
+        group: 'budget',
+        title: 'Remaining Budget',
+        value: formatCurrency(displayMetrics.remainingBudget || 0),
+        subtitle: 'Available',
+        icon: Database,
+        color: 'amber',
+        gradient: 'from-amber-500 to-amber-600',
+        infoText: "The amount of money left to be spent."
+      },
+      {
+        id: 'unutilized',
+        group: 'budget',
+        title: 'Unutilized Budget',
+        value: formatCurrency(displayMetrics.unutilizedBudget || 0),
+        subtitle: 'Completed projects',
+        icon: AlertCircle,
+        color: 'orange',
+        gradient: 'from-orange-500 to-orange-600',
+        alert: displayMetrics.unutilizedBudget > displayMetrics.totalBudget * 0.05,
+        infoText: "Budget remaining unutilized after project completion."
+      },
+      {
+        id: 'over-budget',
+        group: 'budget',
+        title: 'Over Budget Projects',
+        value: displayMetrics.overBudgetProjects || 0,
+        subtitle: 'Cost overrun',
+        icon: AlertTriangle,
+        color: 'red',
+        gradient: 'from-red-500 to-red-600',
+        alert: displayMetrics.overBudgetProjects > 0,
+        infoText: "Number of projects where actual expenditure has exceeded the sanctioned budget."
+      },
+      {
+        id: 'high-budget',
+        group: 'budget',
+        title: 'High Budget Projects',
+        value: displayMetrics.highBudget || 0,
+        subtitle: '>₹5 Cr',
+        icon: IndianRupee,
+        color: 'purple',
+        gradient: 'from-purple-500 to-purple-600',
+        infoText: "Projects with budget exceeding ₹5 crores."
+      }
+    ];
     
-    // Integrate patch data metrics here
-    ...(showPatchData && !patchLoading && patchMetrics ? generatePatchBudgetMetrics(patchMetrics, darkMode) : []),
-  ];
+    // Add patch data metrics if enabled and data is loaded
+    if (showPatchData && !patchLoading && patchMetrics) {
+      const patchBudgetMetrics = generatePatchBudgetMetrics(patchMetrics, darkMode);
+      return [...baseMetrics, ...patchBudgetMetrics];
+    }
+    
+    return baseMetrics;
+  }, [displayMetrics, showPatchData, patchLoading, patchMetrics, darkMode]);
 
-  const progressMetrics = [
+  const progressMetrics = useMemo(() => [
     {
       id: 'tender-progress',
       group: 'progress',
@@ -1239,9 +1340,9 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       gradient: 'from-gray-500 to-gray-600',
       infoText: "Projects started more than a year ago but not complete."
     },
-  ];
+  ], [displayMetrics]);
 
-  const healthMetrics = [
+  const healthMetrics = useMemo(() => [
     {
       id: 'critical',
       group: 'health',
@@ -1308,51 +1409,6 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       infoText: "Projects with zero physical progress."
     },
     {
-      id: 'low-health',
-      group: 'health',
-      title: 'Low Health',
-      value: displayMetrics.lowHealth || 0,
-      subtitle: '<50 score',
-      icon: Heart,
-      color: 'red',
-      gradient: 'from-red-500 to-red-600',
-      infoText: "Projects with poor overall performance."
-    },
-    {
-      id: 'high-efficiency',
-      group: 'health',
-      title: 'High Efficiency',
-      value: displayMetrics.highEfficiency || 0,
-      subtitle: '>80%',
-      icon: Zap,
-      color: 'emerald',
-      gradient: 'from-emerald-500 to-emerald-600',
-      infoText: "Projects performing excellently."
-    },
-    {
-      id: 'overdue',
-      group: 'health',
-      title: 'Overdue',
-      value: displayMetrics.overdue || 0,
-      subtitle: '>90 days',
-      icon: AlertCircle,
-      color: 'red',
-      gradient: 'from-red-600 to-red-700',
-      alert: true,
-      infoText: "Projects delayed by more than 90 days."
-    },
-    {
-      id: 'near-completion',
-      group: 'health',
-      title: 'Near Completion',
-      value: displayMetrics.nearCompletion || 0,
-      subtitle: '75-99%',
-      icon: Target,
-      color: 'cyan',
-      gradient: 'from-cyan-500 to-cyan-600',
-      infoText: "Projects in final stages of completion."
-    },
-    {
       id: 'perfect-pace',
       group: 'health',
       title: 'Perfect Pace',
@@ -1391,20 +1447,10 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       color: 'red',
       gradient: 'from-red-500 to-red-700',
       infoText: "Projects moving extremely slowly (<50% of expected)."
-    },
-    {
-      id: 'payment-pending',
-      group: 'health',
-      title: 'Payment Pending',
-      value: displayMetrics.paymentPending || 0,
-      icon: CreditCard,
-      color: 'amber',
-      gradient: 'from-amber-500 to-orange-600',
-      infoText: "Completed projects where full payment hasn't been made."
     }
-  ];
+  ], [displayMetrics]);
 
-  const timelineMetrics = [
+  const timelineMetrics = useMemo(() => [
     {
       id: 'current-year',
       group: 'timeline',
@@ -1439,17 +1485,17 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
       gradient: 'from-cyan-500 to-cyan-600',
       infoText: "Projects from the previous financial year."
     }
-  ];
+  ], [displayMetrics]);
 
   // Group metrics for filtering
-  const metricGroups = {
+  const metricGroups = useMemo(() => ({
     all: [...projectsMetrics, ...budgetMetrics, ...progressMetrics, ...healthMetrics, ...timelineMetrics],
     projects: projectsMetrics,
     budget: budgetMetrics,
     progress: progressMetrics,
     health: healthMetrics,
     timeline: timelineMetrics
-  };
+  }), [projectsMetrics, budgetMetrics, progressMetrics, healthMetrics, timelineMetrics]);
 
   const getColorClass = (color) => {
     const colors = {
@@ -1564,16 +1610,16 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
                   )}
                 </div>
                 
-                {showTrends && metric.trend !== undefined && metric.trend !== 0 && size !== 'compact' && (
-                  <div className={`flex items-center gap-1 mt-1 text-xs ${
-                    metric.trendDirection === 'up' 
-                      ? (metric.alert ? 'text-red-500' : 'text-green-500')
-                      : (metric.alert ? 'text-green-500' : 'text-red-500')
-                  }`}>
-                    {metric.trendDirection === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                    <span className="text-[10px]">{Math.abs(metric.trend)}%</span>
-                  </div>
-                )}
+                {showTrends && metric.trendValue !== undefined && metric.trendValue !== 0 && size !== 'compact' && (
+                      <div className={`flex items-center gap-1 mt-1 text-xs ${
+                          metric.trend === 'up' 
+                              ? (metric.alert ? 'text-red-500' : 'text-green-500')
+                              : (metric.alert ? 'text-green-500' : 'text-red-500')
+                      }`}>
+                          {metric.trend === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                          <span className="text-[10px]">{Math.abs(parseFloat(metric.trendValue)).toFixed(1)}%</span>
+                      </div>
+                  )}
               </div>
               
               {/* Main icon */}
@@ -1773,22 +1819,23 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
         />
         
         {/* Modal Container */}
-        <div className={`relative w-[95vw] max-w-[1600px] h-[85vh] ${
+        <div className={`relative w-[98vw] max-w-[1600px] h-[88vh] ${
           darkMode ? 'bg-gray-900' : 'bg-white'
         } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
           
           {/* Header */}
-          <div className={`px-6 py-4 border-b ${
+          <div className={`px-3 py-2 border-b ${
             darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
           }`}>
             <div className="flex justify-between items-center">
               <div>
                 <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
-                  {drillDownTitle}
+                  {drillDownTitle} &nbsp;
+                  <span className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
+                    (Showing {drillDownData.length} projects)
+                  </span>
                 </h2>
-                <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
-                  Showing {drillDownData.length} projects
-                </p>
+                
               </div>
               
               <button
@@ -1813,6 +1860,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
               isEmbedded={true}
               maxHeight="calc(85vh - 80px)"
               maxWidth="100%"
+              databaseName={databaseName}
             />
           </div>
         </div>
@@ -1921,19 +1969,6 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
             {expandedView ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             {expandedView ? 'Less' : 'More'}
           </button>
-
-          {/* Details Toggle */}
-          <button
-            onClick={() => setShowDetails(!showDetails)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${
-              showDetails
-                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm'
-                : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <Eye size={12} />
-            Details
-          </button>
         </div>
       </div>
 
@@ -1950,7 +1985,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
                   <Briefcase size={16} className="text-white" />
                 </div>
-                <h3 className="font-semibold">Projects</h3>
+                <h3 className="font-semibold">{dbConfig.displayName ? 'Projects' : 'Projects'}</h3>
                 <span className={`px-2 py-0.5 rounded-full text-xs ${
                   darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
                 }`}>
@@ -1977,7 +2012,6 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
             </div>
           </div>
 
-          {/* Similar sections for Budget, Progress, Health, and Timeline */}
           {/* Budget Section */}
           <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
             darkMode ? 'border-gray-700' : 'border-gray-100'
@@ -1987,7 +2021,7 @@ const MetricsCards = ({ metrics, darkMode, onMetricClick, filteredData = [], onP
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
                   <IndianRupee size={16} className="text-white" />
                 </div>
-                <h3 className="font-semibold">Budget</h3>
+                <h3 className="font-semibold">Financial</h3>
                 <span className={`px-2 py-0.5 rounded-full text-xs ${
                   darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
                 }`}>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   ComposedChart, ScatterChart, Scatter, RadialBarChart, RadialBar,
@@ -14,6 +14,7 @@ import {
   Shield, Users, MapPin, Package, AlertCircle
 } from 'lucide-react';
 import DataTable from '../DataTable';
+import FitViewModal from '../FitView';
 
 const COLORS = {
   efficiency: {
@@ -31,13 +32,25 @@ const COLORS = {
   }
 };
 
-const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
+const EfficiencyMetrics = ({ 
+  data = [], 
+  darkMode = false, 
+  onChartClick = () => {}, 
+  formatAmount = (val) => `₹${val}L`,
+  databaseName = 'engineering',
+  onRefreshData = () => {}
+}) => {
+  const [showDataTableModal, setShowDataTableModal] = useState(false);
+  const [selectedDataForTable, setSelectedDataForTable] = useState([]);
+  const [modalTitle, setModalTitle] = useState('');
+  const [showFitViewModal, setShowFitViewModal] = useState(false);
+  const [selectedProjectForFitView, setSelectedProjectForFitView] = useState(null);
   const [showEfficiencyModal, setShowEfficiencyModal] = useState(false);
-  const [selectedEfficiencyData, setSelectedEfficiencyData] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [efficiencyModalData, setEfficiencyModalData] = useState([]);
+  const [efficiencyModalTitle, setEfficiencyModalTitle] = useState('');
+  const [efficiencyModalStats, setEfficiencyModalStats] = useState(null);
 
+  // Process efficiency data
   const efficiencyData = useMemo(() => {
     if (!data || data.length === 0) {
       return {
@@ -56,10 +69,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       };
     }
 
-    // Store projects by efficiency category
     const efficiencyProjectsMap = {};
-
-    // Overall Efficiency Metrics with project arrays
     const totalProjects = data.length;
     const avgEfficiency = data.reduce((sum, d) => sum + (d.efficiency_score || 0), 0) / totalProjects;
     
@@ -89,7 +99,6 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       poorProjects
     };
 
-    // Efficiency Distribution with project arrays
     const efficiencyRanges = [
       { range: '0-20%', min: 0, max: 20, color: COLORS.efficiency.critical },
       { range: '21-40%', min: 21, max: 40, color: COLORS.efficiency.poor },
@@ -108,12 +117,11 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       return {
         ...range,
         count: rangeProjects.length,
-        budget: rangeProjects.reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100,
+        budget: rangeProjects.reduce((sum, d) => sum + (d.sd_amount_lakh || 0), 0),
         projects: rangeProjects
       };
     });
 
-    // Efficiency by Budget Head with project arrays
     const budgetHeadEfficiency = {};
     data.forEach(d => {
       const head = d.budget_head || 'Unspecified';
@@ -132,7 +140,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       }
       budgetHeadEfficiency[head].projects++;
       budgetHeadEfficiency[head].totalEfficiency += d.efficiency_score || 0;
-      budgetHeadEfficiency[head].budget += (d.sanctioned_amount || 0) / 100;
+      budgetHeadEfficiency[head].budget += (d.sd_amount_lakh || 0);
       budgetHeadEfficiency[head].projectList.push(d);
       
       if (d.efficiency_score >= 80) budgetHeadEfficiency[head].excellent++;
@@ -148,7 +156,6 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       }))
       .sort((a, b) => b.avgEfficiency - a.avgEfficiency);
 
-    // Efficiency by Agency with project arrays
     const agencyEfficiency = {};
     data.forEach(d => {
       const agency = d.executive_agency || 'Unknown';
@@ -164,8 +171,8 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       }
       agencyEfficiency[agency].projects++;
       agencyEfficiency[agency].totalEfficiency += d.efficiency_score || 0;
-      agencyEfficiency[agency].totalProgress += d.physical_progress || 0;
-      agencyEfficiency[agency].totalBudgetUsed += d.percent_expdr || 0;
+      agencyEfficiency[agency].totalProgress += d.physical_progress_percent || 0;
+      agencyEfficiency[agency].totalBudgetUsed += d.expenditure_percent || 0;
       agencyEfficiency[agency].projectList.push(d);
     });
 
@@ -179,10 +186,9 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       .sort((a, b) => b.avgEfficiency - a.avgEfficiency)
       .slice(0, 10);
 
-    // Efficiency by Location
     const locationEfficiency = {};
     data.forEach(d => {
-      const location = d.ftr_hq || 'Unknown';
+      const location = d.ftr_hq_name || 'Unknown';
       if (!locationEfficiency[location]) {
         locationEfficiency[location] = {
           location,
@@ -211,7 +217,6 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       .sort((a, b) => b.avgEfficiency - a.avgEfficiency)
       .slice(0, 10);
 
-    // Efficiency by Contractor
     const contractorEfficiency = {};
     data.forEach(d => {
       const contractor = d.firm_name || 'Unknown';
@@ -226,7 +231,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       }
       contractorEfficiency[contractor].projects++;
       contractorEfficiency[contractor].totalEfficiency += d.efficiency_score || 0;
-      contractorEfficiency[contractor].totalBudget += (d.sanctioned_amount || 0) / 100;
+      contractorEfficiency[contractor].totalBudget += (d.sd_amount_lakh || 0);
       contractorEfficiency[contractor].projectList.push(d);
     });
 
@@ -239,16 +244,15 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       .sort((a, b) => b.avgEfficiency - a.avgEfficiency)
       .slice(0, 15);
 
-    // Efficiency Correlation (Progress vs Budget vs Time)
     const efficiencyCorrelation = data
-      .filter(d => d.sanctioned_amount > 0)
+      .filter(d => d.sd_amount_lakh > 0)
       .slice(0, 100)
       .map(d => ({
         ...d,
-        x: d.physical_progress || 0,
-        y: d.percent_expdr || 0,
+        x: d.physical_progress_percent || 0,
+        y: d.expenditure_percent || 0,
         z: d.efficiency_score || 0,
-        name: d.scheme_name?.substring(0, 20) || 'Unknown',
+        name: d.sub_scheme_name?.substring(0, 20) || d.name_of_scheme?.substring(0, 20) || 'Unknown',
         delay: d.delay_days || 0,
         fill: d.efficiency_score >= 80 ? COLORS.efficiency.excellent :
               d.efficiency_score >= 60 ? COLORS.efficiency.good :
@@ -256,20 +260,19 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
               COLORS.efficiency.poor
       }));
 
-    // Top and Bottom Performers - Keep all original data
     const sortedByEfficiency = data
-      .filter(d => d.sanctioned_amount > 100)
+      .filter(d => d.sd_amount_lakh > 10)
       .sort((a, b) => b.efficiency_score - a.efficiency_score);
 
     const topPerformers = sortedByEfficiency
       .slice(0, 10)
       .map(d => ({
-        ...d, // Keep all original data
-        project: d.scheme_name?.substring(0, 30) || 'Unknown',
+        ...d,
+        project: d.sub_scheme_name?.substring(0, 30) || d.name_of_scheme?.substring(0, 30) || 'Unknown',
         efficiency: d.efficiency_score?.toFixed(1) || 0,
-        progress: d.physical_progress || 0,
-        budgetUsed: d.percent_expdr || 0,
-        budget: (d.sanctioned_amount / 100).toFixed(2),
+        progress: d.physical_progress_percent || 0,
+        budgetUsed: d.expenditure_percent || 0,
+        budget: d.sd_amount_lakh,
         agency: d.executive_agency || 'Unknown'
       }));
 
@@ -277,27 +280,26 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
       .slice(-10)
       .reverse()
       .map(d => ({
-        ...d, // Keep all original data
-        project: d.scheme_name?.substring(0, 30) || 'Unknown',
+        ...d,
+        project: d.sub_scheme_name?.substring(0, 30) || d.name_of_scheme?.substring(0, 30) || 'Unknown',
         efficiency: d.efficiency_score?.toFixed(1) || 0,
-        progress: d.physical_progress || 0,
-        budgetUsed: d.percent_expdr || 0,
-        budget: (d.sanctioned_amount / 100).toFixed(2),
+        progress: d.physical_progress_percent || 0,
+        budgetUsed: d.expenditure_percent || 0,
+        budget: d.sd_amount_lakh,
         agency: d.executive_agency || 'Unknown',
         issues: [
           d.delay_days > 60 && 'Delayed',
-          d.percent_expdr > 100 && 'Over Budget',
-          d.physical_progress < 25 && 'Low Progress'
+          d.expenditure_percent > 100 && 'Over Budget',
+          d.physical_progress_percent < 25 && 'Low Progress'
         ].filter(Boolean).join(', ')
       }));
 
-    // Efficiency Trend
     const efficiencyTrend = [];
     const monthlyEfficiency = {};
     
     data.forEach(d => {
-      if (d.date_award) {
-        const date = new Date(d.date_award);
+      if (d.award_date) {
+        const date = new Date(d.award_date);
         if (!isNaN(date.getTime())) {
           const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
           if (!monthlyEfficiency[monthKey]) {
@@ -329,11 +331,10 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
         efficiencyTrend.push(item);
       });
 
-    // Efficiency Factors Radar
     const efficiencyFactors = [
       { factor: 'Budget Utilization', score: (100 - Math.abs(50 - avgEfficiency)).toFixed(1) },
       { factor: 'Timeline Adherence', score: ((data.filter(d => d.delay_days === 0).length / totalProjects) * 100).toFixed(1) },
-      { factor: 'Progress Rate', score: (data.reduce((sum, d) => sum + (d.physical_progress || 0), 0) / totalProjects).toFixed(1) },
+      { factor: 'Progress Rate', score: (data.reduce((sum, d) => sum + (d.physical_progress_percent || 0), 0) / totalProjects).toFixed(1) },
       { factor: 'Quality Score', score: ((data.filter(d => d.efficiency_score >= 60).length / totalProjects) * 100).toFixed(1) },
       { factor: 'Resource Optimization', score: avgEfficiency.toFixed(1) }
     ];
@@ -354,24 +355,42 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
     };
   }, [data]);
 
-  // Handle efficiency data click to show modal
-  const handleEfficiencyClick = (title, projects, stats = null) => {
-    setSelectedEfficiencyData({
-      title,
-      projects,
-      stats
-    });
+  // Handle efficiency click - opens modal with filtered projects
+  const handleEfficiencyClick = useCallback((title, projects, stats = null) => {
+    setEfficiencyModalTitle(title);
+    setEfficiencyModalData(projects);
+    setEfficiencyModalStats(stats);
     setShowEfficiencyModal(true);
-  };
+  }, []);
 
-  // Handle project click from modal
-  const handleProjectClick = (project) => {
+  // Handle opening DataTable modal
+  const handleOpenDataTable = useCallback((projects, title, stats = null) => {
+    setSelectedDataForTable(projects);
+    setModalTitle(title);
+    setShowDataTableModal(true);
+  }, []);
+
+  // Handle opening FitView modal
+  const handleOpenFitView = useCallback((project) => {
+    setSelectedProjectForFitView(project);
+    setShowFitViewModal(true);
+  }, []);
+
+  // Handle closing FitView modal
+  const handleCloseFitView = useCallback(() => {
+    setShowFitViewModal(false);
+    setSelectedProjectForFitView(null);
+  }, []);
+
+  // Handle project click from within DataTable or charts - always open FitView
+  const handleProjectClick = useCallback((project) => {
+    setShowDataTableModal(false);
     setShowEfficiencyModal(false);
-    onChartClick(project, 'project');
-  };
+    handleOpenFitView(project);
+  }, [handleOpenFitView]);
 
-  // Custom Tooltip
-  const CustomTooltip = ({ active, payload, label }) => {
+  // Custom Tooltip Component
+  const CustomTooltip = useCallback(({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
         <div className={`p-2 rounded-lg shadow-lg backdrop-blur-sm border ${
@@ -382,18 +401,73 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
             <div key={index} className="flex items-center gap-2 text-xs">
               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
               <span className="font-medium">{entry.name}:</span>
-              <span className="font-semibold">{entry.value}</span>
+              <span className="font-semibold">
+                {typeof entry.value === 'number' && (entry.name.includes('Budget') || entry.name.includes('budget'))
+                  ? formatAmount(entry.value)
+                  : entry.value}
+              </span>
             </div>
           ))}
         </div>
       );
     }
     return null;
-  };
+  }, [darkMode, formatAmount]);
 
-  // Efficiency Projects Modal using DataTable
-  const EfficiencyProjectsModal = () => {
-    if (!showEfficiencyModal || !selectedEfficiencyData) return null;
+  // DataTable Modal Component
+  const DataTableModal = useCallback(() => {
+    if (!showDataTableModal) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4">
+        <div 
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowDataTableModal(false)}
+        />
+        
+        <div className={`relative w-[90vw] max-w-[1600px] h-[85vh] ${
+          darkMode ? 'bg-gray-900' : 'bg-white'
+        } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
+          
+          <div className={`px-6 py-4 border-b ${
+            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-purple-500 to-blue-600'
+          }`}>
+            <div className="flex justify-between items-center">
+              <h2 className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                {modalTitle}
+              </h2>
+              <button
+                onClick={() => setShowDataTableModal(false)}
+                className={`p-2 rounded-lg ${
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-purple-700'
+                } transition-colors`}
+              >
+                <X size={18} className={darkMode ? 'text-gray-300' : 'text-white'} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-hidden">
+            <DataTable
+              data={selectedDataForTable}
+              darkMode={darkMode}
+              onRowClick={handleProjectClick}
+              compareMode={false}
+              selectedProjects={[]}
+              isEmbedded={true}
+              maxHeight="100%"
+              onRefreshData={onRefreshData}
+              databaseName={databaseName}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }, [showDataTableModal, darkMode, modalTitle, selectedDataForTable, handleProjectClick, onRefreshData, databaseName]);
+
+  // Efficiency Projects Modal Component
+  const EfficiencyProjectsModal = useCallback(() => {
+    if (!showEfficiencyModal) return null;
 
     return (
       <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4">
@@ -407,31 +481,42 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
         } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
           
           <div className={`px-6 py-4 border-b ${
-            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
+            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-purple-500 to-blue-600'
           }`}>
             <div className="flex justify-between items-center">
               <div>
                 <h2 className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
-                  {selectedEfficiencyData.title}
+                  {efficiencyModalTitle}
                 </h2>
-                <div className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
-                  Total Projects: <strong>{selectedEfficiencyData.projects.length}</strong>
-                  {selectedEfficiencyData.stats && (
-                    <>
-                      {selectedEfficiencyData.stats.avgEfficiency && (
-                        <span className="ml-4">Avg Efficiency: <strong>{selectedEfficiencyData.stats.avgEfficiency}%</strong></span>
-                      )}
-                      {selectedEfficiencyData.stats.totalBudget && (
-                        <span className="ml-4">Total Budget: <strong>₹{(selectedEfficiencyData.stats.totalBudget / 100).toFixed(2)} Cr</strong></span>
-                      )}
-                    </>
-                  )}
-                </div>
+                {efficiencyModalStats && (
+                  <div className="flex items-center gap-4 mt-2 text-sm">
+                    {efficiencyModalStats.avgEfficiency && (
+                      <span className="text-white/90">
+                        Avg Efficiency: {efficiencyModalStats.avgEfficiency}%
+                      </span>
+                    )}
+                    {efficiencyModalStats.totalBudget && (
+                      <span className="text-white/90">
+                        Total Budget: {formatAmount(efficiencyModalStats.totalBudget)}
+                      </span>
+                    )}
+                    {efficiencyModalStats.excellentRate && (
+                      <span className="text-white/90">
+                        Excellent Rate: {efficiencyModalStats.excellentRate}%
+                      </span>
+                    )}
+                    {efficiencyModalStats.poorRate && (
+                      <span className="text-white/90">
+                        Poor Rate: {efficiencyModalStats.poorRate}%
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => setShowEfficiencyModal(false)}
                 className={`p-2 rounded-lg ${
-                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-purple-700'
                 } transition-colors`}
               >
                 <X size={18} className={darkMode ? 'text-gray-300' : 'text-white'} />
@@ -439,64 +524,23 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
             </div>
           </div>
 
-          {selectedEfficiencyData.stats && Object.keys(selectedEfficiencyData.stats).length > 0 && (
-            <div className={`px-6 py-3 border-b ${darkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'}`}>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {selectedEfficiencyData.stats.excellent !== undefined && (
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 uppercase">Excellent</p>
-                    <p className="text-base font-bold text-green-600">{selectedEfficiencyData.stats.excellent}</p>
-                  </div>
-                )}
-                {selectedEfficiencyData.stats.good !== undefined && (
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 uppercase">Good</p>
-                    <p className="text-base font-bold text-blue-600">{selectedEfficiencyData.stats.good}</p>
-                  </div>
-                )}
-                {selectedEfficiencyData.stats.average !== undefined && (
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 uppercase">Average</p>
-                    <p className="text-base font-bold text-yellow-600">{selectedEfficiencyData.stats.average}</p>
-                  </div>
-                )}
-                {selectedEfficiencyData.stats.poor !== undefined && (
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 uppercase">Poor</p>
-                    <p className="text-base font-bold text-red-600">{selectedEfficiencyData.stats.poor}</p>
-                  </div>
-                )}
-                {selectedEfficiencyData.stats.avgProgress !== undefined && (
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 uppercase">Avg Progress</p>
-                    <p className="text-base font-bold">{selectedEfficiencyData.stats.avgProgress}%</p>
-                  </div>
-                )}
-                {selectedEfficiencyData.stats.avgBudgetUsed !== undefined && (
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 uppercase">Budget Used</p>
-                    <p className="text-base font-bold">{selectedEfficiencyData.stats.avgBudgetUsed}%</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           <div className="flex-1 overflow-hidden">
             <DataTable
-              data={selectedEfficiencyData.projects}
+              data={efficiencyModalData}
               darkMode={darkMode}
               onRowClick={handleProjectClick}
               compareMode={false}
               selectedProjects={[]}
               isEmbedded={true}
               maxHeight="100%"
+              onRefreshData={onRefreshData}
+              databaseName={databaseName}
             />
           </div>
         </div>
       </div>
     );
-  };
+  }, [showEfficiencyModal, darkMode, efficiencyModalTitle, efficiencyModalData, efficiencyModalStats, handleProjectClick, formatAmount, onRefreshData, databaseName]);
 
   return (
     <div className="space-y-6">
@@ -523,10 +567,9 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
               key={index}
               className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:scale-105`}
               style={{ borderColor: item.color, backgroundColor: item.color + '10' }}
-              onClick={() => handleEfficiencyClick(
-                `${item.label} Efficiency Projects (${item.count})`,
+              onClick={() => handleOpenDataTable(
                 item.projects || [],
-                { avgEfficiency: efficiencyData.overallEfficiency.avgScore }
+                `${item.label} Efficiency Projects (${item.count})`
               )}
             >
               <div className="text-xl font-bold" style={{ color: item.color }}>{item.count}</div>
@@ -536,7 +579,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
           ))}
         </div>
       </div>
-
+      
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Efficiency Distribution */}
         <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
@@ -557,7 +600,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
                       handleEfficiencyClick(
                         `Efficiency Range: ${range.range} (${range.count} projects)`,
                         range.projects,
-                        { totalBudget: range.budget * 100 }
+                        { totalBudget: range.budget }
                       );
                     }
                   }
@@ -621,10 +664,11 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
               <Scatter 
                 name="Projects" 
                 data={efficiencyData.efficiencyCorrelation}
-                onClick={(data) => onChartClick(data, 'project')}
+                onClick={(data) => handleOpenFitView(data)}
+                style={{ cursor: 'pointer' }}
               >
                 {efficiencyData.efficiencyCorrelation.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} style={{ cursor: 'pointer' }} />
+                  <Cell key={`cell-${index}`} fill={entry.fill} />
                 ))}
               </Scatter>
             </ScatterChart>
@@ -742,7 +786,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
                       contractor.projectList,
                       { 
                         avgEfficiency: contractor.avgEfficiency,
-                        totalBudget: contractor.totalBudget * 100
+                        totalBudget: contractor.totalBudget
                       }
                     );
                   }
@@ -757,7 +801,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
               <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Bar yAxisId="left" dataKey="avgEfficiency" fill="#06b6d4" name="Avg Efficiency %" style={{ cursor: 'pointer' }} />
               <Bar yAxisId="left" dataKey="projects" fill="#94a3b8" name="Projects" />
-              <Line yAxisId="right" type="monotone" dataKey="totalBudget" stroke="#f97316" name="Budget (Cr)" strokeWidth={2} />
+              <Line yAxisId="right" type="monotone" dataKey="totalBudget" stroke="#f97316" name="Budget (L)" strokeWidth={2} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -783,7 +827,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
                 className={`p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.02] ${
                   darkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50'
                 }`}
-                onClick={() => onChartClick(project, 'project')}
+                onClick={() => handleOpenFitView(project)}
               >
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-semibold truncate flex-1 text-gray-900 dark:text-gray-100">{project.project}</span>
@@ -792,7 +836,11 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
                 <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
                   <div className="text-gray-700 dark:text-gray-300">Progress: {project.progress}%</div>
                   <div className="text-gray-700 dark:text-gray-300">Budget: {project.budgetUsed}%</div>
-                  <div className="text-gray-700 dark:text-gray-300">₹{project.budget} Cr</div>
+                  <div className="text-gray-700 dark:text-gray-300">{formatAmount(project.budget)}</div>
+                </div>
+                <div className="mt-1 text-xs text-gray-500 flex items-center gap-1">
+                  <Eye size={10} />
+                  Click for detailed analytics
                 </div>
               </div>
             ))}
@@ -800,7 +848,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
           <button
             onClick={() => {
               const allTopPerformers = data
-                .filter(d => d.sanctioned_amount > 100)
+                .filter(d => d.sd_amount_lakh > 10)
                 .sort((a, b) => b.efficiency_score - a.efficiency_score)
                 .slice(0, 50);
               handleEfficiencyClick('All Top Performing Projects', allTopPerformers);
@@ -827,7 +875,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
                 className={`p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.02] ${
                   darkMode ? 'border-red-800 bg-red-900/20' : 'border-red-200 bg-red-50'
                 }`}
-                onClick={() => onChartClick(project, 'project')}
+                onClick={() => handleOpenFitView(project)}
               >
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-semibold truncate flex-1 text-gray-900 dark:text-gray-100">{project.project}</span>
@@ -837,11 +885,15 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
                   <div className="grid grid-cols-3 gap-2">
                     <div className="text-gray-700 dark:text-gray-300">Progress: {project.progress}%</div>
                     <div className="text-gray-700 dark:text-gray-300">Budget: {project.budgetUsed}%</div>
-                    <div className="text-gray-700 dark:text-gray-300">₹{project.budget} Cr</div>
+                    <div className="text-gray-700 dark:text-gray-300">{formatAmount(project.budget)}</div>
                   </div>
                   {project.issues && (
                     <div className="mt-1 text-red-600">Issues: {project.issues}</div>
                   )}
+                </div>
+                <div className="mt-1 text-xs text-gray-500 flex items-center gap-1">
+                  <Eye size={10} />
+                  Click for detailed analytics
                 </div>
               </div>
             ))}
@@ -849,7 +901,7 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
           <button
             onClick={() => {
               const allBottomPerformers = data
-                .filter(d => d.sanctioned_amount > 100)
+                .filter(d => d.sd_amount_lakh > 10)
                 .sort((a, b) => a.efficiency_score - b.efficiency_score)
                 .slice(0, 50);
               handleEfficiencyClick('All Low Efficiency Projects', allBottomPerformers);
@@ -1064,8 +1116,8 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
               <IndianRupee size={14} className="text-orange-500" />
             </div>
             <p className="text-xl font-bold text-orange-500">
-              ₹{(data.filter(d => d.efficiency_score < 60)
-                .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100).toFixed(2)} Cr
+              {formatAmount(data.filter(d => d.efficiency_score < 60)
+                .reduce((sum, d) => sum + (d.sd_amount_lakh || 0), 0))}
             </p>
             <p className="text-xs text-gray-500 mt-1">
               In low efficiency projects
@@ -1074,8 +1126,16 @@ const EfficiencyMetrics = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
       </div>
 
-      {/* Efficiency Projects Modal */}
+      {/* Modals */}
       <EfficiencyProjectsModal />
+      <DataTableModal />
+      
+      <FitViewModal
+        row={selectedProjectForFitView}
+        isOpen={showFitViewModal}
+        onClose={handleCloseFitView}
+        darkMode={darkMode}
+      />
     </div>
   );
 };

@@ -9,10 +9,8 @@ import {
   CalendarDays, CalendarClock, CalendarCheck, CalendarX,
   GitBranch, Layers, Navigation, Globe, Heart, PlayCircle,
   XCircle, BarChart3, PieChart, LineChart, Percent, TrendingDown,
-  Cross,
-  EyeClosed,
-  Table,
-  ShieldCloseIcon
+  Cross, EyeClosed, Table, ShieldCloseIcon, Database,
+  Folder, Archive, Edit, DollarSign
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -23,7 +21,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
   const reportRef = useRef(null);
   const cachedImageRef = useRef(null);
 
-  // Clean and process project data
+  // Clean and process project data - using config.js column names
   const cleanProjectData = (data) => {
     if (!data) return {};
     
@@ -43,7 +41,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
 
   const project = cleanProjectData(projectData);
 
-  // Calculate Time Allowed
+  // Calculate Time Allowed = PDC Agreement - Award Date - 10
   const calculateTimeAllowed = useCallback((row) => {
     if (!row.award_date || row.award_date === '' || row.award_date === 'N/A') {
       return { days: 0, formatted: 'N/A', status: 'not_started' };
@@ -58,19 +56,18 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
       let targetDate = null;
       let dateType = 'none';
       
-      if (row.revised_pdc && row.revised_pdc !== '' && row.revised_pdc !== 'N/A') {
-        targetDate = new Date(row.revised_pdc);
+      // Check for revised PDC first
+      if (row.pdc_revised && row.pdc_revised !== '' && row.pdc_revised !== 'N/A') {
+        targetDate = new Date(row.pdc_revised);
         dateType = 'revised';
         if (isNaN(targetDate.getTime())) targetDate = null;
       }
       
-      if (!targetDate && (row.pdc_agreement || row.pdc_agreement_1)) {
-        const pdcValue = row.pdc_agreement || row.pdc_agreement_1;
-        if (pdcValue && pdcValue !== '' && pdcValue !== 'N/A') {
-          targetDate = new Date(pdcValue);
-          dateType = 'original';
-          if (isNaN(targetDate.getTime())) targetDate = null;
-        }
+      // Check for PDC agreement
+      if (!targetDate && row.pdc_agreement && row.pdc_agreement !== '' && row.pdc_agreement !== 'N/A') {
+        targetDate = new Date(row.pdc_agreement);
+        dateType = 'original';
+        if (isNaN(targetDate.getTime())) targetDate = null;
       }
 
       if (!targetDate) {
@@ -85,8 +82,11 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
       }
 
       const diffTime = targetDate - awardDate;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      const formatString = `${Math.abs(diffDays)} days (${dateType === 'revised' ? 'Revised PDC' : 'PDC'})`;
+      let diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      // Subtract 10 days as per requirement
+      diffDays = diffDays - 10;
+      
+      const formatString = `${Math.abs(diffDays)} days${dateType === 'revised' ? ' (Revised)' : ''}`;
       
       return {
         days: diffDays,
@@ -100,7 +100,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
     }
   }, []);
 
-  // Calculate Expected Progress
+  // Calculate Expected Progress with monthly rate logic
   const calculateExpectedProgress = useCallback((row) => {
     if (!row.award_date || row.award_date === '' || row.award_date === 'N/A') {
       return 0;
@@ -113,13 +113,11 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
       const today = new Date();
       let pdcDate = null;
       
-      if (row.revised_pdc && row.revised_pdc !== '' && row.revised_pdc !== 'N/A') {
-        pdcDate = new Date(row.revised_pdc);
-      } else if (row.pdc_agreement || row.pdc_agreement_1) {
-        const pdcValue = row.pdc_agreement || row.pdc_agreement_1;
-        if (pdcValue && pdcValue !== '' && pdcValue !== 'N/A') {
-          pdcDate = new Date(pdcValue);
-        }
+      // Check revised PDC first if available
+      if (row.pdc_revised && row.pdc_revised !== '' && row.pdc_revised !== 'N/A') {
+        pdcDate = new Date(row.pdc_revised);
+      } else if (row.pdc_agreement && row.pdc_agreement !== '' && row.pdc_agreement !== 'N/A') {
+        pdcDate = new Date(row.pdc_agreement);
       }
       
       if (!pdcDate || isNaN(pdcDate.getTime())) {
@@ -154,11 +152,67 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
     }
   }, []);
 
-  // Get Progress Status Display
+  // Get Progress Status Display with proper pace calculation
   const getProgressStatusDisplay = useCallback((row) => {
-    const progress = parseFloat(row.physical_progress) || 0;
-    const category = row.progress_category || row.current_status || '';
-    const healthStatus = row.health_status || '';
+    const progress = parseFloat(row.physical_progress_percent) || 0;
+    
+    // Determine category based on progress
+    let category = 'UNKNOWN';
+    if (!row.tender_date || row.tender_date === '') {
+      category = 'TENDER_PROGRESS';
+    } else if (row.tender_date && (!row.award_date || row.award_date === '')) {
+      category = 'TENDERED_NOT_AWARDED';
+    } else if (row.award_date && progress === 0) {
+      category = 'AWARDED_NOT_STARTED';
+    } else if (progress === 0) {
+      category = 'NOT_STARTED';
+    } else if (progress > 0 && progress <= 50) {
+      category = 'PROGRESS_1_TO_50';
+    } else if (progress > 50 && progress <= 71) {
+      category = 'PROGRESS_51_TO_71';
+    } else if (progress > 71 && progress < 100) {
+      category = 'PROGRESS_71_TO_99';
+    } else if (progress >= 100) {
+      category = 'COMPLETED';
+    }
+    
+    // Calculate health status with monthly rate logic
+    const expectedProgress = calculateExpectedProgress(row);
+    let healthStatus = 'NOT_APPLICABLE';
+    
+    if (progress >= 100 && parseFloat(row.expenditure_percent) < 100) {
+      healthStatus = 'PAYMENT_PENDING';
+    } else if (row.award_date) {
+      const progressDiff = progress - expectedProgress;
+      
+      // Calculate monthly rate for proper pace determination
+      const awardDate = new Date(row.award_date);
+      const today = new Date();
+      const elapsedMonths = Math.max(0, (today - awardDate) / (1000 * 60 * 60 * 24 * 30.44));
+      
+      let pdcDate = null;
+      if (row.pdc_revised && row.pdc_revised !== '' && row.pdc_revised !== 'N/A') {
+        pdcDate = new Date(row.pdc_revised);
+      } else if (row.pdc_agreement && row.pdc_agreement !== '' && row.pdc_agreement !== 'N/A') {
+        pdcDate = new Date(row.pdc_agreement);
+      }
+      
+      if (pdcDate && !isNaN(pdcDate.getTime())) {
+        const totalMonths = Math.max(1, (pdcDate - awardDate) / (1000 * 60 * 60 * 24 * 30.44));
+        const monthlyRate = 100 / totalMonths;
+        const monthsBehind = progressDiff / monthlyRate;
+        
+        if (monthsBehind >= -0.25) {
+          healthStatus = 'PERFECT_PACE';
+        } else if (monthsBehind >= -1) {
+          healthStatus = 'SLOW_PACE';
+        } else if (monthsBehind >= -2) {
+          healthStatus = 'BAD_PACE';
+        } else {
+          healthStatus = 'SLEEP_PACE';
+        }
+      }
+    }
     
     const categoryMap = {
       'TENDER_PROGRESS': { label: 'Tender in Progress', color: 'text-gray-600', icon: FileText },
@@ -192,7 +246,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
       secondary: healthInfo,
       progress: progress
     };
-  }, []);
+  }, [calculateExpectedProgress]);
 
   // Process all calculated fields
   const processedProject = {
@@ -204,7 +258,18 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
 
   // Format functions
   const formatAmount = (value) => {
-    const amount = parseFloat(value) || 0;
+    // Handle various input types
+    if (value === null || value === undefined || value === '') return '₹0 L';
+    
+    let amount = 0;
+    if (typeof value === 'string') {
+      // Remove any currency symbols or commas
+      const cleanValue = value.replace(/[₹,]/g, '').trim();
+      amount = parseFloat(cleanValue) || 0;
+    } else {
+      amount = parseFloat(value) || 0;
+    }
+    
     if (amount >= 100) {
       return `₹${(amount / 100).toFixed(2)} Cr`;
     }
@@ -231,36 +296,124 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
     return `${num.toFixed(1)}%`;
   };
 
-  // Calculate metrics
+  // Calculate metrics based on config.js column names
   const calculateMetrics = () => {
-    const physicalProgress = parseFloat(project.physical_progress) || 0;
-    const efficiency = parseFloat(project.efficiency_score) || 0;
-    const delayDays = parseInt(project.delay_days) || 0;
-    const sanctionedAmount = parseFloat(project.sd_amount_lakh) || parseFloat(project.sanctioned_amount) || 0;
-    const totalExpdr = parseFloat(project.expenditure_total) || parseFloat(project.total_expdr) || 0;
-    const percentExpdr = parseFloat(project.expenditure_percent?.replace('%', '')) || parseFloat(project.percent_expdr) || 0;
-    const remainingAmount = sanctionedAmount - totalExpdr;
+    // Using proper column names from config.js
+    const physicalProgress = parseFloat(project.physical_progress_percent) || 0;
     
-    let timeElapsed = 0;
-    if (project.award_date && project.award_date !== 'N/A') {
-      const awardDate = new Date(project.award_date);
-      const today = new Date();
-      timeElapsed = Math.floor((today - awardDate) / (1000 * 60 * 60 * 24));
+    // Financial fields from config.js
+    const sanctionedAmount = parseFloat(project.sd_amount_lakh) || 0;
+    
+    // Calculate total expenditure from config columns
+    const previousFY = parseFloat(project.expenditure_previous_fy) || 0;
+    const currentFY = parseFloat(project.expenditure_current_fy) || 0;
+    const totalExpdr = parseFloat(project.expenditure_total) || previousFY + currentFY;
+    
+    const percentExpdr = parseFloat(project.expenditure_percent) || 
+                        (sanctionedAmount > 0 ? (totalExpdr / sanctionedAmount * 100) : 0);
+    
+    const remainingAmount = sanctionedAmount - totalExpdr;
+    const timeAllowedDays = parseFloat(project.time_allowed_days) || 0;
+    
+    // Calculate delay days based on PDC dates
+    let delayDays = 0;
+    if (physicalProgress < 100) {
+      const pdcDate = project.pdc_revised || project.pdc_agreement;
+      if (pdcDate && pdcDate !== '' && pdcDate !== 'N/A') {
+        try {
+          const pdc = new Date(pdcDate);
+          const today = new Date();
+          if (!isNaN(pdc.getTime()) && today > pdc) {
+            delayDays = Math.ceil((today - pdc) / (1000 * 60 * 60 * 24));
+          }
+        } catch (e) {
+          console.warn('Error calculating delay:', e);
+        }
+      }
     }
     
-    const healthStatus = project.health_status || 'NOT_APPLICABLE';
-    const healthStatusMap = {
-      'PERFECT_PACE': { label: 'Perfect Pace', color: 'green', icon: Zap },
-      'SLOW_PACE': { label: 'Slow Pace', color: 'yellow', icon: Timer },
-      'BAD_PACE': { label: 'Bad Pace', color: 'orange', icon: AlertTriangle },
-      'SLEEP_PACE': { label: 'Sleep Pace', color: 'red', icon: PauseCircle },
-      'PAYMENT_PENDING': { label: 'Payment Pending', color: 'amber', icon: CreditCard },
-      'NOT_APPLICABLE': { label: 'Not Applicable', color: 'gray', icon: Info }
-    };
+    // Calculate time elapsed from award date
+    let timeElapsed = 0;
+    if (project.award_date && project.award_date !== '' && project.award_date !== 'N/A') {
+      try {
+        const awardDate = new Date(project.award_date);
+        const today = new Date();
+        if (!isNaN(awardDate.getTime())) {
+          timeElapsed = Math.floor((today - awardDate) / (1000 * 60 * 60 * 24));
+        }
+      } catch (e) {
+        console.warn('Error calculating time elapsed:', e);
+      }
+    }
     
-    const paceStatus = healthStatusMap[healthStatus] || healthStatusMap['NOT_APPLICABLE'];
+    // Determine health status based on monthly progress pace
+    const expectedProgress = processedProject.expected_progress || 0;
+    let healthStatus = 'Not Applicable';
+    let paceStatus = { label: 'Not Applicable', color: 'gray', icon: Info };
     
-    const riskLevel = project.risk_level || 'LOW';
+    if (project.award_date && project.award_date !== '' && project.award_date !== 'N/A') {
+      if (physicalProgress >= 100 && percentExpdr < 100) {
+        healthStatus = 'Payment Pending';
+        paceStatus = { label: 'Payment Pending', color: 'amber', icon: CreditCard };
+      } else if (expectedProgress > 0) {
+        const progressDifference = physicalProgress - expectedProgress;
+        
+        // Calculate monthly rate for pace determination
+        const awardDate = new Date(project.award_date);
+        const today = new Date();
+        const elapsedMonths = Math.max(0, (today - awardDate) / (1000 * 60 * 60 * 24 * 30.44));
+        
+        let pdcDate = null;
+        if (project.pdc_revised) {
+          pdcDate = new Date(project.pdc_revised);
+        } else if (project.pdc_agreement) {
+          pdcDate = new Date(project.pdc_agreement);
+        }
+        
+        if (pdcDate && !isNaN(pdcDate.getTime())) {
+          const totalMonths = Math.max(1, (pdcDate - awardDate) / (1000 * 60 * 60 * 24 * 30.44));
+          const monthlyRate = 100 / totalMonths;
+          const monthsBehind = progressDifference / monthlyRate;
+          
+          if (monthsBehind >= -0.25) {
+            healthStatus = 'Perfect Pace';
+            paceStatus = { label: 'Perfect Pace', color: 'green', icon: Zap };
+          } else if (monthsBehind >= -1) {
+            healthStatus = 'Slow Pace';
+            paceStatus = { label: 'Slow Pace', color: 'yellow', icon: Timer };
+          } else if (monthsBehind >= -2) {
+            healthStatus = 'Bad Pace';
+            paceStatus = { label: 'Bad Pace', color: 'orange', icon: AlertTriangle };
+          } else {
+            healthStatus = 'Sleep Pace';
+            paceStatus = { label: 'Sleep Pace', color: 'red', icon: PauseCircle };
+          }
+        }
+      }
+    }
+    
+    // Calculate efficiency score (progress vs expenditure)
+    let efficiency = 0;
+    if (percentExpdr > 0) {
+      efficiency = Math.min(100, (physicalProgress / percentExpdr) * 100);
+    } else if (physicalProgress > 0) {
+      efficiency = 100;
+    }
+    
+    // Determine risk level based on multiple factors
+    let riskLevel = 'LOW';
+    if ((delayDays > 90 && physicalProgress < 50) || 
+        (physicalProgress < 25 && timeElapsed > 120) ||
+        (efficiency < 30 && delayDays > 60)) {
+      riskLevel = 'CRITICAL';
+    } else if (delayDays > 90 || efficiency < 50 || 
+               (physicalProgress < 50 && timeElapsed > 90)) {
+      riskLevel = 'HIGH';
+    } else if (delayDays > 30 || efficiency < 70 ||
+               (physicalProgress < expectedProgress - 20)) {
+      riskLevel = 'MEDIUM';
+    }
+    
     const riskColor = {
       'CRITICAL': 'red',
       'HIGH': 'orange', 
@@ -268,22 +421,28 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
       'LOW': 'green'
     }[riskLevel] || 'gray';
 
-    const budgetVariance = sanctionedAmount > 0 
-      ? ((totalExpdr - sanctionedAmount) / sanctionedAmount * 100)
-      : 0;
+    // Calculate budget variance
+    let budgetVariance = 0;
+    if (sanctionedAmount > 0) {
+      budgetVariance = ((totalExpdr - sanctionedAmount) / sanctionedAmount * 100);
+    }
 
+    // Calculate monthly burn rate
     let monthlyBurnRate = 0;
-    if (project.award_date && timeElapsed > 0) {
+    if (timeElapsed > 0) {
       const monthsElapsed = Math.max(1, Math.floor(timeElapsed / 30));
       monthlyBurnRate = totalExpdr / monthsElapsed;
     }
 
+    // Return all calculated metrics
     return {
       physicalProgress,
       efficiency,
       delayDays,
       sanctionedAmount,
       totalExpdr,
+      currentFY,
+      previousFY,
       percentExpdr,
       remainingAmount,
       paceStatus,
@@ -291,10 +450,11 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
       riskColor,
       healthStatus,
       timeElapsed,
+      timeAllowedDays,
       budgetVariance,
       monthlyBurnRate,
-      expectedProgress: processedProject.expected_progress,
-      progressDifference: physicalProgress - processedProject.expected_progress
+      expectedProgress: processedProject.expected_progress || 0,
+      progressDifference: physicalProgress - (processedProject.expected_progress || 0)
     };
   };
 
@@ -344,7 +504,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
       cachedImageRef.current = canvas;
 
       const link = document.createElement('a');
-      link.download = `Report_${project.serial_no || project.s_no}_${Date.now()}.png`;
+      link.download = `Report_${project.s_no || 'unknown'}_${Date.now()}.png`;
       link.href = canvas.toDataURL('image/png', 1.0);
       link.click();
     } catch (error) {
@@ -353,7 +513,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
     } finally {
       setExporting(false);
     }
-  }, [project.serial_no, project.s_no]);
+  }, [project.s_no]);
 
   // Export as PDF using PNG
   const exportPDF = useCallback(async () => {
@@ -387,7 +547,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
       
       pdf.addImage(imgData, 'PNG', xOffset, yOffset, scaledWidth, scaledHeight);
       
-      pdf.save(`Report_${project.serial_no || project.s_no}_${Date.now()}.pdf`);
+      pdf.save(`Report_${project.s_no || 'unknown'}_${Date.now()}.pdf`);
       
       cachedImageRef.current = null;
     } catch (error) {
@@ -396,7 +556,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
     } finally {
       setExporting(false);
     }
-  }, [project.serial_no, project.s_no]);
+  }, [project.s_no]);
 
   // Print using PNG
   const handlePrint = useCallback(async () => {
@@ -418,7 +578,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
         <!DOCTYPE html>
         <html>
           <head>
-            <title>Print Report - ${project.serial_no || project.s_no}</title>
+            <title>Print Report - ${project.s_no || 'unknown'}</title>
             <style>
               @media print {
                 @page {
@@ -446,7 +606,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                background: #ffffffff;
+                background: #ffffff;
               }
               img {
                 max-width: 100%;
@@ -469,7 +629,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
     } finally {
       setExporting(false);
     }
-  }, [project.serial_no, project.s_no]);
+  }, [project.s_no]);
 
   // Get status color class
   const getStatusColor = (value, type) => {
@@ -523,8 +683,8 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
               <FileText size={16} />
             </div>
             <div>
-              <h1>{project.scheme_name_1 || project.scheme_name || 'Project Report'}</h1>
-              <p>S.No: {project.serial_no || project.s_no} | {formatDate(new Date())}</p>
+              <h1>{project.name_of_scheme || project.sub_scheme_name || 'Project Report'}</h1>
+              <p>S.No: {project.s_no} | {formatDate(new Date())}</p>
             </div>
           </div>
           
@@ -595,10 +755,12 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
             <div className='flag-divider'>
 
             </div>
-            <h2>{project.scheme_name_1 || project.scheme_name}</h2>
+            <div className="scheme-title-section">
+              <h2>{project.name_of_scheme || project.sub_scheme_name || 'Project Name Not Available'}</h2>
+            </div>
             <div className="project-meta">
-              <span><Hash size={12} /> {project.serial_no || project.s_no}</span>
-              <span><MapPin size={12} /> {project.work_site}</span>
+              <span><Hash size={12} /> {project.s_no}</span>
+              <span><MapPin size={12} /> {project.location || 'N/A'}</span>
               <span><Building2 size={12} /> {project.executive_agency}</span>
               <span><Users size={12} /> {project.firm_name}</span>
             </div>
@@ -627,7 +789,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
                 <IndianRupee size={14} />
                 <span>Budget Used</span>
               </div>
-              <div className="metric-value text-green-600">
+              <div className={`metric-value text-green-600`}>
                 {formatPercentage(metrics.percentExpdr)}
               </div>
               <div className="metric-subtitle">
@@ -663,61 +825,74 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
             </div>
           </div>
 
-          {/* Detailed Information Grid */}
+          {/* Comprehensive Details Grid - All Fields */}
           <div className="details-grid">
-            {/* Basic Information */}
+            {/* Basic Information - Complete */}
             <div className="detail-card">
-              <h3><FileText size={12} /> Basic Information</h3>
+              <h3><FileText size={12} /> Complete Basic Information</h3>
               <div className="detail-items">
                 {[
-                  ['Serial No', project.serial_no || project.s_no],
-                  ['Budget Head', project.budget_head],
+                  ['Serial No', project.s_no],
                   ['Source Sheet', project.source_sheet],
-                  ['Scheme Name', project.scheme_name_1 || project.scheme_name],
-                  ['AA/ES Ref', project.aa_es_reference],
-                  ['Location', project.location]
-                ].filter(([_, value]) => value && value !== 'N/A').map(([label, value]) => (
+                  ['Budget Head', project.budget_head],
+                  ['Scheme Name', project.name_of_scheme],
+                  ['Sub Scheme', project.sub_scheme_name],
+                  ['AA/ES Reference', project.aa_es_reference],
+                  ['Created At', formatDate(project.created_at)],
+                  ['Updated At', formatDate(project.updated_at)]
+                ].filter(([_, value]) => value !== null && value !== undefined && value !== '').map(([label, value]) => (
                   <div key={label} className="detail-item">
                     <span className="detail-label">{label}:</span>
-                    <span className="detail-value">{value}</span>
+                    <span className="detail-value detail-value-wrap">{value}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Location & Organizations */}
+            {/* Location & Organizations - Complete */}
             <div className="detail-card">
-              <h3><MapPin size={12} /> Location & Organizations</h3>
+              <h3><MapPin size={12} /> Complete Location & Organizations</h3>
               <div className="detail-items">
                 {[
-                  ['Frontier HQ', project.ftr_hq],
-                  ['Sector HQ', project.shq],
-                  ['Work Site', project.work_site],
+                  ['Frontier HQ', project.ftr_hq_name],
+                  ['Sector HQ', project.shq_name],
+                  ['Location', project.location],
                   ['Executive Agency', project.executive_agency],
-                  ['Contractor', project.firm_name]
-                ].filter(([_, value]) => value && value !== 'N/A').map(([label, value]) => (
+                  ['Firm Name', project.firm_name]
+                ].filter(([_, value]) => value && value !== 'N/A' && value !== '').map(([label, value]) => (
                   <div key={label} className="detail-item">
                     <span className="detail-label">{label}:</span>
-                    <span className="detail-value">{value}</span>
+                    <span className="detail-value detail-value-wrap">{value}</span>
                   </div>
                 ))}
+                {/* Work Description - Full Text */}
+                {project.work_description && (
+                  <div className="detail-item detail-item-full">
+                    <span className="detail-label">Work Description:</span>
+                    <span className="detail-value detail-value-wrap detail-value-multiline">
+                      {project.work_description}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Financial Details */}
+            {/* Complete Financial Details */}
             <div className="detail-card">
-              <h3><IndianRupee size={12} /> Financial Details</h3>
+              <h3><IndianRupee size={12} /> Complete Financial Analysis</h3>
               <div className="detail-items">
                 {[
                   ['Sanctioned Amount', formatAmount(metrics.sanctionedAmount)],
-                  ['Expenditure (Previous FY)', formatAmount(project.expenditure_previous_fy)],
-                  ['Current FY Expenditure', formatAmount(project.expenditure_current_fy)],
+                  ['Previous FY Expenditure', formatAmount(metrics.previousFY)],
+                  ['Current FY Expenditure', formatAmount(metrics.currentFY)],
                   ['Total Expenditure', formatAmount(metrics.totalExpdr)],
                   ['Remaining Amount', formatAmount(metrics.remainingAmount)],
-                  ['Utilization', formatPercentage(metrics.percentExpdr)],
-                  ['Budget Variance', `${metrics.budgetVariance.toFixed(1)}%`],
-                  ['Monthly Burn Rate', formatAmount(metrics.monthlyBurnRate)]
-                ].map(([label, value]) => (
+                  ['Utilization %', formatPercentage(metrics.percentExpdr)],
+                  ['Budget Variance', metrics.budgetVariance !== 0 ? `${metrics.budgetVariance.toFixed(2)}%` : null],
+                  ['Monthly Burn Rate', metrics.monthlyBurnRate > 0 ? formatAmount(metrics.monthlyBurnRate) : null],
+                  ['Cost per Progress %', metrics.physicalProgress > 0 ? formatAmount(metrics.totalExpdr / metrics.physicalProgress) : null],
+                  ['Projected Total Cost', metrics.physicalProgress > 0 ? formatAmount((metrics.totalExpdr / metrics.physicalProgress) * 100) : null]
+                ].filter(([_, value]) => value && value !== '₹0 L' && value !== '₹0.00 L' && value !== null).map(([label, value]) => (
                   <div key={label} className="detail-item">
                     <span className="detail-label">{label}:</span>
                     <span className="detail-value">{value}</span>
@@ -726,21 +901,26 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
               </div>
             </div>
 
-            {/* Timeline & Dates */}
+            {/* Complete Timeline & Dates */}
             <div className="detail-card">
-              <h3><Calendar size={12} /> Timeline & Dates</h3>
+              <h3><Calendar size={12} /> Complete Timeline & Dates</h3>
               <div className="detail-items">
                 {[
-                  ['Date TS', formatDate(project.ts_date)],
+                  ['TS Date', formatDate(project.ts_date)],
                   ['Tender Date', formatDate(project.tender_date)],
                   ['Acceptance Date', formatDate(project.acceptance_date)],
                   ['Award Date', formatDate(project.award_date)],
-                  ['PDC Agreement', formatDate(project.pdc_agreement || project.pdc_agreement_1)],
-                  ['Revised PDC', formatDate(project.revised_pdc)],
-                  ['Completion Date', formatDate(project.completion_date_actual)],
-                  ['Time Allowed', processedProject.calculated_time_allowed?.formatted || 'N/A'],
-                  ['Time Elapsed', `${metrics.timeElapsed} days`]
-                ].filter(([_, value]) => value && value !== 'N/A').map(([label, value]) => (
+                  ['PDC Agreement', formatDate(project.pdc_agreement)],
+                  ['PDC Revised', formatDate(project.pdc_revised)],
+                  ['Actual Completion', formatDate(project.completion_date_actual)],
+                  ['Time Allowed', processedProject.calculated_time_allowed?.formatted || 
+                                  (metrics.timeAllowedDays > 0 ? `${metrics.timeAllowedDays} days` : null)],
+                  ['Time Elapsed', metrics.timeElapsed > 0 ? `${metrics.timeElapsed} days` : null],
+                  ['Days Remaining', metrics.timeElapsed > 0 && metrics.timeAllowedDays > 0 ? 
+                                    `${Math.max(0, metrics.timeAllowedDays - metrics.timeElapsed)} days` : null],
+                  ['Project Duration', project.award_date && project.pdc_agreement ? 
+                                      `${Math.ceil((new Date(project.pdc_agreement) - new Date(project.award_date)) / (1000 * 60 * 60 * 24))} days` : null]
+                ].filter(([_, value]) => value && value !== 'N/A' && value !== null).map(([label, value]) => (
                   <div key={label} className="detail-item">
                     <span className="detail-label">{label}:</span>
                     <span className="detail-value">{value}</span>
@@ -749,9 +929,9 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
               </div>
             </div>
 
-            {/* Progress & Performance */}
+            {/* Complete Progress & Performance */}
             <div className="detail-card">
-              <h3><TrendingUp size={12} /> Progress & Performance</h3>
+              <h3><TrendingUp size={12} /> Complete Progress & Performance</h3>
               <div className="detail-items">
                 <div className="progress-section">
                   <div className="progress-item">
@@ -772,12 +952,26 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
                       <div className="progress-fill secondary" style={{ width: `${metrics.expectedProgress}%` }} />
                     </div>
                   </div>
+                  <div className="progress-item">
+                    <div className="progress-label">
+                      <span>Financial Progress</span>
+                      <span>{metrics.percentExpdr.toFixed(1)}%</span>
+                    </div>
+                    <div className="progress-bar small">
+                      <div className="progress-fill financial" style={{ width: `${metrics.percentExpdr}%` }} />
+                    </div>
+                  </div>
                 </div>
                 {[
                   ['Health Status', metrics.paceStatus.label],
+                  ['Current Status', project.current_status],
+                  ['Progress Category', processedProject.progress_status_display?.primary?.label],
+                  ['Progress Variance', `${metrics.progressDifference > 0 ? '+' : ''}${metrics.progressDifference.toFixed(1)}%`],
                   ['Efficiency Score', `${metrics.efficiency.toFixed(1)}%`],
-                  ['Current Status', project.current_status || project.status]
-                ].filter(([_, value]) => value && value !== 'N/A').map(([label, value]) => (
+                  ['Daily Progress Rate', metrics.timeElapsed > 0 ? `${(metrics.physicalProgress / metrics.timeElapsed).toFixed(3)}%` : null],
+                  ['Required Daily Rate', metrics.timeAllowedDays > metrics.timeElapsed ? 
+                                         `${((100 - metrics.physicalProgress) / (metrics.timeAllowedDays - metrics.timeElapsed)).toFixed(3)}%` : null]
+                ].filter(([_, value]) => value !== null && value !== undefined && value !== 'N/A').map(([label, value]) => (
                   <div key={label} className="detail-item">
                     <span className="detail-label">{label}:</span>
                     <span className="detail-value">{value}</span>
@@ -786,9 +980,9 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
               </div>
             </div>
 
-            {/* Risk Assessment */}
+            {/* Risk & Quality Assessment */}
             <div className="detail-card">
-              <h3><AlertTriangle size={12} /> Risk Assessment</h3>
+              <h3><AlertTriangle size={12} /> Risk & Quality Assessment</h3>
               <div className="detail-items">
                 <div className="detail-item">
                   <span className="detail-label">Risk Level:</span>
@@ -798,7 +992,10 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Priority:</span>
-                  <span className="detail-value">{project.priority || 'N/A'}</span>
+                  <span className="detail-value">{
+                    metrics.sanctionedAmount > 10000 || metrics.delayDays > 90 ? 'HIGH' :
+                    metrics.sanctionedAmount > 5000 || metrics.delayDays > 30 ? 'MEDIUM' : 'LOW'
+                  }</span>
                 </div>
                 {metrics.delayDays > 0 && (
                   <div className="detail-item">
@@ -808,15 +1005,37 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
                     </span>
                   </div>
                 )}
+                {metrics.progressDifference < -10 && (
+                  <div className="detail-item">
+                    <span className="detail-label">Progress Gap:</span>
+                    <span className="detail-value text-red-600">
+                      {Math.abs(metrics.progressDifference).toFixed(1)}% behind expected
+                    </span>
+                  </div>
+                )}
+                <div className="detail-item">
+                  <span className="detail-label">Quality Score:</span>
+                  <span className="detail-value">
+                    {Math.max(0, 100 - metrics.delayDays/10 - Math.abs(metrics.progressDifference)/2).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Completion Confidence:</span>
+                  <span className="detail-value">
+                    {metrics.physicalProgress >= 75 ? 'High' :
+                     metrics.physicalProgress >= 50 ? 'Medium' :
+                     metrics.physicalProgress >= 25 ? 'Low' : 'Very Low'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Remarks Section */}
-          {project.remarks && project.remarks !== 'N/A' && (
+          {/* Remarks Section - Full Text */}
+          {project.remarks && project.remarks !== 'N/A' && project.remarks !== '' && (
             <div className="remarks-section">
-              <h3><Info size={12} /> Remarks</h3>
-              <p>{project.remarks}</p>
+              <h3><Info size={12} /> Complete Remarks</h3>
+              <p className="remarks-text">{project.remarks}</p>
             </div>
           )}
 
@@ -870,7 +1089,6 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
           flex-direction: row;
         }
           
-
         .flag-divider {
           height: 3px;
           width: 100%;
@@ -924,7 +1142,6 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
           font-size: 8pt;
         }
         
-
         /* Header Styles */
         .report-header {
           position: sticky;
@@ -1060,11 +1277,24 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
           border-bottom: 2px solid #e5e7eb;
         }
 
+        .scheme-title-section {
+          margin: 1rem 0;
+          display: flex;
+          align-items: baseline;
+          gap: 0.75rem;
+        }
+
+        .scheme-label {
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #6b7280;
+        }
+
         .project-header h2 {
-          font-size: 1.75rem;
-          font-weight: 700;
+          font-size: 1.25rem;
+          font-weight: 600;
           color: #111827;
-          margin: 0 0 0.75rem 0;
+          margin: 0;
         }
 
         .project-meta {
@@ -1073,6 +1303,7 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
           gap: 1.6rem;
           font-size: 0.875rem;
           color: #6b7280;
+          margin-top: 1rem;
         }
 
         .project-meta span {
@@ -1143,6 +1374,10 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
           background: #de2358ff;
         }
 
+        .progress-fill.financial {
+          background: linear-gradient(to right, #10b981, #059669);
+        }
+
         .metric-subtitle {
           font-size: 0.75rem;
           color: #6b7280;
@@ -1184,10 +1419,18 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
           display: flex;
           justify-content: space-between;
           font-size: 0.75rem;
+          align-items: flex-start;
+        }
+
+        .detail-item-full {
+          flex-direction: column;
+          gap: 0.25rem;
         }
 
         .detail-label {
           color: #6b7280;
+          flex-shrink: 0;
+          min-width: 40%;
         }
 
         .detail-value {
@@ -1195,7 +1438,21 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
           color: #111827;
           text-align: right;
           max-width: 60%;
+        }
+
+        .detail-value-wrap {
+          word-wrap: break-word;
           word-break: break-word;
+          white-space: normal;
+          overflow-wrap: break-word;
+          hyphens: auto;
+        }
+
+        .detail-value-multiline {
+          text-align: left;
+          max-width: 100%;
+          margin-top: 0.25rem;
+          line-height: 1.4;
         }
 
         .progress-section {
@@ -1238,10 +1495,16 @@ const Report = ({ projectData, darkMode: initialDarkMode = false, isInModal = fa
           margin: 0 0 0.75rem 0;
         }
 
-        .remarks-section p {
+        .remarks-section p,
+        .remarks-text {
           font-size: 0.75rem;
           color: #4b5563;
           margin: 0;
+          word-wrap: break-word;
+          word-break: break-word;
+          white-space: pre-wrap;
+          overflow-wrap: break-word;
+          line-height: 1.5;
         }
 
         /* Summary Section */

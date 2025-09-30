@@ -14,6 +14,7 @@ import {
   Plus, Minus, Eye, Download, Settings, Info,
   CheckCircle, XCircle, Zap, Shield, Database
 } from 'lucide-react';
+import DataTable from '../DataTable';
 
 const COLORS = {
   primary: ['#f97316', '#3b82f6', '#10b981', '#a855f7', '#ec4899', '#06b6d4', '#eab308', '#ef4444'],
@@ -28,7 +29,14 @@ const COLORS = {
   ]
 };
 
-const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
+const Comparison = ({ 
+  data, 
+  darkMode, 
+  onChartClick, 
+  formatAmount = (val) => `₹${val}L`,
+  onRefreshData = () => {},
+  databaseName = 'engineering'
+}) => {
   // State for dynamic comparison
   const [comparisonType, setComparisonType] = useState('frontier');
   const [selectedItems, setSelectedItems] = useState([]);
@@ -37,22 +45,27 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
   const [showDetails, setShowDetails] = useState(true);
   const [timeRange, setTimeRange] = useState('all');
   const [aggregationType, setAggregationType] = useState('average');
+  
+  // State for DataTable modal
+  const [showDataTableModal, setShowDataTableModal] = useState(false);
+  const [selectedDataForTable, setSelectedDataForTable] = useState([]);
+  const [modalTitle, setModalTitle] = useState('');
 
-  // Extract unique values for comparison
+  // Extract unique values for comparison - updated to match actual data fields
   const uniqueValues = useMemo(() => {
     if (!data || data.length === 0) return {};
     
     return {
       frontiers: [...new Set([
-        ...data.map(d => d.ftr_hq).filter(Boolean),
-        ...data.map(d => d.shq).filter(Boolean)
+        ...data.map(d => d.ftr_hq_name).filter(Boolean),
+        ...data.map(d => d.shq_name).filter(Boolean)
       ])].sort(),
       budgetHeads: [...new Set(data.map(d => d.budget_head).filter(Boolean))].sort(),
       agencies: [...new Set(data.map(d => d.executive_agency).filter(Boolean))].sort(),
       contractors: [...new Set(data.map(d => d.firm_name).filter(Boolean))].sort(),
-      locations: [...new Set(data.map(d => d.work_site?.split(',')[0]?.trim()).filter(Boolean))].sort(),
+      locations: [...new Set(data.map(d => d.location).filter(Boolean))].sort(),
       riskLevels: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'],
-      statuses: ['COMPLETED', 'NEAR_COMPLETION', 'ADVANCED', 'IN_PROGRESS', 'INITIAL', 'NOT_STARTED']
+      statuses: ['COMPLETED', 'ON_TRACK', 'DELAYED', 'AT_RISK', 'NOT_STARTED']
     };
   }, [data]);
 
@@ -67,8 +80,8 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
       case 'riskLevel': return uniqueValues.riskLevels || [];
       case 'status': return uniqueValues.statuses || [];
       case 'project': return data?.slice(0, 50).map(d => ({ 
-        id: d.serial_no, 
-        name: d.scheme_name?.substring(0, 30) 
+        id: d.s_no || d.serial_no || d.id, 
+        name: (d.sub_scheme_name || d.name_of_scheme || 'Unknown').substring(0, 30)
       })) || [];
       default: return [];
     }
@@ -83,7 +96,31 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
     }
   }, [comparisonType, availableItems]);
 
-  // Process comparison data
+  // Helper function to determine project status based on data
+  const getProjectStatus = useCallback((project) => {
+    const progress = project.physical_progress_percent || 0;
+    const delay = project.delay_days || 0;
+    
+    if (progress >= 100) return 'COMPLETED';
+    if (delay > 30 || progress < 25) return 'AT_RISK';
+    if (delay > 0) return 'DELAYED';
+    if (progress > 0) return 'ON_TRACK';
+    return 'NOT_STARTED';
+  }, []);
+
+  // Helper function to determine risk level
+  const getProjectRiskLevel = useCallback((project) => {
+    const efficiency = project.efficiency_score || 0;
+    const delay = project.delay_days || 0;
+    const utilizationRate = project.expenditure_percent || 0;
+    
+    if (delay > 90 || efficiency < 30 || utilizationRate > 120) return 'CRITICAL';
+    if (delay > 30 || efficiency < 50 || utilizationRate > 100) return 'HIGH';
+    if (delay > 0 || efficiency < 70) return 'MEDIUM';
+    return 'LOW';
+  }, []);
+
+  // Process comparison data - updated field mappings
   const comparisonData = useMemo(() => {
     if (!data || selectedItems.length === 0) return [];
 
@@ -93,7 +130,7 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
       // Filter projects based on comparison type
       switch(comparisonType) {
         case 'frontier':
-          filteredProjects = data.filter(d => d.ftr_hq === item || d.shq === item);
+          filteredProjects = data.filter(d => d.ftr_hq_name === item || d.shq_name === item);
           break;
         case 'budgetHead':
           filteredProjects = data.filter(d => d.budget_head === item);
@@ -105,16 +142,18 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
           filteredProjects = data.filter(d => d.firm_name === item);
           break;
         case 'location':
-          filteredProjects = data.filter(d => d.work_site?.includes(item));
+          filteredProjects = data.filter(d => d.location === item);
           break;
         case 'riskLevel':
-          filteredProjects = data.filter(d => d.risk_level === item);
+          filteredProjects = data.filter(d => getProjectRiskLevel(d) === item);
           break;
         case 'status':
-          filteredProjects = data.filter(d => d.status === item);
+          filteredProjects = data.filter(d => getProjectStatus(d) === item);
           break;
         case 'project':
-          filteredProjects = data.filter(d => d.serial_no === item);
+          filteredProjects = data.filter(d => 
+            d.s_no === item || d.serial_no === item || d.id === item
+          );
           break;
         default:
           filteredProjects = [];
@@ -138,14 +177,14 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
         }
         
         filteredProjects = filteredProjects.filter(p => {
-          if (p.date_award) {
-            return new Date(p.date_award) >= filterDate;
+          if (p.award_date) {
+            return new Date(p.award_date) >= filterDate;
           }
           return true;
         });
       }
 
-      // Calculate metrics
+      // Calculate metrics with updated field names
       const calculateMetric = (projects, metric, type = 'average') => {
         if (projects.length === 0) return 0;
         
@@ -153,31 +192,34 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
           case 'count':
             return projects.length;
           case 'budget':
-            return projects.reduce((sum, p) => sum + (p.sanctioned_amount || 0), 0) / 100;
+            return projects.reduce((sum, p) => sum + (p.sd_amount_lakh || 0), 0);
           case 'spent':
-            return projects.reduce((sum, p) => sum + (p.total_expdr || 0), 0) / 100;
+            return projects.reduce((sum, p) => sum + (p.expenditure_total || 0), 0);
           case 'progress':
-            if (type === 'sum') return projects.reduce((sum, p) => sum + (p.physical_progress || 0), 0);
-            return projects.reduce((sum, p) => sum + (p.physical_progress || 0), 0) / projects.length;
+            const totalProgress = projects.reduce((sum, p) => sum + (p.physical_progress_percent || 0), 0);
+            return type === 'sum' ? totalProgress : totalProgress / projects.length;
           case 'efficiency':
-            if (type === 'sum') return projects.reduce((sum, p) => sum + (p.efficiency_score || 0), 0);
-            return projects.reduce((sum, p) => sum + (p.efficiency_score || 0), 0) / projects.length;
+            const totalEfficiency = projects.reduce((sum, p) => sum + (p.efficiency_score || 0), 0);
+            return type === 'sum' ? totalEfficiency : totalEfficiency / projects.length;
           case 'health':
-            if (type === 'sum') return projects.reduce((sum, p) => sum + (p.health_score || 0), 0);
-            return projects.reduce((sum, p) => sum + (p.health_score || 0), 0) / projects.length;
+            const totalHealth = projects.reduce((sum, p) => sum + (p.health_score || 0), 0);
+            return type === 'sum' ? totalHealth : totalHealth / projects.length;
           case 'delay':
-            if (type === 'sum') return projects.reduce((sum, p) => sum + (p.delay_days || 0), 0);
-            return projects.reduce((sum, p) => sum + (p.delay_days || 0), 0) / projects.length;
+            const totalDelay = projects.reduce((sum, p) => sum + Math.abs(p.delay_days || 0), 0);
+            return type === 'sum' ? totalDelay : totalDelay / projects.length;
           case 'utilization':
-            const totalBudget = projects.reduce((sum, p) => sum + (p.sanctioned_amount || 0), 0);
-            const totalSpent = projects.reduce((sum, p) => sum + (p.total_expdr || 0), 0);
+            const totalBudget = projects.reduce((sum, p) => sum + (p.sd_amount_lakh || 0), 0);
+            const totalSpent = projects.reduce((sum, p) => sum + (p.expenditure_total || 0), 0);
             return totalBudget > 0 ? (totalSpent / totalBudget * 100) : 0;
           case 'completed':
-            return projects.filter(p => p.physical_progress >= 100).length;
+            return projects.filter(p => p.physical_progress_percent >= 100).length;
           case 'critical':
-            return projects.filter(p => p.risk_level === 'CRITICAL').length;
+            return projects.filter(p => getProjectRiskLevel(p) === 'CRITICAL').length;
           case 'onTrack':
-            return projects.filter(p => p.delay_days === 0 && p.physical_progress > 0).length;
+            return projects.filter(p => 
+              (p.delay_days === 0 || p.delay_days === undefined) && 
+              p.physical_progress_percent > 0
+            ).length;
           default:
             return 0;
         }
@@ -208,10 +250,18 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
           : 0,
         delayRate: filteredProjects.length > 0
           ? (filteredProjects.filter(p => p.delay_days > 0).length / filteredProjects.length * 100)
-          : 0
+          : 0,
+        rawProjects: filteredProjects // Store for drill-down
       };
     });
-  }, [data, selectedItems, comparisonType, availableItems, timeRange, aggregationType]);
+  }, [data, selectedItems, comparisonType, availableItems, timeRange, aggregationType, getProjectStatus, getProjectRiskLevel]);
+
+  // Handle opening DataTable modal
+  const handleOpenDataTable = useCallback((projects, title) => {
+    setSelectedDataForTable(projects);
+    setModalTitle(title);
+    setShowDataTableModal(true);
+  }, []);
 
   // Toggle item selection
   const toggleItem = useCallback((item) => {
@@ -255,8 +305,8 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
               <span className="font-bold">
                 {entry.name.includes('Rate') || entry.name.includes('utilization') 
                   ? `${entry.value?.toFixed(1)}%`
-                  : entry.name.includes('budget') || entry.name.includes('spent')
-                  ? formatAmount(entry.value * 100)
+                  : entry.name.includes('budget') || entry.name.includes('spent') || entry.name.includes('Budget')
+                  ? formatAmount(entry.value)
                   : entry.value?.toFixed?.(1) || entry.value}
               </span>
             </div>
@@ -305,6 +355,9 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
               )}
               {metrics.includes('projects') && (
                 <Bar dataKey="projects" fill={COLORS.primary[5]} name="Project Count" />
+              )}
+              {metrics.includes('budget') && (
+                <Bar dataKey="budget" fill={COLORS.primary[6]} name="Total Budget (L)" />
               )}
             </BarChart>
           </ResponsiveContainer>
@@ -394,7 +447,7 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: '12px' }} />
               <Bar yAxisId="left" dataKey="projects" fill={COLORS.primary[0]} name="Projects" />
-              <Bar yAxisId="left" dataKey="budget" fill={COLORS.primary[1]} name="Budget (Cr)" />
+              <Bar yAxisId="left" dataKey="budget" fill={COLORS.primary[1]} name="Budget (L)" />
               <Line yAxisId="right" type="monotone" dataKey="progress" stroke={COLORS.primary[2]} name="Avg Progress %" strokeWidth={2} />
               <Line yAxisId="right" type="monotone" dataKey="efficiency" stroke={COLORS.primary[3]} name="Avg Efficiency %" strokeWidth={2} />
             </ComposedChart>
@@ -419,6 +472,7 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
                 name="Progress" 
                 unit="%" 
                 tick={{ fontSize: 11 }}
+                domain={[0, 100]}
               />
               <YAxis 
                 type="number" 
@@ -426,6 +480,7 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
                 name="Efficiency" 
                 unit="%" 
                 tick={{ fontSize: 11 }}
+                domain={[0, 100]}
               />
               <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
               <Scatter name="Comparison" data={scatterData} fill={COLORS.primary[0]}>
@@ -445,9 +500,11 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
   // Export comparison data
   const exportData = () => {
     const csvContent = [
-      ['Name', ...metrics.map(m => m.charAt(0).toUpperCase() + m.slice(1))].join(','),
+      ['Name', 'Projects', 'Budget(L)', 'Spent(L)', 'Progress%', 'Efficiency%', 'Utilization%', 'Delay(days)', 'CompletionRate%'],
       ...comparisonData.map(row =>
-        [row.name, ...metrics.map(m => row[m] || 0)].join(',')
+        [row.name, row.projects, row.budget.toFixed(2), row.spent.toFixed(2), 
+         row.progress.toFixed(1), row.efficiency.toFixed(1), row.utilization.toFixed(1),
+         row.delay.toFixed(0), row.completionRate.toFixed(1)].join(',')
       )
     ].join('\n');
 
@@ -458,6 +515,61 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
     a.download = `comparison-${comparisonType}-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // DataTable Modal Component
+  const DataTableModal = () => {
+    if (!showDataTableModal) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4">
+        <div 
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowDataTableModal(false)}
+        />
+        
+        <div className={`relative w-[90vw] max-w-[1600px] h-[85vh] ${
+          darkMode ? 'bg-gray-900' : 'bg-white'
+        } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
+          
+          <div className={`px-6 py-4 border-b ${
+            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-orange-500 to-orange-600'
+          }`}>
+            <div className="flex justify-between items-center">
+              <h2 className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                {modalTitle}
+              </h2>
+              <button
+                onClick={() => setShowDataTableModal(false)}
+                className={`p-2 rounded-lg ${
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-orange-700'
+                } transition-colors`}
+              >
+                <X size={18} className={darkMode ? 'text-gray-300' : 'text-white'} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-hidden">
+            <DataTable
+              data={selectedDataForTable}
+              darkMode={darkMode}
+              onRowClick={(project) => {
+                if (onChartClick) {
+                  onChartClick(project, 'project');
+                }
+              }}
+              compareMode={false}
+              selectedProjects={[]}
+              isEmbedded={true}
+              maxHeight="100%"
+              onRefreshData={onRefreshData}
+              databaseName={databaseName}
+            />
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -472,7 +584,7 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
         </h3>
 
         {/* Comparison Type Selector */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">
               Compare By
@@ -529,6 +641,22 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
               <option value="month">Last Month</option>
               <option value="quarter">Last Quarter</option>
               <option value="year">Last Year</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">
+              Aggregation
+            </label>
+            <select
+              value={aggregationType}
+              onChange={(e) => setAggregationType(e.target.value)}
+              className={`w-full px-3 py-2 rounded-lg text-sm ${
+                darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-50'
+              } border ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}
+            >
+              <option value="average">Average</option>
+              <option value="sum">Sum</option>
             </select>
           </div>
         </div>
@@ -630,13 +758,22 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
             <h3 className="text-base font-semibold">
               {comparisonType.charAt(0).toUpperCase() + comparisonType.slice(1)} Comparison
             </h3>
-            <button
-              onClick={exportData}
-              className="px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-xs flex items-center gap-1"
-            >
-              <Download size={14} />
-              Export
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowDetails(!showDetails)}
+                className="px-3 py-1.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-xs flex items-center gap-1"
+              >
+                <Eye size={14} />
+                {showDetails ? 'Hide' : 'Show'} Details
+              </button>
+              <button
+                onClick={exportData}
+                className="px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-xs flex items-center gap-1"
+              >
+                <Download size={14} />
+                Export
+              </button>
+            </div>
           </div>
           
           {renderChart()}
@@ -656,14 +793,15 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
                 <tr className={`border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                   <th className="text-left py-2 px-3">Name</th>
                   <th className="text-center py-2 px-3">Projects</th>
-                  <th className="text-center py-2 px-3">Budget (Cr)</th>
-                  <th className="text-center py-2 px-3">Spent (Cr)</th>
+                  <th className="text-center py-2 px-3">Budget</th>
+                  <th className="text-center py-2 px-3">Spent</th>
                   <th className="text-center py-2 px-3">Progress %</th>
                   <th className="text-center py-2 px-3">Efficiency %</th>
                   <th className="text-center py-2 px-3">Health</th>
                   <th className="text-center py-2 px-3">Delay (days)</th>
                   <th className="text-center py-2 px-3">Utilization %</th>
                   <th className="text-center py-2 px-3">Completion %</th>
+                  <th className="text-center py-2 px-3">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -673,8 +811,8 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
                   } transition-colors`}>
                     <td className="py-2 px-3 font-medium">{item.name}</td>
                     <td className="text-center py-2 px-3">{item.projects}</td>
-                    <td className="text-center py-2 px-3">{formatAmount(item.budget * 100)}</td>
-                    <td className="text-center py-2 px-3">{formatAmount(item.spent * 100)}</td>
+                    <td className="text-center py-2 px-3">{formatAmount(item.budget)}</td>
+                    <td className="text-center py-2 px-3">{formatAmount(item.spent)}</td>
                     <td className="text-center py-2 px-3">
                       <span className={`font-medium ${
                         item.progress >= 75 ? 'text-green-600' :
@@ -696,6 +834,17 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
                     </td>
                     <td className="text-center py-2 px-3">{item.utilization.toFixed(1)}%</td>
                     <td className="text-center py-2 px-3">{item.completionRate.toFixed(1)}%</td>
+                    <td className="text-center py-2 px-3">
+                      {item.rawProjects && item.rawProjects.length > 0 && (
+                        <button
+                          onClick={() => handleOpenDataTable(item.rawProjects, `${item.name} - Projects (${item.projects})`)}
+                          className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-1"
+                        >
+                          <Eye size={12} />
+                          View
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -716,7 +865,7 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
             },
             {
               label: 'Total Budget',
-              value: formatAmount(comparisonData.reduce((sum, item) => sum + item.budget, 0) * 100),
+              value: formatAmount(comparisonData.reduce((sum, item) => sum + item.budget, 0)),
               icon: IndianRupee,
               color: 'green'
             },
@@ -747,6 +896,9 @@ const Comparison = ({ data, darkMode, onChartClick, formatAmount }) => {
           ))}
         </div>
       )}
+
+      {/* DataTable Modal */}
+      <DataTableModal />
     </div>
   );
 };

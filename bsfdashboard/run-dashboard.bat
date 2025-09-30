@@ -28,7 +28,7 @@ set HOSTS=%WINDIR%\System32\drivers\etc\hosts
 set PROJECT_DIR=%~dp0
 set BUILD_DIR=%PROJECT_DIR%build
 
-echo [1/5] Checking build directory...
+echo [1/6] Checking build directory...
 echo Project Directory: %PROJECT_DIR%
 echo Build Directory: %BUILD_DIR%
 echo.
@@ -58,7 +58,7 @@ if not exist "%BUILD_DIR%\index.html" (
 echo [OK] Build directory found with index.html
 echo.
 
-echo [2/5] Configuring hosts file...
+echo [2/6] Configuring hosts file...
 :: Backup hosts file on first run
 if not exist "%HOSTS%.backup" (
     copy "%HOSTS%" "%HOSTS%.backup" >nul 2>&1
@@ -78,7 +78,7 @@ if %errorLevel% neq 0 (
 )
 echo.
 
-echo [3/5] Clearing port %PORT%...
+echo [3/6] Clearing port %PORT%...
 :: Kill all processes on port 80
 set KILLED=0
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr :%PORT% ^| findstr LISTENING') do (
@@ -95,7 +95,7 @@ if %KILLED%==1 (
 )
 echo.
 
-echo [4/5] Installing dependencies...
+echo [4/6] Installing dependencies...
 :: Check if serve is installed
 where serve >nul 2>&1
 if %errorLevel% neq 0 (
@@ -114,7 +114,7 @@ if %errorLevel% neq 0 (
 echo.
 
 :: Run node edit.js in a new terminal window
-echo Running edit.js in a new terminal...
+echo [5/6] Running additional processes...
 if exist "%PROJECT_DIR%edit.js" (
     start "BSF Edit Script" cmd /k "cd /d %PROJECT_DIR% && node edit.js && echo. && echo Edit script completed. && pause"
     echo [OK] edit.js launched in new terminal
@@ -124,9 +124,13 @@ if exist "%PROJECT_DIR%edit.js" (
 ) else (
     echo [INFO] edit.js not found, skipping...
 )
+
+:: Run npm start in build directory in a separate command prompt
+start "BSF npm start" cmd /k "cd /d %BUILD_DIR% && npm start && echo. && echo npm start process completed. && pause"
+echo [OK] npm start launched in build directory
 echo.
 
-echo [5/5] Starting production server...
+echo [6/6] Starting production server...
 echo.
 
 :: Change to project directory

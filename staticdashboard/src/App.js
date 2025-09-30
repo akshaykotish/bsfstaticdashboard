@@ -3,8 +3,9 @@ import React, { useState, useEffect } from 'react';
 import HomePage from './Home';
 import Engineering from './Engineering';
 import Operations from './Operations';
+import System from './System'; // Import the new System component
 import { 
-  LayoutGrid, Home, Lock, Shield, AlertTriangle, CreditCard, Mail, Globe, CheckCircle
+  LayoutGrid, Home, Lock, Shield, AlertTriangle, CreditCard, Mail, Globe, CheckCircle, Database
 } from 'lucide-react';
 
 // Try to import Activation module
@@ -76,6 +77,8 @@ const PaywallScreen = () => {
                 {[
                   'Full Dashboard Access',
                   'Engineering Module',
+                  'Operations Module',
+                  'Data Management System',
                   'Real-time Updates',
                   'Command Control Center',
                   'Unlimited Users',
@@ -167,7 +170,7 @@ const PaywallScreen = () => {
           <div className="bg-gray-900/30 px-6 py-4 border-t border-gray-700/50">
             <div className="flex items-center justify-between text-xs text-gray-500">
               <span>© 2025 BSF Dashboard</span>
-              <span>Version 2.1.0 | License Required</span>
+              <span>Version 2.2.0 | License Required</span>
             </div>
           </div>
         </div>
@@ -284,7 +287,7 @@ const App = () => {
           <div className="h-5 w-px bg-gray-600 mx-3"></div>
 
           {/* Navigation Tabs */}
-          <div className="flex items-center h-full gap-1.5" style={{ minWidth: '400px' }}>
+          <div className="flex items-center h-full gap-1.5" style={{ minWidth: '500px' }}>
             {/* Home Tab */}
             <button 
               onClick={() => handleNavigate('home')}
@@ -392,6 +395,42 @@ const App = () => {
                 Operations
               </span>
             </button>
+
+            {/* System Tab - NEW */}
+            <button 
+              onClick={() => handleNavigate('system')}
+              className={`px-3 py-1.5 rounded-md transition-all duration-200 flex items-center gap-1.5 ${
+                currentView === 'system' 
+                  ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg transform scale-105' 
+                  : 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/70 hover:text-gray-100'
+              }`}
+              style={{ 
+                display: 'flex', 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                gap: '6px',
+                minWidth: 'fit-content'
+              }}
+            >
+              <Database 
+                style={{ 
+                  width: '14px', 
+                  height: '14px', 
+                  flexShrink: 0,
+                  strokeWidth: currentView === 'system' ? 2.5 : 2
+                }} 
+              />
+              <span 
+                style={{ 
+                  whiteSpace: 'nowrap', 
+                  display: 'inline-block',
+                  fontSize: '11px',
+                  fontWeight: currentView === 'system' ? '600' : '500'
+                }}
+              >
+                Data System
+              </span>
+            </button>
           </div>
 
           {/* Spacer */}
@@ -407,7 +446,7 @@ const App = () => {
 
           {/* Version Info */}
           <div className="px-2 text-[10px] text-gray-500">
-            v2.1.0 | © 2025 BSF
+            v2.2.0 | © 2025 BSF
           </div>
         </div>
       </header>
@@ -418,6 +457,7 @@ const App = () => {
           {currentView === 'home' && <HomePage onNavigate={handleNavigate} />}
           {currentView === 'engineering' && <Engineering />}
           {currentView === 'operations' && <Operations />}
+          {currentView === 'system' && <System />}
         </div>
       </main>
 

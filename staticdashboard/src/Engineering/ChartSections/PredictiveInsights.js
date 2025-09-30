@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar,
   ComposedChart, ScatterChart, Scatter, PieChart, Pie,
@@ -8,8 +8,10 @@ import {
 import {
   Activity, TrendingUp, Target, AlertTriangle,
   Brain, Zap, Calendar, Clock,
-  IndianRupee, CheckCircle, AlertCircle, Lightbulb
+  IndianRupee, CheckCircle, AlertCircle, Lightbulb,
+  X, Eye
 } from 'lucide-react';
+import DataTable from '../DataTable';
 
 const COLORS = {
   prediction: {
@@ -25,7 +27,26 @@ const COLORS = {
   trend: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 };
 
-const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
+const PredictiveInsights = ({ 
+  data, 
+  darkMode, 
+  onChartClick, 
+  formatAmount = (val) => `₹${val}L`,
+  onRefreshData = () => {},
+  databaseName = 'engineering'
+}) => {
+  // State for DataTable modal
+  const [showDataTableModal, setShowDataTableModal] = useState(false);
+  const [selectedDataForTable, setSelectedDataForTable] = useState([]);
+  const [modalTitle, setModalTitle] = useState('');
+
+  // Handle opening DataTable modal
+  const handleOpenDataTable = useCallback((projects, title) => {
+    setSelectedDataForTable(Array.isArray(projects) ? projects : [projects]);
+    setModalTitle(title);
+    setShowDataTableModal(true);
+  }, []);
+
   const predictions = useMemo(() => {
     if (!data || data.length === 0) {
       return {
@@ -40,10 +61,10 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
       };
     }
 
-    // Filter and clean data
-    const cleanData = data.filter(d => d && d.sanctioned_amount !== undefined);
+    // Filter and clean data - updated field names
+    const cleanData = data.filter(d => d && d.sd_amount_lakh !== undefined);
     
-    // Completion Forecast - Changed to use LineChart instead of stacked AreaChart
+    // Completion Forecast
     const completionForecast = [];
     const today = new Date();
     
@@ -53,7 +74,7 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
       const monthKey = `${forecastDate.getFullYear()}-${String(forecastDate.getMonth() + 1).padStart(2, '0')}`;
       
       const projectsInProgress = cleanData.filter(d => {
-        const progress = parseFloat(d.physical_progress) || 0;
+        const progress = parseFloat(d.physical_progress_percent) || 0;
         return progress > 0 && progress < 100;
       });
       
@@ -62,12 +83,12 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
       let pessimisticCount = 0;
       
       projectsInProgress.forEach(project => {
-        const currentProgress = parseFloat(project.physical_progress) || 0;
+        const currentProgress = parseFloat(project.physical_progress_percent) || 0;
         let velocity = 10;
         
-        if (project.date_award) {
+        if (project.award_date) {
           try {
-            const startDate = new Date(project.date_award);
+            const startDate = new Date(project.award_date);
             if (!isNaN(startDate.getTime())) {
               const monthsElapsed = Math.max(1, Math.floor((today - startDate) / (1000 * 60 * 60 * 24 * 30)));
               velocity = currentProgress / monthsElapsed;
@@ -101,26 +122,26 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
       });
     }
 
-    // Budget Projection
-    const totalBudget = cleanData.reduce((sum, d) => sum + (parseFloat(d.sanctioned_amount) || 0), 0) / 100;
-    const currentSpent = cleanData.reduce((sum, d) => sum + (parseFloat(d.total_expdr) || 0), 0) / 100;
+    // Budget Projection - updated field names
+    const totalBudget = cleanData.reduce((sum, d) => sum + (parseFloat(d.sd_amount_lakh) || 0), 0);
+    const currentSpent = cleanData.reduce((sum, d) => sum + (parseFloat(d.expenditure_total) || 0), 0);
     const currentUtilization = totalBudget > 0 ? (currentSpent / totalBudget) * 100 : 0;
     
     const budgetProjection = [];
     const activeProjects = cleanData.filter(d => {
-      const progress = parseFloat(d.physical_progress) || 0;
+      const progress = parseFloat(d.physical_progress_percent) || 0;
       return progress < 100;
     });
     
     let avgMonthlyBurn = totalBudget * 0.05;
     if (activeProjects.length > 0) {
       const totalMonthlyBurn = activeProjects.reduce((sum, d) => {
-        if (d.date_award && d.total_expdr) {
+        if (d.award_date && d.expenditure_total) {
           try {
-            const startDate = new Date(d.date_award);
+            const startDate = new Date(d.award_date);
             if (!isNaN(startDate.getTime())) {
               const months = Math.max(1, Math.floor((today - startDate) / (1000 * 60 * 60 * 24 * 30)));
-              return sum + (parseFloat(d.total_expdr) || 0) / months;
+              return sum + (parseFloat(d.expenditure_total) || 0) / months;
             }
           } catch (e) {
             // Skip if date parsing fails
@@ -130,7 +151,7 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
       }, 0);
       
       if (totalMonthlyBurn > 0) {
-        avgMonthlyBurn = totalMonthlyBurn / activeProjects.length / 100;
+        avgMonthlyBurn = totalMonthlyBurn / activeProjects.length;
       }
     }
     
@@ -162,7 +183,7 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
       let lowRisk = 0;
       
       cleanData.forEach(project => {
-        const progress = parseFloat(project.physical_progress) || 0;
+        const progress = parseFloat(project.physical_progress_percent) || 0;
         if (progress >= 100) {
           lowRisk++;
           return;
@@ -197,7 +218,7 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
     const avgDelayIncrease = delayedProjects.length > 0
       ? delayedProjects.reduce((sum, d) => {
           const delay = parseFloat(d.delay_days) || 0;
-          const progress = Math.max(1, parseFloat(d.physical_progress) || 1);
+          const progress = Math.max(1, parseFloat(d.physical_progress_percent) || 1);
           return sum + (delay / progress);
         }, 0) / delayedProjects.length
       : 0;
@@ -235,7 +256,7 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
       const monthKey = `${forecastDate.getFullYear()}-${String(forecastDate.getMonth() + 1).padStart(2, '0')}`;
       
       const activeProjectsCount = cleanData.filter(d => {
-        const progress = parseFloat(d.physical_progress) || 0;
+        const progress = parseFloat(d.physical_progress_percent) || 0;
         const projectedProgress = progress + (5 * (i + 1));
         return projectedProgress < 100 && projectedProgress > 0;
       }).length;
@@ -253,13 +274,13 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
     const performanceTrends = [];
     const basePerformance = {
       avgProgress: cleanData.length > 0 
-        ? cleanData.reduce((sum, d) => sum + (parseFloat(d.physical_progress) || 0), 0) / cleanData.length
+        ? cleanData.reduce((sum, d) => sum + (parseFloat(d.physical_progress_percent) || 0), 0) / cleanData.length
         : 0,
       avgEfficiency: cleanData.length > 0
         ? cleanData.reduce((sum, d) => sum + (parseFloat(d.efficiency_score) || 0), 0) / cleanData.length
         : 0,
       completionRate: cleanData.length > 0
-        ? (cleanData.filter(d => (parseFloat(d.physical_progress) || 0) >= 100).length / cleanData.length) * 100
+        ? (cleanData.filter(d => (parseFloat(d.physical_progress_percent) || 0) >= 100).length / cleanData.length) * 100
         : 0
     };
     
@@ -279,30 +300,31 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
       });
     }
 
-    // Critical Path Analysis
+    // Critical Path Analysis - updated field names
     const criticalPathAnalysis = cleanData
       .filter(d => {
-        const riskLevel = d.risk_level || '';
         const delay = parseFloat(d.delay_days) || 0;
-        return riskLevel === 'CRITICAL' || delay > 60;
+        const efficiency = parseFloat(d.efficiency_score) || 0;
+        return delay > 60 || efficiency < 40;
       })
       .map(d => ({
         ...d,
-        project: d.scheme_name?.substring(0, 30) || 'Unknown',
-        currentProgress: parseFloat(d.physical_progress) || 0,
+        project: (d.sub_scheme_name || d.name_of_scheme || 'Unknown').substring(0, 30),
+        currentProgress: parseFloat(d.physical_progress_percent) || 0,
         currentDelay: parseFloat(d.delay_days) || 0,
-        budget: (parseFloat(d.sanctioned_amount) || 0) / 100,
-        predictedCompletion: (parseFloat(d.physical_progress) || 0) < 100 
-          ? Math.ceil((100 - (parseFloat(d.physical_progress) || 0)) / 5) 
+        budget: parseFloat(d.sd_amount_lakh) || 0,
+        predictedCompletion: (parseFloat(d.physical_progress_percent) || 0) < 100 
+          ? Math.ceil((100 - (parseFloat(d.physical_progress_percent) || 0)) / 5) 
           : 0,
         riskScore: (
           ((parseFloat(d.delay_days) || 0) * 0.3) +
-          (100 - (parseFloat(d.physical_progress) || 0)) * 0.3 +
-          (d.risk_level === 'CRITICAL' ? 100 : d.risk_level === 'HIGH' ? 70 : 40) * 0.4
+          (100 - (parseFloat(d.physical_progress_percent) || 0)) * 0.3 +
+          ((parseFloat(d.efficiency_score) || 0) < 40 ? 100 : 
+           (parseFloat(d.efficiency_score) || 0) < 60 ? 70 : 40) * 0.4
         ).toFixed(1),
         intervention: (parseFloat(d.delay_days) || 0) > 90 ? 'Immediate' : 
                      (parseFloat(d.delay_days) || 0) > 60 ? 'Urgent' : 
-                     d.risk_level === 'CRITICAL' ? 'Priority' : 'Monitor'
+                     (parseFloat(d.efficiency_score) || 0) < 40 ? 'Priority' : 'Monitor'
       }))
       .sort((a, b) => parseFloat(b.riskScore) - parseFloat(a.riskScore))
       .slice(0, 10);
@@ -336,8 +358,14 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
       });
     }
     
+    const criticalProjects = cleanData.filter(d => {
+      const delay = parseFloat(d.delay_days) || 0;
+      const efficiency = parseFloat(d.efficiency_score) || 0;
+      return delay > 90 || efficiency < 30;
+    });
+    
     const criticalPercent = cleanData.length > 0
-      ? (cleanData.filter(d => d.risk_level === 'CRITICAL').length / cleanData.length) * 100
+      ? (criticalProjects.length / cleanData.length) * 100
       : 0;
     
     if (criticalPercent > 15) {
@@ -367,7 +395,7 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
     }
     
     const resourceStrained = cleanData.filter(d => {
-      const progress = parseFloat(d.physical_progress) || 0;
+      const progress = parseFloat(d.physical_progress_percent) || 0;
       const delay = parseFloat(d.delay_days) || 0;
       return progress < 50 && delay > 30;
     }).length;
@@ -408,7 +436,11 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
               <span className="font-medium">{entry.name}:</span>
               <span className="font-semibold">{
-                typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value
+                typeof entry.value === 'number' ? 
+                  (entry.name.includes('Funding') || entry.name.includes('Budget') ? 
+                    formatAmount(entry.value) : 
+                    entry.value.toFixed(2)) 
+                  : entry.value
               }</span>
             </div>
           ))}
@@ -418,9 +450,64 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
     return null;
   };
 
+  // DataTable Modal Component
+  const DataTableModal = () => {
+    if (!showDataTableModal) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4">
+        <div 
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowDataTableModal(false)}
+        />
+        
+        <div className={`relative w-[90vw] max-w-[1600px] h-[85vh] ${
+          darkMode ? 'bg-gray-900' : 'bg-white'
+        } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
+          
+          <div className={`px-6 py-4 border-b ${
+            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-red-500 to-orange-600'
+          }`}>
+            <div className="flex justify-between items-center">
+              <h2 className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                {modalTitle}
+              </h2>
+              <button
+                onClick={() => setShowDataTableModal(false)}
+                className={`p-2 rounded-lg ${
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-red-700'
+                } transition-colors`}
+              >
+                <X size={18} className={darkMode ? 'text-gray-300' : 'text-white'} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-hidden">
+            <DataTable
+              data={selectedDataForTable}
+              darkMode={darkMode}
+              onRowClick={(project) => {
+                if (onChartClick) {
+                  onChartClick(project, 'project');
+                }
+              }}
+              compareMode={false}
+              selectedProjects={[]}
+              isEmbedded={true}
+              maxHeight="100%"
+              onRefreshData={onRefreshData}
+              databaseName={databaseName}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
-      {/* AI Recommendations */}
+      {/* AI Recommendations - rest of the component remains the same */}
       {predictions.recommendations.length > 0 && (
         <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
           darkMode ? 'border-gray-700' : 'border-gray-100'
@@ -465,7 +552,7 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
       )}
 
-      {/* Completion Forecast - Using LineChart instead of AreaChart */}
+      {/* Completion Forecast */}
       <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
         darkMode ? 'border-gray-700' : 'border-gray-100'
       }`}>
@@ -521,7 +608,7 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
               <LineChart data={predictions.budgetProjection}>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
                 <XAxis dataKey="month" tick={{ fontSize: 9 }} />
-                <YAxis tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={(value) => `${(value/1000).toFixed(0)}k`} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '10px' }} />
                 <Line type="monotone" dataKey="allocated" stroke="#6b7280" strokeDasharray="5 5" name="Allocated" />
@@ -533,7 +620,7 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
           </div>
         </div>
 
-        {/* Risk Prediction - Also using LineChart */}
+        {/* Risk Prediction */}
         <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
           darkMode ? 'border-gray-700' : 'border-gray-100'
         }`}>
@@ -547,7 +634,7 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
                 <XAxis dataKey="month" tick={{ fontSize: 9 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
+                <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '10px' }} />
                 <Line type="monotone" dataKey="low" stroke={COLORS.risk.low} name="Low Risk" strokeWidth={2} />
                 <Line type="monotone" dataKey="medium" stroke={COLORS.risk.medium} name="Medium Risk" strokeWidth={2} />
@@ -572,7 +659,7 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
               <XAxis dataKey="month" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip />
+              <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Line type="monotone" dataKey="avgProgress" stroke="#3b82f6" name="Avg Progress %" strokeWidth={2} />
               <Line type="monotone" dataKey="avgEfficiency" stroke="#10b981" name="Avg Efficiency %" strokeWidth={2} />
@@ -582,15 +669,24 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
       </div>
 
-      {/* Critical Path Analysis */}
+      {/* Critical Path Analysis - Updated with View button */}
       {predictions.criticalPathAnalysis.length > 0 && (
         <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
           darkMode ? 'border-gray-700' : 'border-gray-100'
         }`}>
-          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
-            <Activity size={16} className="text-red-500" />
-            Critical Path Projects
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold flex items-center gap-2 text-gray-900 dark:text-gray-100">
+              <Activity size={16} className="text-red-500" />
+              Critical Path Projects
+            </h3>
+            <button
+              onClick={() => handleOpenDataTable(predictions.criticalPathAnalysis, 'Critical Path Projects - All Details')}
+              className="px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 text-xs flex items-center gap-1"
+            >
+              <Eye size={14} />
+              View All in Table
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead className={`${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
@@ -598,25 +694,25 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
                   <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Project</th>
                   <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Progress</th>
                   <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Delay</th>
-                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Budget (Cr)</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Budget</th>
                   <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Risk Score</th>
                   <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Months to Complete</th>
                   <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Action</th>
+                  <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">View</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
                 {predictions.criticalPathAnalysis.map((project, index) => (
                   <tr 
                     key={index}
-                    className={`hover:${darkMode ? 'bg-gray-700' : 'bg-blue-50'} cursor-pointer`}
-                    onClick={() => onChartClick(project, 'project')}
+                    className={`hover:${darkMode ? 'bg-gray-700' : 'bg-blue-50'} transition-colors`}
                   >
                     <td className="px-3 py-2 truncate max-w-[200px] text-gray-900 dark:text-gray-100">{project.project}</td>
                     <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{project.currentProgress}%</td>
                     <td className="px-3 py-2 text-center">
                       <span className="text-red-600 font-medium">{project.currentDelay} days</span>
                     </td>
-                    <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">₹{project.budget.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{formatAmount(project.budget)}</td>
                     <td className="px-3 py-2 text-center">
                       <span className={`font-bold ${
                         parseFloat(project.riskScore) > 70 ? 'text-red-600' :
@@ -636,6 +732,15 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
                       }`}>
                         {project.intervention}
                       </span>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        onClick={() => handleOpenDataTable(project, `Project Details: ${project.project}`)}
+                        className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-1"
+                      >
+                        <Eye size={12} />
+                        View
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -660,15 +765,18 @@ const PredictiveInsights = ({ data, darkMode, onChartClick, formatAmount }) => {
               <XAxis dataKey="month" tick={{ fontSize: 10 }} />
               <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
               <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
-              <Tooltip />
+              <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: '11px' }} />
               <Bar yAxisId="left" dataKey="activeProjects" fill="#3b82f6" name="Active Projects" />
-              <Line yAxisId="right" type="monotone" dataKey="fundingNeeded" stroke="#10b981" name="Funding (Cr)" strokeWidth={2} />
+              <Line yAxisId="right" type="monotone" dataKey="fundingNeeded" stroke="#10b981" name="Funding Needed (L)" strokeWidth={2} />
               <Line yAxisId="right" type="monotone" dataKey="manpowerNeeded" stroke="#8b5cf6" name="Teams Required" strokeWidth={2} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* DataTable Modal */}
+      <DataTableModal />
     </div>
   );
 };

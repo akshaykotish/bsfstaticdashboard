@@ -4,100 +4,228 @@ import {
   AlertTriangle, Activity, PiggyBank, Wallet,
   CreditCard, Database, Target, Gauge,
   FileText, X, Download, Search, Filter,
-  IndianRupee, Banknote, Coins, Receipt
+  IndianRupee, Banknote, Coins, Receipt,
+  RefreshCw, ChevronDown, ChevronUp, Settings,
+  Calendar, Clock, Calculator, Hash, Building2,
+  MapPin, Layers, Shield, Fingerprint, Key
 } from 'lucide-react';
 
-// Hook to load and process patch data from enggcurrentyear.csv
-// Takes the same filters object structure as MetricsCards
+// Import database configurations from config.js
+import { databaseConfigs, getConfig, getDatabaseNames, generateId, applyCalculations } from '../System/config';
+
+const API_URL = 'http://172.21.188.201:3456';
+
+// Hook to load and process patch data from enggcurrentyear database
 export const usePatchEngineeringCYB = (filters = {}) => {
   const [rawPatchData, setRawPatchData] = useState([]);
   const [patchLoading, setPatchLoading] = useState(true);
   const [patchError, setPatchError] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
 
-  // Process CSV data
+  console.log('[PatchCYB] Filters received:', filters);
+  
+  // Get database configuration for enggcurrentyear
+  const dbConfig = useMemo(() => getConfig('enggcurrentyear'), []);
+
+  // Process data using config-based calculations
   const processPatchData = useCallback((data) => {
     return data
-      .filter(row => row && (row['S/No.'] || row.ftr_hq || row.budget_head))
+      .filter(row => row && row[dbConfig.idField])
       .map((row, index) => {
-        // Clean numeric values
+        // Apply calculations from config if available
+        let processedRow = { ...row };
+        if (dbConfig.calculations) {
+          processedRow = applyCalculations('enggcurrentyear', processedRow);
+        }
+        
+        // Enhanced numeric cleaning helper with NaN prevention
         const cleanNumber = (val) => {
-          if (val === null || val === undefined || val === '' || val === 'NIL') return 0;
-          if (typeof val === 'string') {
-            val = val.replace(/,/g, '').replace(/₹/g, '').trim();
-            if (val === '-' || val === 'N/A') return 0;
+          if (val === null || val === undefined || val === '' || val === 'NIL' || val === 'N/A' || val === '-') {
+            return 0;
           }
+          
+          if (typeof val === 'string') {
+            // Remove all non-numeric characters except decimal point and minus sign
+            val = val.replace(/[^0-9.-]/g, '').trim();
+            if (val === '' || val === '-' || val === '.') return 0;
+          }
+          
           const num = parseFloat(val);
-          return isNaN(num) ? 0 : num;
+          // Ensure we never return NaN
+          return isNaN(num) || !isFinite(num) ? 0 : num;
         };
 
-        // Clean percentage values
+        // Enhanced percentage cleaning helper with NaN prevention
         const cleanPercentage = (val) => {
-          if (!val || val === 'NIL' || val === '-') return 0;
-          const cleaned = String(val).replace(/%/g, '').replace(/,/g, '').trim();
+          if (val === null || val === undefined || val === '' || val === 'NIL' || val === 'N/A' || val === '-') {
+            return 0;
+          }
+          
+          // Convert to string and clean
+          const cleaned = String(val).replace(/[^0-9.-]/g, '').trim();
+          if (cleaned === '' || cleaned === '-' || cleaned === '.') return 0;
+          
           const num = parseFloat(cleaned);
-          return isNaN(num) ? 0 : num;
+          // Ensure we never return NaN and clamp between 0-100 for percentages
+          if (isNaN(num) || !isFinite(num)) return 0;
+          return Math.min(100, Math.max(0, num));
         };
 
+        // Safe division helper to prevent NaN from division
+        const safeDivide = (numerator, denominator, multiplier = 1) => {
+          const num = cleanNumber(numerator);
+          const denom = cleanNumber(denominator);
+          
+          if (denom === 0 || isNaN(denom) || !isFinite(denom)) {
+            return 0;
+          }
+          
+          const result = (num / denom) * multiplier;
+          return isNaN(result) || !isFinite(result) ? 0 : result;
+        };
+
+        // Map config column names to processed fields with proper cleaning
         const processed = {
-          id: `cy_${index + 1}`,
-          serial_no: row['S/No.'] || index + 1,
-          ftr_hq: row.ftr_hq || 'Unknown',
-          budget_head: row.budget_head || 'Unknown',
-          sub_head: row['Sub head'] || '',
+          id: processedRow[dbConfig.idField] || `cy_${index + 1}`,
+          serial_no: processedRow[dbConfig.idField],
           
-          // Financial values (assuming in lakhs)
-          allotment_prev_fy: cleanNumber(row['Allotment Previous Financial year']),
-          expdr_prev_year: cleanNumber(row['Expdr previous year']),
-          liabilities: cleanNumber(row['Liabilities']),
-          fresh_sanction_cfy: cleanNumber(row['Fresh Sanction issued during CFY']),
-          effective_sanction: cleanNumber(row['Effective sanction']),
-          allotment: cleanNumber(row['Allotment']),
-          expdr_elekha: cleanNumber(row['Expdr booked as per e-lekha as on 22/07/25']),
-          percent_expdr_elekha: cleanPercentage(row['% Age of expdr as per e-lekha']),
-          bill_pending_pad: cleanNumber(row['Bill pending with PAD']),
-          bill_pending_hqrs: cleanNumber(row['Bill pending with HQrs']),
-          total_expdr: cleanNumber(row['Total Expdr']),
-          percent_total_expdr: cleanPercentage(row['% Age of total Expdr']),
-          balance_fund: cleanNumber(row['Balance fund']),
+          // Map using config column names
+          ftr_hq: processedRow['Name of Ftr HQ'] || 'Unknown',
+          budget_head: processedRow['Budget head'] || 'Unknown',
+          sub_head: processedRow['Sub head'] || '',
+          scheme_name: processedRow['Name of scheme'] || '',
           
-          // Calculated fields
+          // Financial values (assuming in lakhs) - all properly cleaned
+          allotment_prev_fy: cleanNumber(processedRow['Allotment Previous Financila year']),
+          expdr_prev_year: cleanNumber(processedRow['Expdr previous year']),
+          liabilities: cleanNumber(processedRow['Liabilities']),
+          fresh_sanction_cfy: cleanNumber(processedRow['Fresh Sanction issued during CFY']),
+          effective_sanction: cleanNumber(processedRow['Effective sanction']),
+          allotment_cfy: cleanNumber(processedRow['Allotment CFY']),
+          allotment_fy_24_25: cleanNumber(processedRow['Allotment  (FY 24-25)']),
+          
+          // Expenditure fields - properly cleaned
+          expdr_elekha_22_07: cleanNumber(processedRow['Expdr booked as per e-lekha as on 22/07/25']),
+          expdr_elekha_31_03: cleanNumber(processedRow['Expdr booked as per e-lekha as on 31/03/25']),
+          total_expdr_register: cleanNumber(processedRow['Total Expdr as per contengency register']),
+          percent_expdr_elekha: 0, // Will calculate below
+          percent_total_expdr: 0, // Will calculate below
+          
+          // Pending bills - properly cleaned
+          bill_pending_pad: cleanNumber(processedRow['Bill pending with PAD']),
+          bill_pending_hqrs: cleanNumber(processedRow['Bill pending with HQrs']),
+          
+          // Balance fund - will calculate below
+          balance_fund: 0,
+          expdr_plan_balance: cleanNumber(processedRow['Expdr plan for balance fund']),
+          
+          // Additional calculated fields
           utilization_rate: 0,
           pending_bills_total: 0,
           efficiency_score: 0,
-          risk_level: 'LOW'
+          risk_level: 'LOW',
+          health_status: 'NORMAL',
+          priority: 'NORMAL'
         };
 
-        // Calculate derived metrics
-        processed.pending_bills_total = processed.bill_pending_pad + processed.bill_pending_hqrs;
-        processed.utilization_rate = processed.allotment > 0 
-          ? ((processed.total_expdr / processed.allotment) * 100).toFixed(2)
-          : 0;
+        // Recalculate percentages to ensure no NaN values
+        const allotment = processed.allotment_cfy;
+        const totalExpdr = processed.total_expdr_register;
+        const expdrElekha = processed.expdr_elekha_22_07;
+        const pendingPAD = processed.bill_pending_pad;
+        const pendingHQ = processed.bill_pending_hqrs;
         
-        // Calculate efficiency score
-        if (processed.allotment > 0) {
-          const utilizationScore = Math.min(100, (processed.total_expdr / processed.allotment) * 100);
+        // Calculate percentages using safe division
+        processed.percent_expdr_elekha = parseFloat(safeDivide(expdrElekha, allotment, 100).toFixed(2));
+        processed.percent_total_expdr = parseFloat(safeDivide(totalExpdr, allotment, 100).toFixed(2));
+        
+        // Calculate balance fund properly with NaN prevention
+        processed.balance_fund = Math.max(0, allotment - totalExpdr - pendingPAD - pendingHQ);
+        if (isNaN(processed.balance_fund) || !isFinite(processed.balance_fund)) {
+          processed.balance_fund = 0;
+        }
+
+        // Calculate derived metrics with NaN prevention
+        processed.pending_bills_total = pendingPAD + pendingHQ;
+        if (isNaN(processed.pending_bills_total)) {
+          processed.pending_bills_total = 0;
+        }
+        
+        // Calculate utilization rate with safe division
+        processed.utilization_rate = parseFloat(safeDivide(totalExpdr, allotment, 100).toFixed(2));
+        
+        // Calculate efficiency score with NaN prevention
+        if (allotment > 0) {
+          const utilizationScore = Math.min(100, safeDivide(totalExpdr, allotment, 100));
           const pendingScore = processed.pending_bills_total > 0 
-            ? Math.max(0, 100 - (processed.pending_bills_total / processed.allotment) * 50) 
+            ? Math.max(0, 100 - safeDivide(processed.pending_bills_total, allotment, 50))
             : 100;
-          processed.efficiency_score = ((utilizationScore + pendingScore) / 2).toFixed(2);
+          
+          const effScore = (utilizationScore + pendingScore) / 2;
+          processed.efficiency_score = parseFloat(
+            (isNaN(effScore) || !isFinite(effScore) ? 0 : effScore).toFixed(2)
+          );
+        } else {
+          processed.efficiency_score = 0;
+        }
+        
+        // Ensure efficiency score is valid
+        if (isNaN(processed.efficiency_score) || !isFinite(processed.efficiency_score)) {
+          processed.efficiency_score = 0;
         }
         
         // Determine risk level based on utilization and pending bills
-        if (processed.utilization_rate < 30 && processed.pending_bills_total > processed.allotment * 0.2) {
+        const utilizationNum = processed.utilization_rate;
+        const pendingRatio = safeDivide(processed.pending_bills_total, allotment, 1);
+        
+        if (utilizationNum < 30 && pendingRatio > 0.2) {
           processed.risk_level = 'CRITICAL';
-        } else if (processed.utilization_rate < 50 || processed.pending_bills_total > processed.allotment * 0.15) {
+          processed.priority = 'HIGH';
+        } else if (utilizationNum < 50 || pendingRatio > 0.15) {
           processed.risk_level = 'HIGH';
-        } else if (processed.utilization_rate < 70 || processed.pending_bills_total > processed.allotment * 0.1) {
+          processed.priority = 'HIGH';
+        } else if (utilizationNum < 70 || pendingRatio > 0.1) {
           processed.risk_level = 'MEDIUM';
+          processed.priority = 'MEDIUM';
         } else {
           processed.risk_level = 'LOW';
+          processed.priority = 'LOW';
         }
+        
+        // Determine health status
+        if (utilizationNum >= 90 && pendingRatio < 0.05) {
+          processed.health_status = 'EXCELLENT';
+        } else if (utilizationNum >= 70 && pendingRatio < 0.1) {
+          processed.health_status = 'GOOD';
+        } else if (utilizationNum >= 50) {
+          processed.health_status = 'NORMAL';
+        } else if (utilizationNum >= 30) {
+          processed.health_status = 'POOR';
+        } else {
+          processed.health_status = 'CRITICAL';
+        }
+        
+        // Final validation - ensure all numeric fields are valid numbers
+        const numericFields = [
+          'allotment_prev_fy', 'expdr_prev_year', 'liabilities', 'fresh_sanction_cfy',
+          'effective_sanction', 'allotment_cfy', 'allotment_fy_24_25', 'expdr_elekha_22_07',
+          'expdr_elekha_31_03', 'total_expdr_register', 'percent_expdr_elekha',
+          'percent_total_expdr', 'bill_pending_pad', 'bill_pending_hqrs', 'balance_fund',
+          'expdr_plan_balance', 'utilization_rate', 'pending_bills_total', 'efficiency_score'
+        ];
+        
+        numericFields.forEach(field => {
+          if (isNaN(processed[field]) || !isFinite(processed[field])) {
+            console.warn(`[PatchCYB] Field ${field} is NaN, setting to 0`);
+            processed[field] = 0;
+          }
+        });
         
         return processed;
       });
-  }, []);
+  }, [dbConfig]);
 
-  // Load patch data from CSV - only once on mount
+  // Load patch data from server API
   useEffect(() => {
     let mounted = true;
 
@@ -106,31 +234,33 @@ export const usePatchEngineeringCYB = (filters = {}) => {
         setPatchLoading(true);
         setPatchError(null);
         
-        const response = await fetch('/enggcurrentyear.csv');
+        // Load from server API endpoint
+        const response = await fetch(`${API_URL}/api/csv/enggcurrentyear/rows?all=true`);
         
         if (!response.ok) {
-          throw new Error(`Failed to load CY patch data: ${response.status}`);
+          throw new Error(`Failed to load CY budget data: ${response.status}`);
         }
         
-        const fileContent = await response.text();
-        
-        // Parse CSV
-        const Papa = await import('papaparse');
-        const result = Papa.parse(fileContent, {
-          header: true,
-          dynamicTyping: true,
-          skipEmptyLines: true,
-          delimitersToGuess: [',', '\t', '|', ';']
-        });
-        
-        if (result.errors.length > 0) {
-          console.warn('CY CSV parsing warnings:', result.errors);
-        }
+        const result = await response.json();
         
         if (mounted) {
-          const processedData = processPatchData(result.data);
+          const processedData = processPatchData(result.rows || []);
           setRawPatchData(processedData);
-          console.log('[PatchCYB] Loaded', processedData.length, 'CY budget records');
+          setLastUpdate(new Date());
+          console.log('[PatchCYB] Loaded', processedData.length, 'CY budget records from server');
+          
+          // Debug: Check if balance_fund is properly calculated
+          const sampleWithBalance = processedData.find(d => d.balance_fund > 0);
+          if (sampleWithBalance) {
+            console.log('[PatchCYB] Sample balance_fund calculation:', {
+              allotment: sampleWithBalance.allotment_cfy,
+              expenditure: sampleWithBalance.total_expdr_register,
+              pendingBills: sampleWithBalance.pending_bills_total,
+              balance: sampleWithBalance.balance_fund,
+              utilizationRate: sampleWithBalance.utilization_rate,
+              percentExpdr: sampleWithBalance.percent_total_expdr
+            });
+          }
         }
         
       } catch (err) {
@@ -150,7 +280,7 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     return () => {
       mounted = false;
     };
-  }, []); // Empty array - load only once
+  }, [processPatchData]);
 
   // Apply filters to patch data
   const patchData = useMemo(() => {
@@ -164,7 +294,8 @@ export const usePatchEngineeringCYB = (filters = {}) => {
       filtered = filtered.filter(item =>
         item.ftr_hq?.toLowerCase().includes(searchLower) ||
         item.budget_head?.toLowerCase().includes(searchLower) ||
-        item.sub_head?.toLowerCase().includes(searchLower)
+        item.sub_head?.toLowerCase().includes(searchLower) ||
+        item.scheme_name?.toLowerCase().includes(searchLower)
       );
     }
     
@@ -182,17 +313,51 @@ export const usePatchEngineeringCYB = (filters = {}) => {
       );
     }
     
-    // Note: Other filters don't apply as the CY data doesn't have those fields
+    // Apply scheme filter if present
+    if (filters?.selectedSchemes?.length > 0) {
+      filtered = filtered.filter(item => 
+        filters.selectedSchemes.includes(item.scheme_name)
+      );
+    }
+    
+    // Apply risk level filter
+    if (filters?.selectedRiskLevels?.length > 0) {
+      filtered = filtered.filter(item => 
+        filters.selectedRiskLevels.includes(item.risk_level)
+      );
+    }
+    
+    // Apply health status filter
+    if (filters?.selectedHealthStatuses?.length > 0) {
+      filtered = filtered.filter(item => 
+        filters.selectedHealthStatuses.includes(item.health_status)
+      );
+    }
+    
+    // Apply utilization range filter
+    if (filters?.utilizationRange && Array.isArray(filters.utilizationRange) && filters.utilizationRange.length === 2) {
+      const [min, max] = filters.utilizationRange;
+      filtered = filtered.filter(item => {
+        const util = parseFloat(item.utilization_rate) || 0;
+        return util >= min && util <= max;
+      });
+    }
+    
+    console.log('[PatchCYB] Filtered data:', filtered.length, 'of', rawPatchData.length, 'records');
     
     return filtered;
   }, [
     rawPatchData, 
     filters?.searchTerm, 
     filters?.selectedBudgetHeads, 
-    filters?.selectedFrontierHQs
+    filters?.selectedFrontierHQs,
+    filters?.selectedSchemes,
+    filters?.selectedRiskLevels,
+    filters?.selectedHealthStatuses,
+    filters?.utilizationRange
   ]);
 
-  // Calculate patch metrics
+  // Calculate patch metrics with proper balance fund calculation and NaN prevention
   const patchMetrics = useMemo(() => {
     if (!patchData || patchData.length === 0) {
       return {
@@ -216,32 +381,50 @@ export const usePatchEngineeringCYB = (filters = {}) => {
         lowRiskCount: 0,
         underUtilized: 0,
         overUtilized: 0,
-        optimalUtilized: 0
+        optimalUtilized: 0,
+        excellentHealth: 0,
+        goodHealth: 0,
+        normalHealth: 0,
+        poorHealth: 0,
+        criticalHealth: 0,
+        topUtilizers: [],
+        bottomUtilizers: [],
+        largestPendingBills: []
       };
     }
     
     const total = patchData.length;
     
-    // Sum up financial metrics (convert from lakhs to crores)
-    const currentYearAllocation = patchData.reduce((sum, d) => sum + d.allotment, 0) / 100;
-    const currentYearExpenditure = patchData.reduce((sum, d) => sum + d.total_expdr, 0) / 100;
-    const pendingBillsPAD = patchData.reduce((sum, d) => sum + d.bill_pending_pad, 0) / 100;
-    const pendingBillsHQ = patchData.reduce((sum, d) => sum + d.bill_pending_hqrs, 0) / 100;
-    const totalPendingBills = pendingBillsPAD + pendingBillsHQ;
-    const balanceFunds = patchData.reduce((sum, d) => sum + d.balance_fund, 0) / 100;
-    const freshSanctions = patchData.reduce((sum, d) => sum + d.fresh_sanction_cfy, 0) / 100;
-    const previousYearAllocation = patchData.reduce((sum, d) => sum + d.allotment_prev_fy, 0) / 100;
-    const previousYearExpenditure = patchData.reduce((sum, d) => sum + d.expdr_prev_year, 0) / 100;
-    const liabilities = patchData.reduce((sum, d) => sum + d.liabilities, 0) / 100;
-    const effectiveSanction = patchData.reduce((sum, d) => sum + d.effective_sanction, 0) / 100;
+    // Helper to ensure valid numbers
+    const ensureNumber = (val) => {
+      const num = parseFloat(val) || 0;
+      return isNaN(num) || !isFinite(num) ? 0 : num;
+    };
     
-    // Calculate averages
+    // Sum up financial metrics (convert from lakhs to crores)
+    const currentYearAllocation = patchData.reduce((sum, d) => sum + ensureNumber(d.allotment_cfy), 0) / 100;
+    const currentYearExpenditure = patchData.reduce((sum, d) => sum + ensureNumber(d.total_expdr_register), 0) / 100;
+    const pendingBillsPAD = patchData.reduce((sum, d) => sum + ensureNumber(d.bill_pending_pad), 0) / 100;
+    const pendingBillsHQ = patchData.reduce((sum, d) => sum + ensureNumber(d.bill_pending_hqrs), 0) / 100;
+    const totalPendingBills = pendingBillsPAD + pendingBillsHQ;
+    
+    // Calculate balance funds properly
+    const balanceFunds = patchData.reduce((sum, d) => sum + ensureNumber(d.balance_fund), 0) / 100;
+    
+    // Additional financial metrics
+    const freshSanctions = patchData.reduce((sum, d) => sum + ensureNumber(d.fresh_sanction_cfy), 0) / 100;
+    const previousYearAllocation = patchData.reduce((sum, d) => sum + ensureNumber(d.allotment_prev_fy), 0) / 100;
+    const previousYearExpenditure = patchData.reduce((sum, d) => sum + ensureNumber(d.expdr_prev_year), 0) / 100;
+    const liabilities = patchData.reduce((sum, d) => sum + ensureNumber(d.liabilities), 0) / 100;
+    const effectiveSanction = patchData.reduce((sum, d) => sum + ensureNumber(d.effective_sanction), 0) / 100;
+    
+    // Calculate averages with NaN prevention
     const avgUtilizationRate = total > 0 
-      ? patchData.reduce((sum, d) => sum + parseFloat(d.utilization_rate || 0), 0) / total
+      ? patchData.reduce((sum, d) => sum + ensureNumber(d.utilization_rate), 0) / total
       : 0;
     
     const avgEfficiencyScore = total > 0
-      ? patchData.reduce((sum, d) => sum + parseFloat(d.efficiency_score || 0), 0) / total
+      ? patchData.reduce((sum, d) => sum + ensureNumber(d.efficiency_score), 0) / total
       : 0;
     
     // Count risk levels
@@ -251,36 +434,176 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     const lowRiskCount = patchData.filter(d => d.risk_level === 'LOW').length;
     
     // Utilization categories
-    const underUtilized = patchData.filter(d => parseFloat(d.utilization_rate) < 50).length;
-    const overUtilized = patchData.filter(d => parseFloat(d.utilization_rate) > 90).length;
-    const optimalUtilized = patchData.filter(d => 
-      parseFloat(d.utilization_rate) >= 50 && parseFloat(d.utilization_rate) <= 90
-    ).length;
+    const underUtilized = patchData.filter(d => ensureNumber(d.utilization_rate) < 50).length;
+    const overUtilized = patchData.filter(d => ensureNumber(d.utilization_rate) > 90).length;
+    const optimalUtilized = patchData.filter(d => {
+      const util = ensureNumber(d.utilization_rate);
+      return util >= 50 && util <= 90;
+    }).length;
     
-    return {
+    // Health status counts
+    const excellentHealth = patchData.filter(d => d.health_status === 'EXCELLENT').length;
+    const goodHealth = patchData.filter(d => d.health_status === 'GOOD').length;
+    const normalHealth = patchData.filter(d => d.health_status === 'NORMAL').length;
+    const poorHealth = patchData.filter(d => d.health_status === 'POOR').length;
+    const criticalHealth = patchData.filter(d => d.health_status === 'CRITICAL').length;
+    
+    // Top and bottom performers
+    const sortedByUtilization = [...patchData].sort((a, b) => 
+      ensureNumber(b.utilization_rate) - ensureNumber(a.utilization_rate)
+    );
+    const topUtilizers = sortedByUtilization.slice(0, 5);
+    const bottomUtilizers = sortedByUtilization.slice(-5).reverse();
+    
+    // Largest pending bills
+    const largestPendingBills = [...patchData]
+      .sort((a, b) => ensureNumber(b.pending_bills_total) - ensureNumber(a.pending_bills_total))
+      .slice(0, 5);
+    
+    // Ensure all returned values are valid numbers
+    const result = {
       totalRecords: total,
-      currentYearAllocation,
-      currentYearExpenditure,
-      pendingBillsPAD,
-      pendingBillsHQ,
-      totalPendingBills,
-      balanceFunds,
-      freshSanctions,
-      previousYearAllocation,
-      previousYearExpenditure,
-      liabilities,
-      effectiveSanction,
-      avgUtilizationRate: avgUtilizationRate.toFixed(2),
-      avgEfficiencyScore: avgEfficiencyScore.toFixed(2),
+      currentYearAllocation: isNaN(currentYearAllocation) ? 0 : currentYearAllocation,
+      currentYearExpenditure: isNaN(currentYearExpenditure) ? 0 : currentYearExpenditure,
+      pendingBillsPAD: isNaN(pendingBillsPAD) ? 0 : pendingBillsPAD,
+      pendingBillsHQ: isNaN(pendingBillsHQ) ? 0 : pendingBillsHQ,
+      totalPendingBills: isNaN(totalPendingBills) ? 0 : totalPendingBills,
+      balanceFunds: isNaN(balanceFunds) ? 0 : balanceFunds,
+      freshSanctions: isNaN(freshSanctions) ? 0 : freshSanctions,
+      previousYearAllocation: isNaN(previousYearAllocation) ? 0 : previousYearAllocation,
+      previousYearExpenditure: isNaN(previousYearExpenditure) ? 0 : previousYearExpenditure,
+      liabilities: isNaN(liabilities) ? 0 : liabilities,
+      effectiveSanction: isNaN(effectiveSanction) ? 0 : effectiveSanction,
+      avgUtilizationRate: isNaN(avgUtilizationRate) ? '0.00' : avgUtilizationRate.toFixed(2),
+      avgEfficiencyScore: isNaN(avgEfficiencyScore) ? '0.00' : avgEfficiencyScore.toFixed(2),
       criticalCount,
       highRiskCount,
       mediumRiskCount,
       lowRiskCount,
       underUtilized,
       overUtilized,
-      optimalUtilized
+      optimalUtilized,
+      excellentHealth,
+      goodHealth,
+      normalHealth,
+      poorHealth,
+      criticalHealth,
+      topUtilizers,
+      bottomUtilizers,
+      largestPendingBills
     };
+    
+    // Debug log for metrics
+    console.log('[PatchCYB] Metrics calculated:', {
+      totalRecords: result.totalRecords,
+      balanceFunds: result.balanceFunds.toFixed(2),
+      currentYearAllocation: result.currentYearAllocation.toFixed(2),
+      currentYearExpenditure: result.currentYearExpenditure.toFixed(2),
+      totalPendingBills: result.totalPendingBills.toFixed(2),
+      avgUtilizationRate: result.avgUtilizationRate,
+      avgEfficiencyScore: result.avgEfficiencyScore
+    });
+    
+    return result;
   }, [patchData]);
+
+  // Refresh data from server
+  const refreshPatchData = useCallback(async () => {
+    setPatchLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/csv/enggcurrentyear/rows?all=true`);
+      if (!response.ok) throw new Error('Failed to refresh data');
+      
+      const result = await response.json();
+      const processedData = processPatchData(result.rows || []);
+      setRawPatchData(processedData);
+      setLastUpdate(new Date());
+      setPatchError(null);
+      console.log('[PatchCYB] Data refreshed:', processedData.length, 'records');
+      return processedData;
+    } catch (err) {
+      setPatchError(err.message);
+      throw err;
+    } finally {
+      setPatchLoading(false);
+    }
+  }, [processPatchData]);
+
+  // Update single record
+  const updatePatchRecord = useCallback(async (index, updates) => {
+    try {
+      const response = await fetch(`${API_URL}/api/csv/enggcurrentyear/rows/${index}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updates)
+      });
+      
+      if (!response.ok) throw new Error('Failed to update record');
+      
+      const result = await response.json();
+      
+      // Refresh data after update
+      await refreshPatchData();
+      
+      return result;
+    } catch (err) {
+      console.error('[PatchCYB] Error updating record:', err);
+      throw err;
+    }
+  }, [refreshPatchData]);
+
+  // Add new record
+  const addPatchRecord = useCallback(async (newRecord) => {
+    try {
+      // Generate ID if not provided
+      if (!newRecord[dbConfig.idField]) {
+        newRecord[dbConfig.idField] = generateId('enggcurrentyear', Date.now(), rawPatchData.length + 1);
+      }
+      
+      const response = await fetch(`${API_URL}/api/csv/enggcurrentyear/rows`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newRecord)
+      });
+      
+      if (!response.ok) throw new Error('Failed to add record');
+      
+      const result = await response.json();
+      
+      // Refresh data after adding
+      await refreshPatchData();
+      
+      return result;
+    } catch (err) {
+      console.error('[PatchCYB] Error adding record:', err);
+      throw err;
+    }
+  }, [dbConfig, rawPatchData.length, refreshPatchData]);
+
+  // Delete record
+  const deletePatchRecord = useCallback(async (index) => {
+    try {
+      const response = await fetch(`${API_URL}/api/csv/enggcurrentyear/rows/${index}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) throw new Error('Failed to delete record');
+      
+      const result = await response.json();
+      
+      // Refresh data after deletion
+      await refreshPatchData();
+      
+      return result;
+    } catch (err) {
+      console.error('[PatchCYB] Error deleting record:', err);
+      throw err;
+    }
+  }, [refreshPatchData]);
 
   return {
     patchData,
@@ -288,107 +611,186 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     patchLoading,
     patchError,
     rawPatchData,
+    lastUpdate,
+    dbConfig,
+    refreshPatchData,
+    updatePatchRecord,
+    addPatchRecord,
+    deletePatchRecord,
     PatchDataTable: PatchDataTableComponent
   };
 };
 
-// Generate metric cards for patch data
+// Generate metric cards for patch data with enhanced details and fixed balance funds
 export const generatePatchBudgetMetrics = (patchMetrics, darkMode = false) => {
   if (!patchMetrics) return [];
+  
+  // Helper to ensure valid number display
+  const formatValue = (value) => {
+    const num = parseFloat(value) || 0;
+    return isNaN(num) || !isFinite(num) ? 0 : num;
+  };
+  
+  // Use balanceFunds (note the 's') as it's the correct property name
+  const balanceAmount = formatValue(patchMetrics.balanceFunds);
+  const allocationAmount = formatValue(patchMetrics.currentYearAllocation);
+  const utilizationRate = formatValue(patchMetrics.avgUtilizationRate);
+  const efficiencyScore = formatValue(patchMetrics.avgEfficiencyScore);
   
   return [
     {
       id: 'cy-allocation',
       group: 'budget',
       title: 'CY Allocation',
-      value: `₹${patchMetrics.currentYearAllocation.toFixed(2)}Cr`,
+      value: `₹${allocationAmount.toFixed(2)}Cr`,
       subtitle: `${patchMetrics.totalRecords} heads`,
       icon: Wallet,
       color: 'indigo',
       gradient: 'from-indigo-500 to-indigo-600',
       isPatchData: true,
       percentage: 100,
-      infoText: "Total budget allocated for the current financial year across all budget heads."
+      trend: allocationAmount > patchMetrics.previousYearAllocation ? 'up' : 'down',
+      trendValue: patchMetrics.previousYearAllocation > 0 
+        ? ((allocationAmount - patchMetrics.previousYearAllocation) / patchMetrics.previousYearAllocation * 100).toFixed(1)
+        : 0,
+      infoText: "Total budget allocated for the current financial year across all budget heads.",
+      details: {
+        'Previous Year': `₹${formatValue(patchMetrics.previousYearAllocation).toFixed(2)}Cr`,
+        'Fresh Sanctions': `₹${formatValue(patchMetrics.freshSanctions).toFixed(2)}Cr`,
+        'Effective Sanction': `₹${formatValue(patchMetrics.effectiveSanction).toFixed(2)}Cr`
+      }
     },
     {
       id: 'cy-expenditure',
       group: 'budget',
       title: 'CY Expenditure',
-      value: `₹${patchMetrics.currentYearExpenditure.toFixed(2)}Cr`,
-      subtitle: `${patchMetrics.avgUtilizationRate}% utilized`,
+      value: `₹${formatValue(patchMetrics.currentYearExpenditure).toFixed(2)}Cr`,
+      subtitle: `${utilizationRate}% utilized`,
       icon: CreditCard,
       color: 'blue',
       gradient: 'from-blue-500 to-blue-600',
       isPatchData: true,
-      percentage: parseFloat(patchMetrics.avgUtilizationRate),
-      infoText: "Total expenditure in the current financial year including e-lekha bookings and pending bills."
+      percentage: utilizationRate,
+      trend: utilizationRate >= 70 ? 'up' : 'down',
+      infoText: "Total expenditure in the current financial year including e-lekha bookings and pending bills.",
+      details: {
+        'Previous Year Expdr': `₹${formatValue(patchMetrics.previousYearExpenditure).toFixed(2)}Cr`,
+        'Efficiency Score': `${efficiencyScore}%`,
+        'Under Utilized': patchMetrics.underUtilized,
+        'Over Utilized': patchMetrics.overUtilized
+      }
     },
     {
       id: 'cy-pending-bills',
       group: 'budget',
       title: 'CY Pending Bills',
-      value: `₹${patchMetrics.totalPendingBills.toFixed(2)}Cr`,
-      subtitle: `PAD: ₹${patchMetrics.pendingBillsPAD.toFixed(2)}Cr`,
+      value: `₹${formatValue(patchMetrics.totalPendingBills).toFixed(2)}Cr`,
+      subtitle: `PAD: ₹${formatValue(patchMetrics.pendingBillsPAD).toFixed(2)}Cr | HQ: ₹${formatValue(patchMetrics.pendingBillsHQ).toFixed(2)}Cr`,
       icon: Receipt,
       color: 'orange',
       gradient: 'from-orange-500 to-orange-600',
       isPatchData: true,
-      alert: patchMetrics.totalPendingBills > patchMetrics.currentYearAllocation * 0.1,
-      infoText: "Bills pending with PAD and Headquarters for processing and payment."
+      alert: patchMetrics.totalPendingBills > allocationAmount * 0.1,
+      severity: patchMetrics.totalPendingBills > allocationAmount * 0.15 ? 'high' : 'medium',
+      infoText: "Bills pending with PAD and Headquarters for processing and payment.",
+      details: {
+        'Percent of Allocation': allocationAmount > 0 
+          ? `${(formatValue(patchMetrics.totalPendingBills) / allocationAmount * 100).toFixed(1)}%`
+          : '0%',
+        'Critical Count': patchMetrics.criticalCount
+      }
     },
     {
       id: 'cy-balance',
       group: 'budget',
       title: 'CY Balance Funds',
-      value: `₹${patchMetrics.balanceFunds.toFixed(2)}Cr`,
-      subtitle: 'Available',
+      value: `₹${balanceAmount.toFixed(2)}Cr`,
+      subtitle: allocationAmount > 0 
+        ? `${(balanceAmount / allocationAmount * 100).toFixed(1)}% available`
+        : '0% available',
       icon: PiggyBank,
       color: 'green',
       gradient: 'from-green-500 to-green-600',
       isPatchData: true,
-      infoText: "Remaining budget available for utilization in the current financial year."
-    },
-    {
-      id: 'cy-fresh-sanctions',
-      group: 'budget',
-      title: 'CY Fresh Sanctions',
-      value: `₹${patchMetrics.freshSanctions.toFixed(2)}Cr`,
-      subtitle: 'New approvals',
-      icon: CheckCircle,
-      color: 'teal',
-      gradient: 'from-teal-500 to-teal-600',
-      isPatchData: true,
-      infoText: "Fresh sanctions issued during the current financial year for new projects."
+      percentage: allocationAmount > 0 ? (balanceAmount / allocationAmount * 100) : 0,
+      infoText: "Remaining budget available for utilization in the current financial year (Allocation - Expenditure - Pending Bills).",
+      details: {
+        'Optimal Utilized': patchMetrics.optimalUtilized,
+        'Time Remaining': 'Q4 FY 2024-25',
+        'Allocation': `₹${allocationAmount.toFixed(2)}Cr`,
+        'Spent + Pending': `₹${(formatValue(patchMetrics.currentYearExpenditure) + formatValue(patchMetrics.totalPendingBills)).toFixed(2)}Cr`
+      }
     },
     {
       id: 'cy-liabilities',
       group: 'budget',
       title: 'CY Liabilities',
-      value: `₹${patchMetrics.liabilities.toFixed(2)}Cr`,
-      subtitle: 'Carried forward',
+      value: `₹${formatValue(patchMetrics.liabilities).toFixed(2)}Cr`,
+      subtitle: allocationAmount > 0 
+        ? `${(formatValue(patchMetrics.liabilities) / allocationAmount * 100).toFixed(1)}% of allocation`
+        : '0% of allocation',
       icon: AlertTriangle,
       color: 'red',
       gradient: 'from-red-500 to-red-600',
       isPatchData: true,
-      alert: patchMetrics.liabilities > patchMetrics.currentYearAllocation * 0.2,
-      infoText: "Liabilities carried forward from previous years that need to be cleared."
+      alert: patchMetrics.liabilities > allocationAmount * 0.2,
+      severity: patchMetrics.liabilities > allocationAmount * 0.3 ? 'critical' : 'high',
+      infoText: "Liabilities carried forward from previous years that need to be cleared.",
+      details: {
+        'High Risk Count': patchMetrics.highRiskCount,
+        'Critical Count': patchMetrics.criticalCount
+      }
+    },
+    {
+      id: 'cy-efficiency',
+      group: 'performance',
+      title: 'CY Efficiency Score',
+      value: `${efficiencyScore}%`,
+      subtitle: `${patchMetrics.excellentHealth + patchMetrics.goodHealth} performing well`,
+      icon: Target,
+      color: 'purple',
+      gradient: 'from-purple-500 to-purple-600',
+      isPatchData: true,
+      percentage: efficiencyScore,
+      trend: efficiencyScore >= 70 ? 'up' : 'down',
+      infoText: "Overall efficiency score based on utilization and pending bills.",
+      details: {
+        'Excellent': patchMetrics.excellentHealth,
+        'Good': patchMetrics.goodHealth,
+        'Normal': patchMetrics.normalHealth,
+        'Poor': patchMetrics.poorHealth,
+        'Critical': patchMetrics.criticalHealth
+      }
     }
   ];
 };
 
-// Patch Data Table Component
+// Enhanced Patch Data Table Component with config integration
 const PatchDataTableComponent = ({ 
   data = [], 
   darkMode = false, 
   title = "Current Year Budget Details",
   onClose,
-  isModal = false 
+  isModal = false,
+  onRowEdit,
+  onRowDelete,
+  onRefresh
 }) => {
   const [sortField, setSortField] = useState('serial_no');
   const [sortDirection, setSortDirection] = useState('asc');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [showAdvancedView, setShowAdvancedView] = useState(false);
   const itemsPerPage = 20;
+  
+  // Get database configuration
+  const dbConfig = useMemo(() => getConfig('enggcurrentyear'), []);
+
+  // Helper to ensure valid number display
+  const ensureNumber = (val) => {
+    const num = parseFloat(val) || 0;
+    return isNaN(num) || !isFinite(num) ? 0 : num;
+  };
 
   // Filter and sort data
   const processedData = useMemo(() => {
@@ -400,7 +802,8 @@ const PatchDataTableComponent = ({
       filtered = filtered.filter(item =>
         item.ftr_hq?.toLowerCase().includes(search) ||
         item.budget_head?.toLowerCase().includes(search) ||
-        item.sub_head?.toLowerCase().includes(search)
+        item.sub_head?.toLowerCase().includes(search) ||
+        item.scheme_name?.toLowerCase().includes(search)
       );
     }
     
@@ -441,45 +844,55 @@ const PatchDataTableComponent = ({
 
   const exportToCSV = () => {
     const headers = [
-      'S.No', 'Frontier HQ', 'Budget Head', 'Sub Head',
-      'Allocation', 'Expenditure', 'Utilization %', 'Balance',
-      'Pending Bills PAD', 'Pending Bills HQ', 'Risk Level'
+      'S.No',
+      'Frontier HQ',
+      'Budget Head',
+      'Sub Head',
+      'Scheme Name',
+      'Allocation CFY',
+      'Total Expenditure',
+      'Utilization %',
+      'Pending Bills (Total)',
+      'Balance Fund',
+      'Risk Level',
+      'Health Status'
     ];
     
     const rows = processedData.map(row => [
       row.serial_no,
       row.ftr_hq,
       row.budget_head,
-      row.sub_head,
-      row.allotment.toFixed(2),
-      row.total_expdr.toFixed(2),
-      row.utilization_rate,
-      row.balance_fund.toFixed(2),
-      row.bill_pending_pad.toFixed(2),
-      row.bill_pending_hqrs.toFixed(2),
-      row.risk_level
+      row.sub_head || '',
+      row.scheme_name || '',
+      ensureNumber(row.allotment_cfy).toFixed(2),
+      ensureNumber(row.total_expdr_register).toFixed(2),
+      ensureNumber(row.utilization_rate).toFixed(2),
+      ensureNumber(row.pending_bills_total).toFixed(2),
+      ensureNumber(row.balance_fund).toFixed(2),
+      row.risk_level,
+      row.health_status
     ]);
     
     const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => 
-        typeof cell === 'string' && cell.includes(',') 
-          ? `"${cell}"` 
-          : cell
-      ).join(','))
+      ['Current Year Budget Analysis Report'],
+      [`Generated: ${new Date().toLocaleString()}`],
+      [''],
+      headers,
+      ...rows.map(row => row.join(','))
     ].join('\n');
     
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `cy-budget-data-${Date.now()}.csv`;
+    a.download = `cy-budget-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const formatCurrency = (value) => {
-    return `₹${(value / 100).toFixed(2)}Cr`;
+    const num = ensureNumber(value);
+    return `₹${(num / 100).toFixed(2)}Cr`;
   };
 
   const getRiskBadgeColor = (risk) => {
@@ -490,6 +903,17 @@ const PatchDataTableComponent = ({
       LOW: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
     };
     return colors[risk] || colors.LOW;
+  };
+
+  const getHealthBadgeColor = (health) => {
+    const colors = {
+      EXCELLENT: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      GOOD: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      NORMAL: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400',
+      POOR: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+      CRITICAL: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+    };
+    return colors[health] || colors.NORMAL;
   };
 
   if (isModal) {
@@ -504,21 +928,47 @@ const PatchDataTableComponent = ({
           darkMode ? 'bg-gray-900' : 'bg-white'
         } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
           
-          {/* Header */}
+          {/* Header with Config Icon */}
           <div className={`px-6 py-4 border-b ${
             darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-indigo-500 to-indigo-600'
           }`}>
             <div className="flex justify-between items-center">
-              <div>
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
-                  {title}
-                </h2>
-                <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-indigo-100'}`}>
-                  Showing {processedData.length} budget entries
-                </p>
+              <div className="flex items-center gap-3">
+                <Calendar size={20} className="text-white" />
+                <div>
+                  <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                    {title}
+                  </h2>
+                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-indigo-100'}`}>
+                    Database: {dbConfig.displayName} | {processedData.length} entries
+                  </p>
+                </div>
+                <Key size={16} className="text-yellow-400" title={`ID Field: ${dbConfig.idField}`} />
               </div>
               
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowAdvancedView(!showAdvancedView)}
+                  className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 ${
+                    darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-indigo-700 hover:bg-indigo-800 text-white'
+                  } transition-colors`}
+                >
+                  <Layers size={14} />
+                  {showAdvancedView ? 'Simple' : 'Advanced'}
+                </button>
+                
+                {onRefresh && (
+                  <button
+                    onClick={onRefresh}
+                    className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 ${
+                      darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-indigo-700 hover:bg-indigo-800 text-white'
+                    } transition-colors`}
+                  >
+                    <RefreshCw size={14} />
+                    Refresh
+                  </button>
+                )}
+                
                 <button
                   onClick={exportToCSV}
                   className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 ${
@@ -549,7 +999,7 @@ const PatchDataTableComponent = ({
               <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by Frontier HQ, Budget Head, or Sub Head..."
+                placeholder="Search by Frontier HQ, Budget Head, Sub Head, or Scheme..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className={`w-full pl-9 pr-4 py-2 text-sm rounded-lg ${
@@ -568,81 +1018,227 @@ const PatchDataTableComponent = ({
                 darkMode ? 'bg-gray-800' : 'bg-gray-100'
               } z-10`}>
                 <tr>
-                  {[
-                    { field: 'serial_no', label: 'S.No', width: 'w-16' },
-                    { field: 'ftr_hq', label: 'Frontier HQ', width: 'w-32' },
-                    { field: 'budget_head', label: 'Budget Head', width: 'w-40' },
-                    { field: 'sub_head', label: 'Sub Head', width: 'w-40' },
-                    { field: 'allotment', label: 'Allocation', width: 'w-28' },
-                    { field: 'total_expdr', label: 'Expenditure', width: 'w-28' },
-                    { field: 'utilization_rate', label: 'Utilization', width: 'w-24' },
-                    { field: 'balance_fund', label: 'Balance', width: 'w-28' },
-                    { field: 'pending_bills_total', label: 'Pending Bills', width: 'w-28' },
-                    { field: 'risk_level', label: 'Risk', width: 'w-24' }
-                  ].map(col => (
-                    <th
-                      key={col.field}
-                      onClick={() => handleSort(col.field)}
-                      className={`${col.width} px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-opacity-80 ${
-                        darkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1">
-                        {col.label}
-                        {sortField === col.field && (
-                          <span className="text-indigo-500">
-                            {sortDirection === 'asc' ? '↑' : '↓'}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                  ))}
+                  {/* Table headers based on config */}
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                      onClick={() => handleSort('serial_no')}>
+                    <div className="flex items-center gap-1">
+                      <Fingerprint size={12} className="text-yellow-500" />
+                      ID
+                      {sortField === 'serial_no' && (
+                        <span className="text-indigo-500">
+                          {sortDirection === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                  
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                    <div className="flex items-center gap-1">
+                      <Building2 size={12} className="text-purple-500" />
+                      Location
+                    </div>
+                  </th>
+                  
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                    <div className="flex items-center gap-1">
+                      <FileText size={12} className="text-blue-500" />
+                      Budget Details
+                    </div>
+                  </th>
+                  
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                      onClick={() => handleSort('allotment_cfy')}>
+                    <div className="flex items-center gap-1">
+                      <DollarSign size={12} className="text-green-500" />
+                      Allocation
+                      {sortField === 'allotment_cfy' && (
+                        <span className="text-indigo-500">
+                          {sortDirection === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                  
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                    <div className="flex items-center gap-1">
+                      <Calculator size={12} className="text-orange-500" />
+                      Expenditure
+                    </div>
+                  </th>
+                  
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                      onClick={() => handleSort('utilization_rate')}>
+                    <div className="flex items-center gap-1">
+                      <Gauge size={12} className="text-purple-500" />
+                      Utilization
+                      {sortField === 'utilization_rate' && (
+                        <span className="text-indigo-500">
+                          {sortDirection === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                  
+                  {showAdvancedView && (
+                    <>
+                      <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                        <div className="flex items-center gap-1">
+                          <Clock size={12} className="text-red-500" />
+                          Pending Bills
+                        </div>
+                      </th>
+                      
+                      <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                          onClick={() => handleSort('balance_fund')}>
+                        <div className="flex items-center gap-1">
+                          <PiggyBank size={12} className="text-green-500" />
+                          Balance
+                          {sortField === 'balance_fund' && (
+                            <span className="text-indigo-500">
+                              {sortDirection === 'asc' ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </div>
+                      </th>
+                      
+                      <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                        <div className="flex items-center gap-1">
+                          <Shield size={12} className="text-yellow-500" />
+                          Status
+                        </div>
+                      </th>
+                    </>
+                  )}
+                  
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
+              
               <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                {paginatedData.map((row) => (
+                {paginatedData.map((row, index) => (
                   <tr 
                     key={row.id}
                     className={`hover:bg-opacity-50 transition-colors ${
                       darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-50'
                     }`}
                   >
-                    <td className="px-3 py-2 text-sm">{row.serial_no}</td>
-                    <td className="px-3 py-2 text-sm font-medium">{row.ftr_hq}</td>
-                    <td className="px-3 py-2 text-sm">{row.budget_head}</td>
-                    <td className="px-3 py-2 text-sm">{row.sub_head}</td>
-                    <td className="px-3 py-2 text-sm font-medium">
-                      {formatCurrency(row.allotment)}
-                    </td>
                     <td className="px-3 py-2 text-sm">
-                      {formatCurrency(row.total_expdr)}
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono text-xs">{row.serial_no}</span>
+                      </div>
                     </td>
+                    
+                    <td className="px-3 py-2 text-sm">
+                      <div className="space-y-1">
+                        <div className="font-medium">{row.ftr_hq}</div>
+                        {row.scheme_name && (
+                          <div className="text-xs text-gray-500">{row.scheme_name}</div>
+                        )}
+                      </div>
+                    </td>
+                    
+                    <td className="px-3 py-2 text-sm">
+                      <div className="space-y-1">
+                        <div className="font-medium">{row.budget_head}</div>
+                        {row.sub_head && (
+                          <div className="text-xs text-gray-500">{row.sub_head}</div>
+                        )}
+                      </div>
+                    </td>
+                    
+                    <td className="px-3 py-2 text-sm font-medium">
+                      {formatCurrency(row.allotment_cfy)}
+                    </td>
+                    
+                    <td className="px-3 py-2 text-sm">
+                      <div className="space-y-1">
+                        <div>{formatCurrency(row.total_expdr_register)}</div>
+                        <div className="text-xs text-gray-500">
+                          Prev: {formatCurrency(row.expdr_prev_year)}
+                        </div>
+                      </div>
+                    </td>
+                    
                     <td className="px-3 py-2 text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{row.utilization_rate}%</span>
-                        <div className="w-12 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <span className="font-medium">{ensureNumber(row.utilization_rate).toFixed(1)}%</span>
+                        <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                           <div 
-                            className="h-full bg-indigo-500"
-                            style={{ width: `${Math.min(100, row.utilization_rate)}%` }}
+                            className={`h-full ${
+                              ensureNumber(row.utilization_rate) >= 90 ? 'bg-green-500' :
+                              ensureNumber(row.utilization_rate) >= 70 ? 'bg-blue-500' :
+                              ensureNumber(row.utilization_rate) >= 50 ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }`}
+                            style={{ width: `${Math.min(100, ensureNumber(row.utilization_rate))}%` }}
                           />
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-sm">
-                      {formatCurrency(row.balance_fund)}
-                    </td>
-                    <td className="px-3 py-2 text-sm">
-                      <div className="text-xs">
-                        <div>{formatCurrency(row.pending_bills_total)}</div>
-                        <div className="text-gray-500">
-                          PAD: {formatCurrency(row.bill_pending_pad)}
-                        </div>
+                    
+                    {showAdvancedView && (
+                      <>
+                        <td className="px-3 py-2 text-sm">
+                          <div className="space-y-1">
+                            <div className="text-xs font-medium">
+                              Total: {formatCurrency(row.pending_bills_total)}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              PAD: {formatCurrency(row.bill_pending_pad)}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              HQ: {formatCurrency(row.bill_pending_hqrs)}
+                            </div>
+                          </div>
+                        </td>
+                        
+                        <td className="px-3 py-2 text-sm">
+                          <div className="font-medium text-green-600 dark:text-green-400">
+                            {formatCurrency(row.balance_fund)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {ensureNumber(row.allotment_cfy) > 0 
+                              ? `${((ensureNumber(row.balance_fund) / ensureNumber(row.allotment_cfy)) * 100).toFixed(1)}% avail`
+                              : '0% avail'}
+                          </div>
+                        </td>
+                        
+                        <td className="px-3 py-2 text-sm">
+                          <div className="space-y-1">
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getRiskBadgeColor(row.risk_level)}`}>
+                              {row.risk_level}
+                            </span>
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getHealthBadgeColor(row.health_status)}`}>
+                              {row.health_status}
+                            </span>
+                          </div>
+                        </td>
+                      </>
+                    )}
+                    
+                    <td className="px-3 py-2 text-sm text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        {onRowEdit && (
+                          <button
+                            onClick={() => onRowEdit(row, index)}
+                            className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded"
+                            title="Edit"
+                          >
+                            <Settings size={14} className="text-blue-500" />
+                          </button>
+                        )}
+                        {onRowDelete && (
+                          <button
+                            onClick={() => onRowDelete(row, index)}
+                            className="p-1 hover:bg-red-100 dark:hover:bg-red-900/20 rounded"
+                            title="Delete"
+                          >
+                            <X size={14} className="text-red-500" />
+                          </button>
+                        )}
                       </div>
-                    </td>
-                    <td className="px-3 py-2 text-sm">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getRiskBadgeColor(row.risk_level)}`}>
-                        {row.risk_level}
-                      </span>
                     </td>
                   </tr>
                 ))}
@@ -714,7 +1310,7 @@ const PatchDataTableComponent = ({
   }
 
   // Non-modal embedded view
-  return null; // Return null for now since we're only using modal view
+  return null;
 };
 
 // Export the table component

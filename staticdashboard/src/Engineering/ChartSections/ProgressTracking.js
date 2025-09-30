@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   ComposedChart, ScatterChart, Scatter, RadarChart, Radar,
@@ -10,8 +10,9 @@ import {
   TrendingUp, Target, Clock, Gauge, Activity,
   CheckCircle, XCircle, AlertTriangle, Timer,
   Zap, ArrowUp, ArrowDown, BarChart3, PieChart as PieChartIcon,
-  MapPin, Building2, Users
+  MapPin, Building2, Users, Eye, Calculator
 } from 'lucide-react';
+import FitViewModal from '../FitView';
 
 const COLORS = {
   progress: {
@@ -36,6 +37,21 @@ const COLORS = {
 };
 
 const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
+  const [showFitViewModal, setShowFitViewModal] = useState(false);
+  const [selectedProjectForFitView, setSelectedProjectForFitView] = useState(null);
+
+  // Handle opening FitView modal for project details
+  const handleOpenFitView = (project) => {
+    setSelectedProjectForFitView(project);
+    setShowFitViewModal(true);
+  };
+
+  // Handle closing FitView modal
+  const handleCloseFitView = () => {
+    setShowFitViewModal(false);
+    setSelectedProjectForFitView(null);
+  };
+
   const progressMetrics = useMemo(() => {
     if (!data || data.length === 0) {
       return {
@@ -65,13 +81,13 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
 
     const milestoneData = milestones.map(m => {
       const projects = data.filter(d => 
-        d.physical_progress >= m.range[0] && d.physical_progress <= m.range[1]
+        d.physical_progress_percent >= m.range[0] && d.physical_progress_percent <= m.range[1]
       );
       
       return {
         ...m,
         projects: projects.length,
-        budget: projects.reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100,
+        budget: projects.reduce((sum, d) => sum + (d.sd_amount_lakh || 0), 0),
         avgDelay: projects.length > 0 
           ? projects.reduce((sum, d) => sum + (d.delay_days || 0), 0) / projects.length
           : 0,
@@ -79,52 +95,52 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
       };
     });
 
-    // Velocity Analysis (Progress Rate) - FIXED
+    // Velocity Analysis (Progress Rate)
     const velocityData = data
-      .filter(d => d.date_award && d.physical_progress > 0)
+      .filter(d => d.award_date && d.physical_progress_percent > 0)
       .map(d => {
-        const startDate = new Date(d.date_award);
+        const startDate = new Date(d.award_date);
         const today = new Date();
         const daysElapsed = Math.max(1, Math.floor((today - startDate) / (1000 * 60 * 60 * 24)));
-        const velocity = d.physical_progress / daysElapsed;
+        const velocity = d.physical_progress_percent / daysElapsed;
         
         return {
           // Keep all original data fields
           ...d,
           // Add computed fields for display
-          project: d.scheme_name?.substring(0, 25) || 'Unknown',
+          project: d.sub_scheme_name?.substring(0, 25) || d.name_of_scheme?.substring(0, 25) || 'Unknown',
           velocity: velocity.toFixed(3),
-          progress: d.physical_progress,
+          progress: d.physical_progress_percent,
           daysElapsed,
-          expectedCompletion: velocity > 0 ? Math.ceil((100 - d.physical_progress) / velocity) : 999,
+          expectedCompletion: velocity > 0 ? Math.ceil((100 - d.physical_progress_percent) / velocity) : 999,
           status: velocity > 0.5 ? 'fast' : velocity > 0.2 ? 'normal' : velocity > 0.05 ? 'slow' : 'stalled',
           color: velocity > 0.5 ? COLORS.velocity.fast : 
                  velocity > 0.2 ? COLORS.velocity.normal : 
                  velocity > 0.05 ? COLORS.velocity.slow : COLORS.velocity.stalled,
           // Include location info
-          ftr_hq: d.ftr_hq || 'N/A',
-          shq: d.shq || 'N/A',
-          work_site: d.work_site || 'N/A'
+          ftr_hq: d.ftr_hq_name || 'N/A',
+          shq: d.shq_name || 'N/A',
+          work_site: d.location || 'N/A'
         };
       })
       .sort((a, b) => b.velocity - a.velocity)
       .slice(0, 20);
 
-    // Progress vs Budget Correlation - FIXED
+    // Progress vs Budget Correlation
     const progressBudgetCorrelation = data
-      .filter(d => d.sanctioned_amount > 0)
+      .filter(d => d.sd_amount_lakh > 0)
       .slice(0, 100)
       .map(d => ({
         // Keep all original data fields
         ...d,
         // Add computed fields for display
-        x: d.physical_progress,
-        y: d.percent_expdr || 0,
-        z: d.sanctioned_amount / 100,
-        name: d.scheme_name?.substring(0, 20) || 'Unknown',
+        x: d.physical_progress_percent,
+        y: d.expenditure_percent || 0,
+        z: d.sd_amount_lakh,
+        name: d.sub_scheme_name?.substring(0, 20) || d.name_of_scheme?.substring(0, 20) || 'Unknown',
         risk: d.risk_level,
-        fill: d.percent_expdr > d.physical_progress + 20 ? COLORS.correlation.inefficient :
-              d.physical_progress > d.percent_expdr + 20 ? COLORS.correlation.efficient : 
+        fill: d.expenditure_percent > d.physical_progress_percent + 20 ? COLORS.correlation.inefficient :
+              d.physical_progress_percent > d.expenditure_percent + 20 ? COLORS.correlation.efficient : 
               COLORS.correlation.normal
       }));
 
@@ -141,28 +157,28 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
 
     const progressDistribution = progressRanges.map(range => ({
       ...range,
-      count: data.filter(d => d.physical_progress >= range.min && d.physical_progress <= range.max).length,
+      count: data.filter(d => d.physical_progress_percent >= range.min && d.physical_progress_percent <= range.max).length,
       avgBudget: data
-        .filter(d => d.physical_progress >= range.min && d.physical_progress <= range.max)
-        .reduce((sum, d, _, arr) => sum + (d.sanctioned_amount || 0) / arr.length / 100, 0) || 0
+        .filter(d => d.physical_progress_percent >= range.min && d.physical_progress_percent <= range.max)
+        .reduce((sum, d, _, arr) => sum + (d.sd_amount_lakh || 0) / arr.length, 0) || 0
     }));
 
-    // Stagnant Projects - FIXED
+    // Stagnant Projects
     const stagnantProjects = data
-      .filter(d => d.physical_progress > 0 && d.physical_progress < 100 && d.delay_days > 60)
+      .filter(d => d.physical_progress_percent > 0 && d.physical_progress_percent < 100 && d.delay_days > 60)
       .map(d => ({
         // Keep all original data fields
         ...d,
         // Add computed fields for display
-        project: d.scheme_name?.substring(0, 30) || 'Unknown',
-        progress: d.physical_progress,
+        project: d.sub_scheme_name?.substring(0, 30) || d.name_of_scheme?.substring(0, 30) || 'Unknown',
+        progress: d.physical_progress_percent,
         stuckDays: d.delay_days,
-        budget: (d.sanctioned_amount / 100).toFixed(2),
+        budget: d.sd_amount_lakh.toFixed(2),
         agency: d.executive_agency || 'Unknown',
         risk: d.risk_level,
-        ftr_hq: d.ftr_hq || 'N/A',
-        shq: d.shq || 'N/A',
-        work_site: d.work_site || 'N/A'
+        ftr_hq: d.ftr_hq_name || 'N/A',
+        shq: d.shq_name || 'N/A',
+        work_site: d.location || 'N/A'
       }))
       .sort((a, b) => b.stuckDays - a.stuckDays)
       .slice(0, 15);
@@ -174,15 +190,15 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
         // Keep all original data fields
         ...d,
         // Add computed fields for display
-        project: d.scheme_name?.substring(0, 30) || 'Unknown',
-        progress: d.physical_progress,
+        project: d.sub_scheme_name?.substring(0, 30) || d.name_of_scheme?.substring(0, 30) || 'Unknown',
+        progress: d.physical_progress_percent,
         delayDays: d.delay_days,
-        budget: (d.sanctioned_amount / 100).toFixed(2),
+        budget: d.sd_amount_lakh.toFixed(2),
         agency: d.executive_agency || 'Unknown',
         risk: d.risk_level,
-        ftr_hq: d.ftr_hq || 'N/A',
-        shq: d.shq || 'N/A',
-        work_site: d.work_site || 'N/A',
+        ftr_hq: d.ftr_hq_name || 'N/A',
+        shq: d.shq_name || 'N/A',
+        work_site: d.location || 'N/A',
         contractor: d.firm_name || 'N/A'
       }))
       .sort((a, b) => b.delayDays - a.delayDays)
@@ -204,10 +220,10 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
         };
       }
       agencyProgress[agency].totalProjects++;
-      agencyProgress[agency].totalProgress += d.physical_progress || 0;
-      agencyProgress[agency].totalBudget += (d.sanctioned_amount || 0) / 100;
-      if (d.physical_progress >= 100) agencyProgress[agency].completed++;
-      if (d.delay_days === 0 && d.physical_progress > 0) agencyProgress[agency].onTrack++;
+      agencyProgress[agency].totalProgress += d.physical_progress_percent || 0;
+      agencyProgress[agency].totalBudget += (d.sd_amount_lakh || 0);
+      if (d.physical_progress_percent >= 100) agencyProgress[agency].completed++;
+      if (d.delay_days === 0 && d.physical_progress_percent > 0) agencyProgress[agency].onTrack++;
       if (d.delay_days > 0) agencyProgress[agency].delayed++;
     });
 
@@ -223,7 +239,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
     // Progress by Frontier HQ
     const frontierProgress = {};
     data.forEach(d => {
-      const frontier = d.ftr_hq || 'Unknown';
+      const frontier = d.ftr_hq_name || 'Unknown';
       if (!frontierProgress[frontier]) {
         frontierProgress[frontier] = {
           name: frontier,
@@ -236,9 +252,9 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
         };
       }
       frontierProgress[frontier].totalProjects++;
-      frontierProgress[frontier].totalProgress += d.physical_progress || 0;
-      frontierProgress[frontier].totalBudget += (d.sanctioned_amount || 0) / 100;
-      if (d.physical_progress >= 100) frontierProgress[frontier].completed++;
+      frontierProgress[frontier].totalProgress += d.physical_progress_percent || 0;
+      frontierProgress[frontier].totalBudget += (d.sd_amount_lakh || 0);
+      if (d.physical_progress_percent >= 100) frontierProgress[frontier].completed++;
       if (d.delay_days > 0) frontierProgress[frontier].delayed++;
       if (d.risk_level === 'CRITICAL') frontierProgress[frontier].criticalProjects++;
     });
@@ -266,8 +282,8 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
         };
       }
       budgetHeadProgress[head].totalProjects++;
-      budgetHeadProgress[head].totalProgress += d.physical_progress || 0;
-      budgetHeadProgress[head].budget += (d.sanctioned_amount || 0) / 100;
+      budgetHeadProgress[head].totalProgress += d.physical_progress_percent || 0;
+      budgetHeadProgress[head].budget += (d.sd_amount_lakh || 0);
     });
 
     const progressByBudgetHead = Object.values(budgetHeadProgress)
@@ -277,7 +293,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
       }))
       .sort((a, b) => b.totalProjects - a.totalProjects);
 
-    // Completion Forecast (Next 6 months) - FIXED to ensure proper data structure
+    // Completion Forecast (Next 6 months)
     const completionForecast = [];
     const today = new Date();
     for (let i = 0; i < 6; i++) {
@@ -286,8 +302,8 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
       const monthKey = `${forecastDate.getFullYear()}-${String(forecastDate.getMonth() + 1).padStart(2, '0')}`;
       
       const expectedCompletions = data.filter(d => {
-        if (d.physical_progress >= 100) return false;
-        const progressNeeded = 100 - d.physical_progress;
+        if (d.physical_progress_percent >= 100) return false;
+        const progressNeeded = 100 - d.physical_progress_percent;
         const monthsNeeded = progressNeeded / 10; // Assuming 10% progress per month
         return monthsNeeded <= i + 1 && monthsNeeded > i;
       }).length;
@@ -299,13 +315,13 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
       });
     }
 
-    // Progress Trend Analysis - FIXED to ensure proper data structure
+    // Progress Trend Analysis
     const progressTrend = [];
     const monthlyProgress = {};
     
     data.forEach(d => {
-      if (d.date_award) {
-        const date = new Date(d.date_award);
+      if (d.award_date) {
+        const date = new Date(d.award_date);
         if (!isNaN(date.getTime())) {
           const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
           if (!monthlyProgress[monthKey]) {
@@ -316,7 +332,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
               projects: 0
             };
           }
-          monthlyProgress[monthKey].totalProgress += d.physical_progress || 0;
+          monthlyProgress[monthKey].totalProgress += d.physical_progress_percent || 0;
           monthlyProgress[monthKey].projects++;
         }
       }
@@ -433,7 +449,12 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                 <XAxis dataKey="x" name="Progress %" domain={[0, 100]} tick={{ fontSize: 10 }} />
                 <YAxis dataKey="y" name="Budget Used %" domain={[0, 120]} tick={{ fontSize: 10 }} />
                 <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
-                <Scatter name="Projects" data={progressMetrics.progressBudgetCorrelation}>
+                <Scatter 
+                  name="Projects" 
+                  data={progressMetrics.progressBudgetCorrelation}
+                  onClick={(data) => handleOpenFitView(data)}
+                  style={{ cursor: 'pointer' }}
+                >
                   {progressMetrics.progressBudgetCorrelation.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
@@ -490,6 +511,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                 <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Frontier HQ</th>
                 <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Days to Complete</th>
                 <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Status</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Actions</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
@@ -497,7 +519,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                 <tr 
                   key={index} 
                   className={`hover:${darkMode ? 'bg-gray-700' : 'bg-blue-50'} cursor-pointer transition-colors`}
-                  onClick={() => onChartClick(item, 'project')}
+                  onClick={() => handleOpenFitView(item)}
                 >
                   <td className="px-3 py-2 truncate max-w-[200px]">
                     <div>
@@ -531,6 +553,20 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                       {item.status}
                     </span>
                   </td>
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenFitView(item);
+                      }}
+                      className={`px-2 py-1 rounded-lg text-xs flex items-center gap-1 mx-auto ${
+                        darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-blue-50 hover:bg-blue-100'
+                      } transition-colors text-blue-600 dark:text-blue-400`}
+                    >
+                      <Calculator size={12} />
+                      Analytics
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -556,7 +592,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                     ? darkMode ? 'border-red-800 bg-red-900/20' : 'border-red-200 bg-red-50'
                     : darkMode ? 'border-orange-800 bg-orange-900/20' : 'border-orange-200 bg-orange-50'
                 }`}
-                onClick={() => onChartClick(project, 'project')}
+                onClick={() => handleOpenFitView(project)}
               >
                 <div className="flex justify-between items-start mb-2">
                   <p className="text-xs font-semibold truncate flex-1 text-gray-900 dark:text-gray-100">{project.project}</p>
@@ -594,8 +630,12 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                     </div>
                     <div>
                       <span className="text-gray-500">Budget:</span>
-                      <p className="font-semibold text-gray-700 dark:text-gray-300">₹{project.budget}Cr</p>
+                      <p className="font-semibold text-gray-700 dark:text-gray-300">₹{project.budget}L</p>
                     </div>
+                  </div>
+                  <div className="mt-2 flex items-center justify-center text-xs text-gray-500">
+                    <Eye size={10} className="mr-1" />
+                    Click for detailed analytics
                   </div>
                 </div>
               </div>
@@ -620,7 +660,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                 className={`p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.02] ${
                   darkMode ? 'border-yellow-800 bg-yellow-900/20' : 'border-yellow-200 bg-yellow-50'
                 }`}
-                onClick={() => onChartClick(project, 'project')}
+                onClick={() => handleOpenFitView(project)}
               >
                 <p className="text-xs font-semibold truncate text-gray-900 dark:text-gray-100">{project.project}</p>
                 <p className="text-xs text-gray-500 truncate mt-1">
@@ -638,8 +678,12 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-600 dark:text-gray-400">Budget:</span>
-                    <span className="font-medium text-gray-700 dark:text-gray-300">₹{project.budget} Cr</span>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">₹{project.budget} L</span>
                   </div>
+                </div>
+                <div className="mt-2 flex items-center justify-center text-xs text-gray-500">
+                  <Calculator size={10} className="mr-1" />
+                  View analytics
                 </div>
               </div>
             ))}
@@ -647,7 +691,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
         </div>
       )}
 
-      {/* Completion Forecast - FIXED AreaChart */}
+      {/* Completion Forecast */}
       {progressMetrics.completionForecast.length > 0 && (
         <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
           darkMode ? 'border-gray-700' : 'border-gray-100'
@@ -690,7 +734,7 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
                 <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Completed</th>
                 <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">On Track</th>
                 <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Delayed</th>
-                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Budget (Cr)</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Budget (L)</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
@@ -717,6 +761,14 @@ const ProgressTracking = ({ data, darkMode, onChartClick, formatAmount }) => {
           </table>
         </div>
       </div>
+
+      {/* FitView Modal */}
+      <FitViewModal
+        row={selectedProjectForFitView}
+        isOpen={showFitViewModal}
+        onClose={handleCloseFitView}
+        darkMode={darkMode}
+      />
     </div>
   );
 };

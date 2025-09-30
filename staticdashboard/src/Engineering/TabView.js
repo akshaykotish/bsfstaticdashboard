@@ -2,10 +2,27 @@ import React, { useState, useMemo } from 'react';
 import { 
   Check, Globe, Briefcase, Zap, Timer, 
   AlertTriangle, PauseCircle, CreditCard, Info, 
-  RotateCcw, Layers, DollarSign, Activity, Heart
+  RotateCcw, Layers, DollarSign, Activity, Heart,
+  FileText, MapPin, Building2, Users, Calendar, Hash,
+  Navigation, Clock, Target, Package
 } from 'lucide-react';
 
-const TabView = ({ filters, darkMode, rawData = [] }) => {
+// Import database configurations
+let databaseConfigs;
+try {
+  const configModule = require('../System/config');
+  databaseConfigs = configModule.databaseConfigs || configModule.default || configModule;
+} catch (error) {
+  console.warn('Could not load config.js, using fallback configuration');
+  databaseConfigs = {};
+}
+
+const TabView = ({ filters, darkMode, rawData = [], databaseName = 'engineering' }) => {
+  // Get database configuration
+  const dbConfig = useMemo(() => {
+    return databaseConfigs[databaseName] || databaseConfigs.engineering || {};
+  }, [databaseName]);
+
   // Pace/Health status options with icons and colors
   const healthStatusOptions = [
     { value: 'PERFECT_PACE', label: 'Perfect Pace', icon: Zap, color: 'green' },
@@ -28,43 +45,91 @@ const TabView = ({ filters, darkMode, rawData = [] }) => {
     { value: 'COMPLETED', label: '100% Completed' }
   ];
 
-  // Get available options from filters (these are already cascaded/filtered)
-  const availableOptions = useMemo(() => {
-    return filters.availableOptions || {
-      budgetHeads: [],
-      frontierHQs: [],
-      sectorHQs: [],
-      schemes: [],
-      progressCategories: [],
-      healthStatuses: []
-    };
-  }, [filters.availableOptions]);
-
-  // Get all options from raw data for showing totals
-  const allOptions = useMemo(() => {
-    if (!rawData || rawData.length === 0) {
-      return {
-        budgetHeads: [],
-        frontierHQs: [],
-        sectorHQs: [],
-        schemes: [],
-        progressCategories: [],
-        healthStatuses: []
-      };
+  // Define only the fields you want to show
+  const fieldConfigs = [
+    {
+      field: 'budget_head',
+      title: 'Budget Head',
+      icon: DollarSign,
+      type: 'column'
+    },
+    {
+      field: 'name_of_scheme',
+      title: 'Name of Scheme', 
+      icon: Briefcase,
+      type: 'column'
+    },
+    {
+      field: 'ftr_hq_name',
+      title: 'Frontier HQ Name',
+      icon: Globe,
+      type: 'column'
+    },
+    {
+      field: 'shq_name',
+      title: 'SHQ Name',
+      icon: Navigation,
+      type: 'column'
+    },
+    {
+      field: 'location',
+      title: 'Location',
+      icon: MapPin,
+      type: 'column'
+    },
+    {
+      field: 'executive_agency',
+      title: 'Executive Agency',
+      icon: Building2,
+      type: 'column'
+    },
+    {
+      field: 'health_status',
+      title: 'Project Health (Pace)',
+      icon: Heart,
+      type: 'derived',
+      options: healthStatusOptions
+    },
+    {
+      field: 'progress_category',
+      title: 'Physical Progress',
+      icon: Activity,
+      type: 'derived',
+      options: progressCategoryOptions
     }
+  ];
 
-    return {
-      budgetHeads: [...new Set(rawData.map(d => d.budget_head))].filter(Boolean).sort(),
-      frontierHQs: [...new Set(rawData.map(d => d.ftr_hq))].filter(Boolean).sort(),
-      sectorHQs: [...new Set(rawData.map(d => d.shq))].filter(Boolean).sort(),
-      schemes: [...new Set(rawData.map(d => d.scheme_name))].filter(Boolean).sort(),
-      progressCategories: progressCategoryOptions.map(p => p.value),
-      healthStatuses: healthStatusOptions.map(h => h.value)
-    };
-  }, [rawData]);
+  // Get available options from filters or data
+  const getFieldOptions = (field) => {
+    // Try from filters first
+    if (filters.availableOptions && filters.availableOptions[field]) {
+      return filters.availableOptions[field];
+    }
+    
+    // Try from column filters
+    if (filters.columnFilters && field in filters.columnFilters) {
+      const uniqueValues = [...new Set(rawData.map(d => d[field]))].filter(Boolean);
+      return uniqueValues.sort();
+    }
+    
+    // Fallback to extracting from raw data
+    if (rawData && rawData.length > 0) {
+      const uniqueValues = [...new Set(rawData.map(d => d[field]))].filter(Boolean);
+      return uniqueValues.sort();
+    }
+    
+    return [];
+  };
+
+  // Get all options (unfiltered) for showing totals
+  const getAllFieldOptions = (field) => {
+    if (!rawData || rawData.length === 0) return [];
+    const uniqueValues = [...new Set(rawData.map(d => d[field]))].filter(Boolean);
+    return uniqueValues.sort();
+  };
 
   // Calculate counts for each option
-  const getCounts = (field) => {
+  const getFieldCounts = (field) => {
     const counts = {};
     if (!filters.filteredData) return counts;
     
@@ -78,14 +143,53 @@ const TabView = ({ filters, darkMode, rawData = [] }) => {
     return counts;
   };
 
-  const counts = useMemo(() => ({
-    budgetHeads: getCounts('budget_head'),
-    frontierHQs: getCounts('ftr_hq'),
-    sectorHQs: getCounts('shq'),
-    schemes: getCounts('scheme_name'),
-    progressCategories: getCounts('progress_category'),
-    healthStatuses: getCounts('health_status')
-  }), [filters.filteredData]);
+  // Get selected values for a field
+  const getSelectedValues = (field) => {
+    // Check column filters first
+    if (filters.columnFilters && filters.columnFilters[field]) {
+      return filters.columnFilters[field];
+    }
+    
+    // Check backwards compatibility properties
+    const fieldMappings = {
+      'budget_head': filters.selectedBudgetHeads,
+      'executive_agency': filters.selectedAgencies,
+      'ftr_hq_name': filters.selectedFrontierHQs,
+      'shq_name': filters.selectedSectorHQs,
+      'name_of_scheme': filters.selectedSchemes,
+      'location': filters.selectedLocations,
+      'health_status': filters.selectedHealthStatuses,
+      'progress_category': filters.selectedProgressCategories
+    };
+    
+    return fieldMappings[field] || [];
+  };
+
+  // Set selected values for a field
+  const setSelectedValues = (field, values) => {
+    // Try column filter first
+    if (filters.setColumnFilter) {
+      filters.setColumnFilter(field, values);
+      return;
+    }
+    
+    // Fallback to specific setters
+    const fieldSetters = {
+      'budget_head': filters.setSelectedBudgetHeads,
+      'executive_agency': filters.setSelectedAgencies,
+      'ftr_hq_name': filters.setSelectedFrontierHQs,
+      'shq_name': filters.setSelectedSectorHQs,
+      'name_of_scheme': filters.setSelectedSchemes,
+      'location': filters.setSelectedLocations,
+      'health_status': filters.setSelectedHealthStatuses,
+      'progress_category': filters.setSelectedProgressCategories
+    };
+    
+    const setter = fieldSetters[field];
+    if (setter && typeof setter === 'function') {
+      setter(values);
+    }
+  };
 
   // Tab component
   const Tab = ({ label, selected, onClick, count, disabled = false, icon: Icon, color = 'gray' }) => {
@@ -167,21 +271,61 @@ const TabView = ({ filters, darkMode, rawData = [] }) => {
   const FilterRow = ({ 
     title, 
     icon: Icon, 
-    items, 
-    selectedItems, 
-    onToggle, 
-    onClearAll,
-    onSelectAll,
-    showCounts = false,
-    itemCounts = {},
-    customLabels = {},
-    customColors = {},
-    customIcons = {},
-    isFiltered = false,
-    totalCount = 0
+    field,
+    config = {}
   }) => {
+    const items = getFieldOptions(field);
+    const allItems = getAllFieldOptions(field);
+    const selectedItems = getSelectedValues(field);
+    const itemCounts = getFieldCounts(field);
+    const isFiltered = items.length < allItems.length;
+    
+    // Get custom labels and colors for specific field types
+    let customLabels = {};
+    let customColors = {};
+    let customIcons = {};
+    
+    if (config.options) {
+      config.options.forEach(opt => {
+        customLabels[opt.value] = opt.label;
+        if (opt.color) customColors[opt.value] = opt.color;
+        if (opt.icon) customIcons[opt.value] = opt.icon;
+      });
+    }
+    
+    // Special handling for progress categories
+    if (field === 'progress_category') {
+      customColors = {
+        'TENDER_PROGRESS': 'gray',
+        'TENDERED_NOT_AWARDED': 'yellow',
+        'AWARDED_NOT_STARTED': 'orange',
+        'NOT_STARTED': 'red',
+        'PROGRESS_1_TO_50': 'yellow',
+        'PROGRESS_51_TO_71': 'blue',
+        'PROGRESS_71_TO_99': 'green',
+        'COMPLETED': 'green'
+      };
+    }
+    
     const selectedCount = selectedItems.length;
     const noneSelected = selectedCount === 0;
+
+    const handleToggle = (item) => {
+      const current = selectedItems;
+      if (current.includes(item)) {
+        setSelectedValues(field, current.filter(i => i !== item));
+      } else {
+        setSelectedValues(field, [...current, item]);
+      }
+    };
+
+    const handleClearAll = () => {
+      setSelectedValues(field, []);
+    };
+
+    const handleSelectAll = () => {
+      setSelectedValues(field, items);
+    };
 
     return (
       <div className={`
@@ -199,8 +343,8 @@ const TabView = ({ filters, darkMode, rawData = [] }) => {
               <p className="text-[10px] text-gray-500 dark:text-gray-400">
                 {noneSelected ? 'All shown' : `${selectedCount} selected`}
                 {items.length > 0 && ` • ${items.length} available`}
-                {isFiltered && totalCount > items.length && (
-                  <span className="text-orange-500"> (filtered from {totalCount})</span>
+                {isFiltered && allItems.length > items.length && (
+                  <span className="text-orange-500"> (filtered from {allItems.length})</span>
                 )}
               </p>
             </div>
@@ -209,7 +353,7 @@ const TabView = ({ filters, darkMode, rawData = [] }) => {
           <div className="flex gap-1">
             {items.length > 0 && (
               <button
-                onClick={onSelectAll}
+                onClick={handleSelectAll}
                 className="px-2 py-1 text-[10px] font-medium rounded-lg
                          bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50
                          transition-all duration-200"
@@ -219,7 +363,7 @@ const TabView = ({ filters, darkMode, rawData = [] }) => {
             )}
             {selectedCount > 0 && (
               <button
-                onClick={onClearAll}
+                onClick={handleClearAll}
                 className="px-2 py-1 text-[10px] font-medium rounded-lg
                          bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600
                          transition-all duration-200"
@@ -242,8 +386,8 @@ const TabView = ({ filters, darkMode, rawData = [] }) => {
                 key={item}
                 label={customLabels[item] || item}
                 selected={selectedItems.includes(item)}
-                onClick={() => onToggle(item)}
-                count={showCounts ? itemCounts[item] : undefined}
+                onClick={() => handleToggle(item)}
+                count={itemCounts[item]}
                 icon={customIcons[item]}
                 color={customColors[item] || 'gray'}
               />
@@ -254,24 +398,7 @@ const TabView = ({ filters, darkMode, rawData = [] }) => {
     );
   };
 
-  // Check if cascading is active
-  const isCascaded = useMemo(() => {
-    return (
-      availableOptions.budgetHeads?.length < allOptions.budgetHeads?.length ||
-      availableOptions.frontierHQs?.length < allOptions.frontierHQs?.length ||
-      availableOptions.sectorHQs?.length < allOptions.sectorHQs?.length ||
-      availableOptions.schemes?.length < allOptions.schemes?.length
-    );
-  }, [availableOptions, allOptions]);
-
   const hasActiveFilters = filters.hasActiveFilters ? filters.hasActiveFilters() : false;
-
-  // Debug log to verify filters object
-  console.log('[TabView] Filters object:', {
-    hasSetSelectedSchemes: typeof filters.setSelectedSchemes === 'function',
-    selectedSchemes: filters.selectedSchemes,
-    availableSchemes: availableOptions.schemes?.slice(0, 3)
-  });
 
   return (
     <div className="space-y-3">
@@ -286,10 +413,11 @@ const TabView = ({ filters, darkMode, rawData = [] }) => {
             <Layers size={18} className="text-gray-700 dark:text-gray-300" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">Fast Filter View</h2>
+            <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">
+              Fast Filter View
+            </h2>
             <p className="text-xs text-gray-600 dark:text-gray-400">
               {hasActiveFilters ? 'Showing filtered results' : 'Showing all • Click tabs to filter'}
-              {isCascaded && ' • Smart filtering active'}
             </p>
           </div>
         </div>
@@ -316,172 +444,17 @@ const TabView = ({ filters, darkMode, rawData = [] }) => {
         </div>
       </div>
 
-      {/* Filter Rows */}
+      {/* Filter Rows - Only showing requested fields */}
       <div className="space-y-2">
-        {/* Budget Heads */}
-        <FilterRow
-          title="Budget Heads"
-          icon={DollarSign}
-          items={availableOptions.budgetHeads}
-          selectedItems={filters.selectedBudgetHeads || []}
-          onToggle={(item) => {
-            const current = filters.selectedBudgetHeads || [];
-            if (current.includes(item)) {
-              filters.setSelectedBudgetHeads(current.filter(i => i !== item));
-            } else {
-              filters.setSelectedBudgetHeads([...current, item]);
-            }
-          }}
-          onClearAll={() => filters.setSelectedBudgetHeads([])}
-          onSelectAll={() => filters.setSelectedBudgetHeads(availableOptions.budgetHeads)}
-          showCounts={true}
-          itemCounts={counts.budgetHeads}
-          isFiltered={availableOptions.budgetHeads.length < allOptions.budgetHeads.length}
-          totalCount={allOptions.budgetHeads.length}
-        />
-
-        {/* Frontier HQs */}
-        <FilterRow
-          title="Frontier HQs"
-          icon={Globe}
-          items={availableOptions.frontierHQs}
-          selectedItems={filters.selectedFrontierHQs || []}
-          onToggle={(item) => {
-            const current = filters.selectedFrontierHQs || [];
-            if (current.includes(item)) {
-              filters.setSelectedFrontierHQs(current.filter(i => i !== item));
-            } else {
-              filters.setSelectedFrontierHQs([...current, item]);
-            }
-          }}
-          onClearAll={() => filters.setSelectedFrontierHQs([])}
-          onSelectAll={() => filters.setSelectedFrontierHQs(availableOptions.frontierHQs)}
-          showCounts={true}
-          itemCounts={counts.frontierHQs}
-          isFiltered={availableOptions.frontierHQs.length < allOptions.frontierHQs.length}
-          totalCount={allOptions.frontierHQs.length}
-        />
-
-        {/* Schemes - FIXED IMPLEMENTATION */}
-        <FilterRow
-          title="Schemes"
-          icon={Briefcase}
-          items={availableOptions.schemes}
-          selectedItems={filters.selectedSchemes || []}
-          onToggle={(item) => {
-            console.log('[TabView] Scheme toggle clicked:', item);
-            console.log('[TabView] Current selected schemes:', filters.selectedSchemes);
-            
-            if (!filters.setSelectedSchemes || typeof filters.setSelectedSchemes !== 'function') {
-              console.error('[TabView] setSelectedSchemes is not a function!');
-              return;
-            }
-            
-            const current = filters.selectedSchemes || [];
-            const newSelection = current.includes(item) 
-              ? current.filter(i => i !== item)
-              : [...current, item];
-            
-            console.log('[TabView] New selection will be:', newSelection);
-            filters.setSelectedSchemes(newSelection);
-          }}
-          onClearAll={() => {
-            console.log('[TabView] Clear all schemes clicked');
-            if (filters.setSelectedSchemes) {
-              filters.setSelectedSchemes([]);
-            }
-          }}
-          onSelectAll={() => {
-            console.log('[TabView] Select all schemes clicked');
-            if (filters.setSelectedSchemes) {
-              filters.setSelectedSchemes(availableOptions.schemes);
-            }
-          }}
-          showCounts={true}
-          itemCounts={counts.schemes}
-          isFiltered={availableOptions.schemes.length < allOptions.schemes.length}
-          totalCount={allOptions.schemes.length}
-        />
-
-        {/* Sector HQs */}
-        <FilterRow
-          title="Sector HQs"
-          icon={Globe}
-          items={availableOptions.sectorHQs}
-          selectedItems={filters.selectedSectorHQs || []}
-          onToggle={(item) => {
-            const current = filters.selectedSectorHQs || [];
-            if (current.includes(item)) {
-              filters.setSelectedSectorHQs(current.filter(i => i !== item));
-            } else {
-              filters.setSelectedSectorHQs([...current, item]);
-            }
-          }}
-          onClearAll={() => filters.setSelectedSectorHQs([])}
-          onSelectAll={() => filters.setSelectedSectorHQs(availableOptions.sectorHQs)}
-          showCounts={true}
-          itemCounts={counts.sectorHQs}
-          isFiltered={availableOptions.sectorHQs.length < allOptions.sectorHQs.length}
-          totalCount={allOptions.sectorHQs.length}
-        />
-
-        {/* Progress Categories */}
-        <FilterRow
-          title="Physical Progress"
-          icon={Activity}
-          items={availableOptions.progressCategories}
-          selectedItems={filters.selectedProgressCategories || []}
-          onToggle={(item) => {
-            const current = filters.selectedProgressCategories || [];
-            if (current.includes(item)) {
-              filters.setSelectedProgressCategories(current.filter(i => i !== item));
-            } else {
-              filters.setSelectedProgressCategories([...current, item]);
-            }
-          }}
-          onClearAll={() => filters.setSelectedProgressCategories([])}
-          onSelectAll={() => filters.setSelectedProgressCategories(availableOptions.progressCategories)}
-          showCounts={true}
-          itemCounts={counts.progressCategories}
-          customLabels={Object.fromEntries(progressCategoryOptions.map(p => [p.value, p.label]))}
-          customColors={{
-            'TENDER_PROGRESS': 'gray',
-            'TENDERED_NOT_AWARDED': 'yellow',
-            'AWARDED_NOT_STARTED': 'orange',
-            'NOT_STARTED': 'red',
-            'PROGRESS_1_TO_50': 'yellow',
-            'PROGRESS_51_TO_71': 'blue',
-            'PROGRESS_71_TO_99': 'green',
-            'COMPLETED': 'green'
-          }}
-          isFiltered={availableOptions.progressCategories.length < allOptions.progressCategories.length}
-          totalCount={allOptions.progressCategories.length}
-        />
-
-        {/* Health Status (Pace) */}
-        <FilterRow
-          title="Project Health (Pace)"
-          icon={Heart}
-          items={availableOptions.healthStatuses}
-          selectedItems={filters.selectedHealthStatuses || []}
-          onToggle={(item) => {
-            const current = filters.selectedHealthStatuses || [];
-            if (current.includes(item)) {
-              filters.setSelectedHealthStatuses(current.filter(i => i !== item));
-            } else {
-              filters.setSelectedHealthStatuses([...current, item]);
-            }
-          }}
-          onClearAll={() => filters.setSelectedHealthStatuses([])}
-          onSelectAll={() => filters.setSelectedHealthStatuses(availableOptions.healthStatuses)}
-          showCounts={true}
-          itemCounts={counts.healthStatuses}
-          customLabels={Object.fromEntries(healthStatusOptions.map(h => [h.value, h.label]))}
-          customColors={Object.fromEntries(healthStatusOptions.map(h => [h.value, h.color]))}
-          customIcons={Object.fromEntries(healthStatusOptions.map(h => [h.value, h.icon]))}
-          isFiltered={availableOptions.healthStatuses.length < allOptions.healthStatuses.length}
-          totalCount={allOptions.healthStatuses.length}
-        />
+        {fieldConfigs.map(config => (
+          <FilterRow
+            key={config.field}
+            title={config.title}
+            icon={config.icon}
+            field={config.field}
+            config={config}
+          />
+        ))}
       </div>
 
       {/* Info Panel */}

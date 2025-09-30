@@ -42,7 +42,7 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
   const [showAgencyModal, setShowAgencyModal] = useState(false);
   const [selectedAgency, setSelectedAgency] = useState(null);
 
-  // Calculate comprehensive metrics
+  // Calculate comprehensive metrics with correct field mappings
   const metrics = useMemo(() => {
     if (!data || data.length === 0) {
       return {
@@ -64,20 +64,20 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
       };
     }
 
-    // Executive Summary
+    // Executive Summary - using correct field names
     const executiveSummary = {
       totalProjects: data.length,
-      onTrack: data.filter(d => (!d.delay_days || d.delay_days === 0) && d.physical_progress > 0).length,
+      onTrack: data.filter(d => (!d.delay_days || d.delay_days === 0) && d.physical_progress_percent > 0).length,
       delayed: data.filter(d => d.delay_days && d.delay_days > 0).length,
       critical: data.filter(d => d.risk_level === 'CRITICAL').length,
-      completed: data.filter(d => d.physical_progress >= 100).length,
-      notStarted: data.filter(d => d.physical_progress === 0).length,
-      ongoing: data.filter(d => d.physical_progress > 0 && d.physical_progress < 100).length
+      completed: data.filter(d => d.physical_progress_percent >= 100).length,
+      notStarted: data.filter(d => d.physical_progress_percent === 0).length,
+      ongoing: data.filter(d => d.physical_progress_percent > 0 && d.physical_progress_percent < 100).length
     };
 
-    // Budget Overview
-    const totalBudget = data.reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100;
-    const totalSpent = data.reduce((sum, d) => sum + (d.total_expdr || 0), 0) / 100;
+    // Budget Overview - using sd_amount_lakh and expenditure fields
+    const totalBudget = data.reduce((sum, d) => sum + (d.sd_amount_lakh || 0), 0);
+    const totalSpent = data.reduce((sum, d) => sum + (d.expenditure_total || 0), 0);
     const totalRemaining = totalBudget - totalSpent;
     
     const budgetOverview = [
@@ -86,13 +86,13 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
       { name: 'Remaining', value: totalRemaining, fill: COLORS.budget.remaining }
     ].filter(item => item.value > 0);
 
-    // Monthly Trend Analysis
+    // Monthly Trend Analysis - using award_date
     const monthlyTrend = [];
     const monthlyData = {};
     
     data.forEach(d => {
-      if (d.date_award) {
-        const date = new Date(d.date_award);
+      if (d.award_date) {
+        const date = new Date(d.award_date);
         if (!isNaN(date.getTime())) {
           const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
           if (!monthlyData[monthKey]) {
@@ -105,9 +105,9 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
             };
           }
           monthlyData[monthKey].projects++;
-          monthlyData[monthKey].budget += (d.sanctioned_amount || 0) / 100;
-          monthlyData[monthKey].spent += (d.total_expdr || 0) / 100;
-          if (d.physical_progress >= 100) monthlyData[monthKey].completed++;
+          monthlyData[monthKey].budget += (d.sd_amount_lakh || 0);
+          monthlyData[monthKey].spent += (d.expenditure_total || 0);
+          if (d.physical_progress_percent >= 100) monthlyData[monthKey].completed++;
         }
       }
     });
@@ -168,17 +168,17 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
         agencyProjects[agency] = [];
       }
       agencyStats[agency].projects++;
-      agencyStats[agency].budget += (d.sanctioned_amount || 0) / 100;
-      agencyStats[agency].totalProgress += d.physical_progress || 0;
+      agencyStats[agency].budget += (d.sd_amount_lakh || 0);
+      agencyStats[agency].totalProgress += d.physical_progress_percent || 0;
       
       // Store complete project data for modal
       agencyProjects[agency].push(d);
       
       // Calculate additional stats
-      if (d.physical_progress >= 100) agencyStats[agency].completed++;
+      if (d.physical_progress_percent >= 100) agencyStats[agency].completed++;
       if (d.delay_days > 0) agencyStats[agency].delayed++;
       if (d.risk_level === 'CRITICAL') agencyStats[agency].critical++;
-      if ((!d.delay_days || d.delay_days === 0) && d.physical_progress > 0) agencyStats[agency].onTrack++;
+      if ((!d.delay_days || d.delay_days === 0) && d.physical_progress_percent > 0) agencyStats[agency].onTrack++;
     });
 
     const agencyPerformance = Object.values(agencyStats)
@@ -237,7 +237,7 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
               <span className="font-semibold">{entry.name}:</span>
               <span className="font-medium">
                 {typeof entry.value === 'number' && (entry.name.includes('Budget') || entry.name.includes('Spent'))
-                  ? formatAmount(entry.value * 100)
+                  ? formatAmount(entry.value)
                   : entry.value}
               </span>
             </div>
@@ -301,7 +301,7 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 <div className="text-center">
                   <p className="text-xs text-gray-500 uppercase">Total Budget</p>
-                  <p className="text-lg font-bold">{formatAmount(selectedAgency.stats.budget * 100)}</p>
+                  <p className="text-lg font-bold">{formatAmount(selectedAgency.stats.budget)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-500 uppercase">Projects</p>
@@ -406,7 +406,7 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }}></div>
                   <span>{item.name}</span>
                 </div>
-                <span className="font-bold">{formatAmount(item.value * 100)}</span>
+                <span className="font-bold">{formatAmount(item.value)}</span>
               </div>
             ))}
           </div>
@@ -477,8 +477,8 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
                 <Legend wrapperStyle={{ fontSize: '12px' }} />
                 <Bar yAxisId="left" dataKey="projects" fill="#3b82f6" name="New Projects" />
                 <Bar yAxisId="left" dataKey="completed" fill="#10b981" name="Completed" />
-                <Line yAxisId="right" type="monotone" dataKey="budget" stroke="#f97316" name="Budget (Cr)" strokeWidth={2} />
-                <Line yAxisId="right" type="monotone" dataKey="spent" stroke="#a855f7" name="Spent (Cr)" strokeWidth={2} />
+                <Line yAxisId="right" type="monotone" dataKey="budget" stroke="#f97316" name="Budget (Lakh)" strokeWidth={2} />
+                <Line yAxisId="right" type="monotone" dataKey="spent" stroke="#a855f7" name="Spent (Lakh)" strokeWidth={2} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -507,7 +507,7 @@ const Overview = ({ data, darkMode, onChartClick, formatAmount, expandedView }) 
                   </div>
                 </div>
                 <div className="flex justify-between items-center text-sm mb-2">
-                  <span>Budget: {formatAmount(agency.budget * 100)}</span>
+                  <span>Budget: {formatAmount(agency.budget)}</span>
                   <span>Avg Progress: {agency.avgProgress}%</span>
                 </div>
                 <div className="grid grid-cols-4 gap-2 text-xs mb-2">

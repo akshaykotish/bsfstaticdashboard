@@ -3,10 +3,11 @@ import {
   X, Save, AlertCircle, Calendar, DollarSign, 
   MapPin, Building2, User, FileText, Hash,
   Loader, Check, ChevronDown, Info, RefreshCw,
-  Trash2
+  Trash2, Calculator, CalendarDays, Link2, Sparkles,
+  Plus, Copy, AlertTriangle
 } from 'lucide-react';
 
-const API_URL = 'http://localhost:3456';
+const API_URL = 'http://172.21.188.201:3456';
 
 const Edit = ({ 
   isOpen, 
@@ -24,23 +25,29 @@ const Edit = ({
   const [success, setSuccess] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
   const [isDirty, setIsDirty] = useState(false);
+  const [showPDCCalculator, setShowPDCCalculator] = useState(false);
+  const [calculationMode, setCalculationMode] = useState('days-to-date');
+  const [originalRowIndex, setOriginalRowIndex] = useState(null);
+  const [generatingSerial, setGeneratingSerial] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   const formRef = useRef(null);
+  const BUFFER_DAYS = 10;
 
-  // All fields from new CSV structure - organized into groups
+  // Field groups configuration
   const fieldGroups = [
     {
       title: 'Basic Information',
       icon: FileText,
       fields: [
-        { key: 'serial_no', label: 'Serial No', type: 'text', required: true, width: 'col-span-1' },
+        { key: 'serial_no', label: 'Serial No', type: 'text', width: 'col-span-1' },
         { key: 's_no', label: 'S.No (Alternative)', type: 'text', width: 'col-span-1' },
         { key: 'source_sheet', label: 'Source Sheet', type: 'text', width: 'col-span-1' },
         { key: 'budget_head', label: 'Budget Head', type: 'text', required: true, width: 'col-span-1' },
-        { key: 'scheme_name', label: 'Scheme Code', type: 'number', width: 'col-span-1', step: 'any' },
+        { key: 'scheme_name', label: 'Scheme Code', type: 'text', width: 'col-span-1' },
         { key: 'scheme_name_1', label: 'Scheme Name', type: 'text', required: true, width: 'col-span-3' },
         { key: 'aa_es_reference', label: 'AA/ES Reference', type: 'text', width: 'col-span-2' },
-        { key: 'location', label: 'Location ID', type: 'number', width: 'col-span-1', step: 'any' },
+        { key: 'location', label: 'Location', type: 'text', width: 'col-span-1' },
       ]
     },
     {
@@ -58,11 +65,11 @@ const Edit = ({
       title: 'Financial Details',
       icon: DollarSign,
       fields: [
-        { key: 'sd_amount_lakh', label: 'Sanctioned Amount (Lakhs)', type: 'number', required: true, min: 0, width: 'col-span-1', step: 'any' },
-        { key: 'expenditure_previous_fy', label: 'Expenditure Previous FY', type: 'number', min: 0, width: 'col-span-1', step: 'any' },
-        { key: 'expenditure_current_fy', label: 'Current FY Expenditure', type: 'number', min: 0, width: 'col-span-1', step: 'any' },
-        { key: 'expenditure_total', label: 'Total Expenditure', type: 'number', min: 0, width: 'col-span-1', readonly: true, step: 'any' },
-        { key: 'expenditure_percent', label: 'Expenditure %', type: 'text', width: 'col-span-1' },
+        { key: 'sd_amount_lakh', label: 'Sanctioned Amount (Lakhs)', type: 'number', required: true, min: 0.01, width: 'col-span-1', step: 'any' },
+        { key: 'expenditure_previous_fy', label: 'Expenditure Previous FY', type: 'number', width: 'col-span-1', step: 'any' },
+        { key: 'expenditure_current_fy', label: 'Current FY Expenditure', type: 'number', width: 'col-span-1', step: 'any' },
+        { key: 'expenditure_total', label: 'Total Expenditure', type: 'number', width: 'col-span-1', readonly: true, step: 'any' },
+        { key: 'expenditure_percent', label: 'Expenditure %', type: 'text', width: 'col-span-1', readonly: true },
       ]
     },
     {
@@ -72,12 +79,12 @@ const Edit = ({
         { key: 'ts_date', label: 'TS Date', type: 'date', width: 'col-span-1' },
         { key: 'tender_date', label: 'Tender Date', type: 'date', width: 'col-span-1' },
         { key: 'acceptance_date', label: 'Acceptance Date', type: 'date', width: 'col-span-1' },
-        { key: 'award_date', label: 'Award Date', type: 'date', width: 'col-span-1' },
-        { key: 'pdc_agreement', label: 'PDC Agreement', type: 'date', width: 'col-span-1' },
+        { key: 'award_date', label: 'Award Date', type: 'date', width: 'col-span-1', important: true },
+        { key: 'pdc_agreement', label: 'PDC Agreement', type: 'date', width: 'col-span-1', linkedField: 'time_allowed_days' },
         { key: 'pdc_agreement_1', label: 'PDC Agreement (Alt)', type: 'date', width: 'col-span-1' },
         { key: 'revised_pdc', label: 'Revised PDC', type: 'date', width: 'col-span-1' },
         { key: 'completion_date_actual', label: 'Actual Completion Date', type: 'date', width: 'col-span-1' },
-        { key: 'time_allowed_days', label: 'Time Allowed (Days)', type: 'number', min: 0, width: 'col-span-1' },
+        { key: 'time_allowed_days', label: 'Time Allowed (Days)', type: 'number', min: 0, width: 'col-span-1', linkedField: 'pdc_agreement' },
       ]
     },
     {
@@ -91,16 +98,170 @@ const Edit = ({
     }
   ];
 
+  // Helper function to safely parse values
+  const safeParseFloat = (value) => {
+    if (value === null || value === undefined || value === '' || value === 'N/A') return 0;
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const safeString = (value) => {
+    if (value === null || value === undefined || value === 'N/A') return '';
+    return String(value).trim();
+  };
+
+  // Parse date from various formats
+  const parseDate = (dateValue) => {
+    if (!dateValue || dateValue === '' || dateValue === 'N/A') return '';
+    
+    try {
+      // Handle various date formats
+      const dateStr = String(dateValue).trim();
+      
+      // Already in YYYY-MM-DD format
+      if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+        return dateStr.split('T')[0];
+      }
+      
+      // DD.MM.YYYY format
+      if (/^\d{1,2}\.\d{1,2}\.\d{2,4}$/.test(dateStr)) {
+        const [day, month, year] = dateStr.split('.');
+        const fullYear = year.length === 2 ? (parseInt(year) > 50 ? 1900 + parseInt(year) : 2000 + parseInt(year)) : year;
+        return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+      
+      // DD/MM/YYYY format
+      if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(dateStr)) {
+        const [day, month, year] = dateStr.split('/');
+        const fullYear = year.length === 2 ? (parseInt(year) > 50 ? 1900 + parseInt(year) : 2000 + parseInt(year)) : year;
+        return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+      
+      // Try parsing as Date object
+      const date = new Date(dateStr);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0];
+      }
+    } catch (err) {
+      console.warn('Error parsing date:', dateValue, err);
+    }
+    
+    return '';
+  };
+
+  // Generate unique serial number
+  const generateUniqueSerialNo = async () => {
+    setGeneratingSerial(true);
+    try {
+      const response = await fetch(`${API_URL}/api/csv/engineering.csv/rows`);
+      if (!response.ok) throw new Error('Failed to fetch data');
+      
+      const result = await response.json();
+      const existingSerials = new Set();
+      
+      if (result.rows) {
+        result.rows.forEach(row => {
+          if (row.serial_no) existingSerials.add(String(row.serial_no).trim());
+          if (row.s_no) existingSerials.add(String(row.s_no).trim());
+        });
+      }
+      
+      const timestamp = Date.now();
+      const year = new Date().getFullYear();
+      const month = String(new Date().getMonth() + 1).padStart(2, '0');
+      const random = Math.floor(Math.random() * 9000) + 1000;
+      
+      const patterns = [
+        `PRJ-${year}${month}-${random}`,
+        `ENG-${year}-${String(timestamp).slice(-6)}`,
+        `P${year}${month}${String(random).padStart(4, '0')}`,
+        `SN-${timestamp % 1000000}`,
+        `PRJ${Date.now().toString(36).toUpperCase()}`,
+      ];
+      
+      for (const pattern of patterns) {
+        if (!existingSerials.has(pattern)) {
+          setFormData(prev => ({ 
+            ...prev, 
+            serial_no: pattern,
+            s_no: prev.s_no || pattern 
+          }));
+          setIsDirty(true);
+          return pattern;
+        }
+      }
+      
+      const fallbackSerial = `AUTO-${timestamp}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      setFormData(prev => ({ 
+        ...prev, 
+        serial_no: fallbackSerial,
+        s_no: prev.s_no || fallbackSerial 
+      }));
+      setIsDirty(true);
+      return fallbackSerial;
+      
+    } catch (error) {
+      console.error('Error generating serial number:', error);
+      const offlineSerial = `OFFLINE-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      setFormData(prev => ({ 
+        ...prev, 
+        serial_no: offlineSerial,
+        s_no: prev.s_no || offlineSerial 
+      }));
+      setIsDirty(true);
+      return offlineSerial;
+    } finally {
+      setGeneratingSerial(false);
+    }
+  };
+
+  // Calculate PDC date from award date and time allowed
+  const calculatePDCFromDays = (awardDate, timeAllowedDays) => {
+    if (!awardDate || !timeAllowedDays || timeAllowedDays <= 0) return '';
+    
+    try {
+      const award = new Date(awardDate);
+      if (isNaN(award.getTime())) return '';
+      
+      const pdc = new Date(award);
+      pdc.setDate(pdc.getDate() + parseInt(timeAllowedDays) + BUFFER_DAYS);
+      
+      return pdc.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
+
+  // Calculate time allowed days from award date and PDC
+  const calculateDaysFromPDC = (awardDate, pdcDate) => {
+    if (!awardDate || !pdcDate) return 0;
+    
+    try {
+      const award = new Date(awardDate);
+      const pdc = new Date(pdcDate);
+      
+      if (isNaN(award.getTime()) || isNaN(pdc.getTime())) return 0;
+      
+      const diffTime = pdc - award;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      const actualTimeAllowed = Math.max(0, diffDays - BUFFER_DAYS);
+      
+      return actualTimeAllowed;
+    } catch {
+      return 0;
+    }
+  };
+
   // Initialize form data
   useEffect(() => {
     if (isOpen) {
       if (isNewProject) {
-        // Set default values for new project
         const defaults = {
           serial_no: '',
           s_no: '',
-          source_sheet: '',
-          scheme_name: 0,
+          source_sheet: 'New Entry',
+          scheme_name: '',
           scheme_name_1: '',
           budget_head: '',
           ftr_hq: '',
@@ -109,8 +270,8 @@ const Edit = ({
           executive_agency: '',
           firm_name: '',
           aa_es_reference: '',
-          location: 0,
-          sd_amount_lakh: 0,
+          location: '',
+          sd_amount_lakh: '',
           expenditure_previous_fy: 0,
           expenditure_current_fy: 0,
           expenditure_total: 0,
@@ -118,80 +279,138 @@ const Edit = ({
           physical_progress: 0,
           current_status: 0,
           time_allowed_days: 0,
-          remarks: ''
+          remarks: '',
+          ts_date: '',
+          tender_date: '',
+          acceptance_date: '',
+          award_date: '',
+          pdc_agreement: '',
+          pdc_agreement_1: '',
+          revised_pdc: '',
+          completion_date_actual: ''
         };
         setFormData(defaults);
+        setOriginalRowIndex(null);
+        generateUniqueSerialNo();
       } else if (projectData) {
-        // Load existing project data - preserve all fields
-        const data = { ...projectData };
+        // Extract row index
+        let rowIdx = null;
         
-        // Ensure numeric fields are numbers
-        const numericFields = ['sd_amount_lakh', 'expenditure_previous_fy', 'expenditure_current_fy', 
-                               'expenditure_total', 'scheme_name', 'location',
-                               'physical_progress', 'current_status', 'time_allowed_days'];
-        
-        numericFields.forEach(field => {
-          if (data[field] !== undefined && data[field] !== null && data[field] !== '') {
-            data[field] = parseFloat(data[field]) || 0;
-          } else {
-            data[field] = 0;
-          }
-        });
-        
-        // Handle expenditure_percent (might have % symbol)
-        if (data.expenditure_percent) {
-          data.expenditure_percent = String(data.expenditure_percent).replace('%', '');
-        } else {
-          data.expenditure_percent = '0';
+        if (projectData.rowIndex !== undefined && projectData.rowIndex !== null) {
+          rowIdx = parseInt(projectData.rowIndex);
+        } else if (projectData.index !== undefined && projectData.index !== null) {
+          rowIdx = parseInt(projectData.index);
+        } else if (projectData.id !== undefined && projectData.id !== null) {
+          rowIdx = parseInt(projectData.id) - 1;
+        } else if (projectData._rowIndex !== undefined && projectData._rowIndex !== null) {
+          rowIdx = parseInt(projectData._rowIndex);
         }
         
-        // Format dates for input fields
-        const dateFields = ['ts_date', 'tender_date', 'acceptance_date', 'award_date', 
-                           'pdc_agreement', 'pdc_agreement_1', 'revised_pdc', 'completion_date_actual'];
+        setOriginalRowIndex(rowIdx);
         
-        dateFields.forEach(field => {
-          if (data[field] && data[field] !== 'N/A' && data[field] !== '') {
-            try {
-              const date = new Date(data[field]);
-              if (!isNaN(date.getTime())) {
-                data[field] = date.toISOString().split('T')[0];
-              } else {
-                data[field] = '';
-              }
-            } catch {
-              data[field] = '';
-            }
-          } else {
-            data[field] = '';
-          }
-        });
+        console.log('Loading project data:', projectData);
         
+        // Map data from projectData with proper fallbacks and conversions
+        const data = {
+          serial_no: safeString(projectData.serial_no),
+          s_no: safeString(projectData.s_no || projectData.serial_no),
+          source_sheet: safeString(projectData.source_sheet),
+          budget_head: safeString(projectData.budget_head),
+          scheme_name: safeString(projectData.scheme_name),
+          scheme_name_1: safeString(projectData.scheme_name_1 || projectData.scheme_name),
+          aa_es_reference: safeString(projectData.aa_es_reference || projectData.aa_es_ref),
+          location: safeString(projectData.location),
+          ftr_hq: safeString(projectData.ftr_hq),
+          shq: safeString(projectData.shq),
+          work_site: safeString(projectData.work_site),
+          executive_agency: safeString(projectData.executive_agency),
+          firm_name: safeString(projectData.firm_name),
+          sd_amount_lakh: safeParseFloat(projectData.sd_amount_lakh || projectData.sanctioned_amount),
+          expenditure_previous_fy: safeParseFloat(projectData.expenditure_previous_fy || projectData.expdr_upto_31mar25),
+          expenditure_current_fy: safeParseFloat(projectData.expenditure_current_fy || projectData.expdr_cfy),
+          expenditure_total: safeParseFloat(projectData.expenditure_total || projectData.total_expdr),
+          expenditure_percent: safeString(projectData.expenditure_percent || projectData.percent_expdr || '0').replace('%', ''),
+          physical_progress: safeParseFloat(projectData.physical_progress),
+          current_status: safeParseFloat(projectData.current_status || projectData.progress_status),
+          time_allowed_days: safeParseFloat(projectData.time_allowed_days),
+          remarks: safeString(projectData.remarks)
+        };
+        
+        // Process date fields
+        data.ts_date = parseDate(projectData.ts_date || projectData.date_ts);
+        data.tender_date = parseDate(projectData.tender_date || projectData.date_tender);
+        data.acceptance_date = parseDate(projectData.acceptance_date || projectData.date_acceptance);
+        data.award_date = parseDate(projectData.award_date || projectData.date_award);
+        data.pdc_agreement = parseDate(projectData.pdc_agreement);
+        data.pdc_agreement_1 = parseDate(projectData.pdc_agreement_1);
+        data.revised_pdc = parseDate(projectData.revised_pdc);
+        data.completion_date_actual = parseDate(projectData.completion_date_actual || projectData.actual_completion_date);
+        
+        // Recalculate totals if needed
+        if (!data.expenditure_total || data.expenditure_total === 0) {
+          data.expenditure_total = Math.abs(data.expenditure_previous_fy) + Math.abs(data.expenditure_current_fy);
+        }
+        
+        // Handle negative values by using absolute values
+        data.expenditure_previous_fy = Math.abs(data.expenditure_previous_fy);
+        data.expenditure_current_fy = Math.abs(data.expenditure_current_fy);
+        data.expenditure_total = Math.abs(data.expenditure_total);
+        
+        if (data.sd_amount_lakh > 0) {
+          const percent = ((data.expenditure_total / data.sd_amount_lakh) * 100).toFixed(2);
+          data.expenditure_percent = percent;
+        }
+        
+        console.log('Processed form data:', data);
         setFormData(data);
       }
       setError('');
       setSuccess('');
       setValidationErrors({});
       setIsDirty(false);
+      setShowDeleteConfirm(false);
     }
   }, [isOpen, projectData, isNewProject]);
 
   // Handle input changes
   const handleChange = (key, value) => {
-    // For number fields, ensure we're storing numbers
     const field = fieldGroups.flatMap(g => g.fields).find(f => f.key === key);
     let processedValue = value;
     
     if (field && field.type === 'number') {
-      processedValue = value === '' ? 0 : parseFloat(value) || 0;
+      processedValue = value === '' ? '' : parseFloat(value) || 0;
     }
     
-    setFormData(prev => ({
-      ...prev,
-      [key]: processedValue
-    }));
+    setFormData(prev => {
+      const newData = { ...prev, [key]: processedValue };
+      
+      // Auto-calculate linked fields
+      if (key === 'award_date') {
+        if (newData.time_allowed_days > 0) {
+          const calculatedPDC = calculatePDCFromDays(processedValue, newData.time_allowed_days);
+          if (calculatedPDC) {
+            newData.pdc_agreement = calculatedPDC;
+          }
+        }
+      } else if (key === 'time_allowed_days') {
+        if (newData.award_date && processedValue > 0) {
+          const calculatedPDC = calculatePDCFromDays(newData.award_date, processedValue);
+          if (calculatedPDC) {
+            newData.pdc_agreement = calculatedPDC;
+          }
+        }
+      } else if (key === 'pdc_agreement') {
+        if (newData.award_date && processedValue) {
+          const calculatedDays = calculateDaysFromPDC(newData.award_date, processedValue);
+          newData.time_allowed_days = calculatedDays;
+        }
+      }
+      
+      return newData;
+    });
+    
     setIsDirty(true);
     
-    // Clear validation error for this field
     if (validationErrors[key]) {
       setValidationErrors(prev => {
         const newErrors = { ...prev };
@@ -209,21 +428,21 @@ const Edit = ({
       group.fields.forEach(field => {
         const value = formData[field.key];
         
-        // Required field validation
-        if (field.required && (!value || value === '' || (field.type === 'number' && field.key === 'sd_amount_lakh' && value === 0))) {
-          if (field.key === 'sd_amount_lakh' && value === 0) {
-            errors[field.key] = `${field.label} must be greater than 0`;
-          } else if (!value || value === '') {
+        if (field.required) {
+          if (field.type === 'text' && (!value || value === '')) {
             errors[field.key] = `${field.label} is required`;
+          } else if (field.type === 'number' && field.key === 'sd_amount_lakh') {
+            // Sanctioned amount must be greater than 0
+            const numValue = parseFloat(value);
+            if (isNaN(numValue) || numValue <= 0) {
+              errors[field.key] = `${field.label} must be greater than 0`;
+            }
           }
         }
         
-        // Number validation
         if (field.type === 'number' && value !== '' && value !== null && value !== undefined) {
           const numValue = parseFloat(value);
-          if (isNaN(numValue)) {
-            errors[field.key] = `${field.label} must be a number`;
-          } else {
+          if (!isNaN(numValue)) {
             if (field.min !== undefined && numValue < field.min) {
               errors[field.key] = `${field.label} must be at least ${field.min}`;
             }
@@ -235,15 +454,32 @@ const Edit = ({
       });
     });
     
+    if (formData.award_date && formData.pdc_agreement) {
+      const awardDate = new Date(formData.award_date);
+      const pdcDate = new Date(formData.pdc_agreement);
+      
+      if (pdcDate < awardDate) {
+        errors.pdc_agreement = 'PDC date cannot be before Award date';
+      }
+    }
+    
+    if (formData.revised_pdc && formData.pdc_agreement) {
+      const pdcDate = new Date(formData.pdc_agreement);
+      const revisedPDC = new Date(formData.revised_pdc);
+      
+      if (revisedPDC < pdcDate) {
+        errors.revised_pdc = 'Revised PDC should be after original PDC';
+      }
+    }
+    
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // Save data - Updated to trigger data refresh instead of page reload
+  // Save data
   const handleSave = async () => {
     if (!validateForm()) {
       setError('Please fix the validation errors');
-      // Scroll to first error
       const firstErrorField = Object.keys(validationErrors)[0];
       const element = document.getElementById(`field-${firstErrorField}`);
       if (element) {
@@ -257,94 +493,86 @@ const Edit = ({
     setSuccess('');
 
     try {
-      // Prepare data for submission - preserve all original fields
-      const submitData = { ...formData };
+      const submitData = {};
       
-      // Ensure numeric fields are numbers
-      const numericFields = ['sd_amount_lakh', 'expenditure_previous_fy', 'expenditure_current_fy', 
-                             'expenditure_total', 'scheme_name', 'location',
-                             'physical_progress', 'current_status', 'time_allowed_days'];
-      
-      numericFields.forEach(field => {
-        if (submitData[field] !== undefined) {
-          submitData[field] = parseFloat(submitData[field]) || 0;
-        }
-      });
-      
-      // Add % back to expenditure_percent if needed
-      if (submitData.expenditure_percent && !submitData.expenditure_percent.includes('%')) {
-        submitData.expenditure_percent = submitData.expenditure_percent + '%';
-      }
-      
-      // Convert empty date strings to null
-      const dateFields = ['ts_date', 'tender_date', 'acceptance_date', 'award_date', 
-                         'pdc_agreement', 'pdc_agreement_1', 'revised_pdc', 'completion_date_actual'];
-      
-      dateFields.forEach(field => {
-        if (submitData[field] === '') {
-          submitData[field] = null;
-        }
+      // Prepare all fields for submission
+      fieldGroups.forEach(group => {
+        group.fields.forEach(field => {
+          const value = formData[field.key];
+          if (field.type === 'number') {
+            submitData[field.key] = value === '' ? 0 : (value || 0);
+          } else {
+            submitData[field.key] = value || '';
+          }
+        });
       });
 
-      // Determine the row index - use serial_no or id field
-      let rowIndex;
-      if (!isNewProject) {
-        // Try different approaches to get the row index
-        if (projectData.rowIndex !== undefined) {
-          rowIndex = projectData.rowIndex;
-        } else if (projectData.id !== undefined) {
-          rowIndex = projectData.id - 1;
-        } else if (projectData.serial_no !== undefined) {
-          // If using serial_no, it might already be the row index
-          rowIndex = parseInt(projectData.serial_no) - 1;
-        } else {
-          throw new Error('Cannot determine row index for update');
+      // Ensure required numeric fields have valid values
+      submitData.sd_amount_lakh = parseFloat(submitData.sd_amount_lakh) || 0.01;
+      submitData.expenditure_previous_fy = Math.abs(parseFloat(submitData.expenditure_previous_fy) || 0);
+      submitData.expenditure_current_fy = Math.abs(parseFloat(submitData.expenditure_current_fy) || 0);
+      submitData.expenditure_total = submitData.expenditure_previous_fy + submitData.expenditure_current_fy;
+
+      console.log('Submitting data:', submitData);
+
+      if (isNewProject) {
+        // Add new row - FIXED: Added /api prefix
+        const response = await fetch(`${API_URL}/api/csv/engineering.csv/rows`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(submitData),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Server error: ${errorText}`);
         }
-      }
 
-      const endpoint = isNewProject 
-        ? `${API_URL}/csv/engineering.csv/add`
-        : `${API_URL}/csv/engineering.csv/update`;
-
-      const body = isNewProject
-        ? { row: submitData }
-        : { 
-            rowIndex: rowIndex,
-            updates: submitData 
-          };
-
-      console.log('Saving project:', { endpoint, body, isNewProject });
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        setSuccess(isNewProject ? 'Project added successfully!' : 'Project updated successfully!');
+        const result = await response.json();
+        
+        setSuccess('Project added successfully!');
         setIsDirty(false);
         
-        // Notify parent component of successful save FIRST
-        if (onSaveSuccess && typeof onSaveSuccess === 'function') {
-          await onSaveSuccess(submitData);
+        if (onSaveSuccess) {
+          await onSaveSuccess({ ...submitData, index: result.index });
         }
         
-        // Then call the refresh function to update data without page reload
-        if (onRefreshData && typeof onRefreshData === 'function') {
+        if (onRefreshData) {
           await onRefreshData();
         }
         
-        // Close modal after brief delay to show success message
-        setTimeout(() => {
-          onClose();
-        }, 1000);
+        setTimeout(() => onClose(), 1500);
       } else {
-        throw new Error(result.error || 'Failed to save data');
+        // Update existing row - FIXED: Added /api prefix
+        if (originalRowIndex === null || originalRowIndex === undefined) {
+          throw new Error('Cannot update: Row index is missing');
+        }
+
+        const response = await fetch(`${API_URL}/api/csv/engineering.csv/rows/${originalRowIndex}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(submitData),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Server error: ${errorText}`);
+        }
+
+        const result = await response.json();
+        
+        setSuccess('Project updated successfully!');
+        setIsDirty(false);
+        
+        if (onSaveSuccess) {
+          await onSaveSuccess({ ...submitData, index: originalRowIndex });
+        }
+        
+        if (onRefreshData) {
+          await onRefreshData();
+        }
+        
+        setTimeout(() => onClose(), 1500);
       }
     } catch (err) {
       console.error('Save error:', err);
@@ -354,46 +582,38 @@ const Edit = ({
     }
   };
 
-  // Delete project - Updated to trigger data refresh instead of page reload
+  // Delete project
   const handleDelete = async () => {
-    if (isNewProject || !projectData) return;
+    if (isNewProject || originalRowIndex === null) return;
     
-    if (!window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-      return;
-    }
-
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/csv/engineering.csv/delete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ rowIndex: projectData.id - 1 }),
+      // FIXED: Added /api prefix
+      const response = await fetch(`${API_URL}/api/csv/engineering.csv/rows/${originalRowIndex}`, {
+        method: 'DELETE',
       });
 
-      const result = await response.json();
-
-      if (result.success) {
-        setSuccess('Project deleted successfully!');
-        
-        // Call the refresh function to update data without page reload
-        if (onRefreshData && typeof onRefreshData === 'function') {
-          await onRefreshData();
-        }
-        
-        // Notify parent component of successful deletion
-        onDeleteSuccess(projectData);
-        
-        // Close modal after brief delay
-        setTimeout(() => {
-          onClose();
-        }, 1000);
-      } else {
-        throw new Error(result.error || 'Failed to delete project');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server error: ${errorText}`);
       }
+
+      const result = await response.json();
+      
+      setSuccess('Project deleted successfully!');
+      setShowDeleteConfirm(false);
+      
+      if (onDeleteSuccess) {
+        onDeleteSuccess(projectData);
+      }
+      
+      if (onRefreshData) {
+        await onRefreshData();
+      }
+      
+      setTimeout(() => onClose(), 1500);
     } catch (err) {
       console.error('Delete error:', err);
       setError(err.message || 'Failed to delete project');
@@ -402,49 +622,170 @@ const Edit = ({
     }
   };
 
-  // Auto-calculate total expenditure
+  // Auto-calculate total expenditure and percentage
   useEffect(() => {
-    const prevFy = parseFloat(formData.expenditure_previous_fy) || 0;
-    const currFy = parseFloat(formData.expenditure_current_fy) || 0;
+    const prevFy = Math.abs(parseFloat(formData.expenditure_previous_fy) || 0);
+    const currFy = Math.abs(parseFloat(formData.expenditure_current_fy) || 0);
     const total = prevFy + currFy;
     
     if (formData.expenditure_total !== total) {
       setFormData(prev => ({ ...prev, expenditure_total: total }));
     }
     
-    // Calculate percentage
     const sanctioned = parseFloat(formData.sd_amount_lakh) || 0;
     if (sanctioned > 0) {
       const percentage = ((total / sanctioned) * 100).toFixed(2);
       if (formData.expenditure_percent !== percentage) {
         setFormData(prev => ({ ...prev, expenditure_percent: percentage }));
       }
-    } else {
-      if (formData.expenditure_percent !== '0') {
-        setFormData(prev => ({ ...prev, expenditure_percent: '0' }));
-      }
+    } else if (formData.expenditure_percent !== '0') {
+      setFormData(prev => ({ ...prev, expenditure_percent: '0' }));
     }
   }, [formData.expenditure_previous_fy, formData.expenditure_current_fy, formData.sd_amount_lakh]);
+
+  // Handle close with unsaved changes check
+  const handleClose = () => {
+    if (isDirty) {
+      if (window.confirm('You have unsaved changes. Are you sure you want to close?')) {
+        onClose();
+      }
+    } else {
+      onClose();
+    }
+  };
+
+  // Duplicate project
+  const handleDuplicate = () => {
+    const duplicatedData = { 
+      ...formData, 
+      serial_no: '',
+      s_no: '',
+      source_sheet: 'Duplicated Entry'
+    };
+    setFormData(duplicatedData);
+    setOriginalRowIndex(null);
+    generateUniqueSerialNo();
+    setSuccess('Project duplicated. Update the details and save as new.');
+  };
+
+  // PDC Calculator Component
+  const PDCCalculator = () => (
+    <div className={`fixed bottom-20 right-4 z-50 w-80 ${
+      darkMode ? 'bg-gray-800' : 'bg-white'
+    } rounded-xl shadow-2xl p-4 border ${
+      darkMode ? 'border-gray-700' : 'border-blue-200'
+    }`}>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-bold flex items-center gap-2">
+          <Calculator size={14} className="text-blue-500" />
+          PDC Calculator
+        </h3>
+        <button
+          onClick={() => setShowPDCCalculator(false)}
+          className="text-gray-400 hover:text-gray-600"
+        >
+          <X size={14} />
+        </button>
+      </div>
+      
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setCalculationMode('days-to-date')}
+            className={`flex-1 px-2 py-1 text-xs rounded ${
+              calculationMode === 'days-to-date'
+                ? 'bg-blue-500 text-white'
+                : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+            }`}
+          >
+            Days → Date
+          </button>
+          <button
+            onClick={() => setCalculationMode('date-to-days')}
+            className={`flex-1 px-2 py-1 text-xs rounded ${
+              calculationMode === 'date-to-days'
+                ? 'bg-blue-500 text-white'
+                : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+            }`}
+          >
+            Date → Days
+          </button>
+        </div>
+        
+        {calculationMode === 'days-to-date' ? (
+          <div className="space-y-2">
+            <p className="text-xs text-gray-500">
+              Enter Time Allowed to calculate PDC date
+            </p>
+            {formData.award_date ? (
+              <div className="text-xs">
+                <span className="text-gray-500">Award Date: </span>
+                <span className="font-medium">{formData.award_date}</span>
+              </div>
+            ) : (
+              <p className="text-xs text-orange-500">Set Award Date first</p>
+            )}
+            {formData.time_allowed_days > 0 && formData.award_date && (
+              <>
+                <div className="text-xs">
+                  <span className="text-gray-500">Time Allowed: </span>
+                  <span className="font-medium">{formData.time_allowed_days} days</span>
+                </div>
+                <div className="text-xs">
+                  <span className="text-gray-500">Buffer Days: </span>
+                  <span className="font-medium">+10 days</span>
+                </div>
+                <div className="text-xs border-t pt-1">
+                  <span className="text-gray-500">Calculated PDC: </span>
+                  <span className="font-medium text-blue-600">
+                    {calculatePDCFromDays(formData.award_date, formData.time_allowed_days)}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-gray-500">
+              Enter PDC date to calculate Time Allowed
+            </p>
+            {formData.award_date ? (
+              <div className="text-xs">
+                <span className="text-gray-500">Award Date: </span>
+                <span className="font-medium">{formData.award_date}</span>
+              </div>
+            ) : (
+              <p className="text-xs text-orange-500">Set Award Date first</p>
+            )}
+            {formData.pdc_agreement && formData.award_date && (
+              <>
+                <div className="text-xs">
+                  <span className="text-gray-500">PDC Date: </span>
+                  <span className="font-medium">{formData.pdc_agreement}</span>
+                </div>
+                <div className="text-xs border-t pt-1">
+                  <span className="text-gray-500">Calculated Time Allowed: </span>
+                  <span className="font-medium text-blue-600">
+                    {calculateDaysFromPDC(formData.award_date, formData.pdc_agreement)} days
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={() => {
-          if (isDirty) {
-            if (window.confirm('You have unsaved changes. Are you sure you want to close?')) {
-              onClose();
-            }
-          } else {
-            onClose();
-          }
-        }}
+        onClick={handleClose}
       />
       
-      {/* Modal */}
       <div className={`relative w-full max-w-6xl max-h-[90vh] ${
         darkMode ? 'bg-gray-900' : 'bg-white'
       } rounded-2xl shadow-2xl overflow-hidden flex flex-col`}>
@@ -460,27 +801,61 @@ const Edit = ({
               </h2>
               {!isNewProject && formData.scheme_name_1 && (
                 <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
-                  {formData.scheme_name_1} | Serial No: {formData.serial_no || formData.s_no}
+                  {formData.scheme_name_1} | Serial No: {formData.serial_no || formData.s_no || 'N/A'}
                 </p>
               )}
             </div>
             
-            <button
-              onClick={() => {
-                if (isDirty) {
-                  if (window.confirm('You have unsaved changes. Are you sure you want to close?')) {
-                    onClose();
-                  }
-                } else {
-                  onClose();
-                }
-              }}
-              className={`p-2 rounded-lg ${
-                darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
-              } transition-colors`}
-            >
-              <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
-            </button>
+            <div className="flex items-center gap-3">
+              {isNewProject && (
+                <button
+                  onClick={generateUniqueSerialNo}
+                  disabled={generatingSerial}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                    generatingSerial 
+                      ? 'bg-gray-600 cursor-not-allowed' 
+                      : 'bg-green-600 hover:bg-green-700'
+                  } text-white transition-colors flex items-center gap-2`}
+                >
+                  {generatingSerial ? (
+                    <Loader size={14} className="animate-spin" />
+                  ) : (
+                    <Sparkles size={14} />
+                  )}
+                  Generate Serial
+                </button>
+              )}
+              
+              {!isNewProject && (
+                <button
+                  onClick={handleDuplicate}
+                  className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                >
+                  <Copy size={14} />
+                  Duplicate
+                </button>
+              )}
+              
+              <button
+                onClick={() => setShowPDCCalculator(!showPDCCalculator)}
+                className={`p-2 rounded-lg ${
+                  showPDCCalculator 
+                    ? 'bg-blue-700 text-white' 
+                    : darkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-blue-700 text-white'
+                } transition-colors`}
+              >
+                <Calculator size={20} />
+              </button>
+              
+              <button
+                onClick={handleClose}
+                className={`p-2 rounded-lg ${
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
+                } transition-colors`}
+              >
+                <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -521,7 +896,7 @@ const Edit = ({
                       id={`field-${field.key}`}
                       className={field.width || 'col-span-1'}
                     >
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <div className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         {field.label}
                         {field.required && <span className="text-red-500 ml-1">*</span>}
                         {field.readonly && (
@@ -529,7 +904,13 @@ const Edit = ({
                             Auto
                           </span>
                         )}
-                      </label>
+                        {field.linkedField && (
+                          <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded flex items-center gap-1 inline-flex">
+                            <Link2 size={8} />
+                            Linked
+                          </span>
+                        )}
+                      </div>
                       
                       {field.type === 'textarea' ? (
                         <textarea
@@ -563,11 +944,15 @@ const Edit = ({
                               ? darkMode
                                 ? 'bg-gray-900 border-gray-700 text-gray-500 cursor-not-allowed'
                                 : 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
-                              : validationErrors[field.key]
-                                ? 'border-red-500 focus:ring-red-400'
-                                : darkMode 
-                                  ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400' 
-                                  : 'bg-white border-gray-200 focus:ring-blue-400'
+                              : field.linkedField
+                                ? darkMode
+                                  ? 'bg-gray-700 border-blue-600 text-gray-100 focus:ring-blue-400'
+                                  : 'bg-blue-50 border-blue-300 focus:ring-blue-400'
+                                : validationErrors[field.key]
+                                  ? 'border-red-500 focus:ring-red-400'
+                                  : darkMode 
+                                    ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400' 
+                                    : 'bg-white border-gray-200 focus:ring-blue-400'
                           } focus:ring-2 focus:outline-none transition-colors`}
                         />
                       )}
@@ -589,20 +974,42 @@ const Edit = ({
         } flex justify-between items-center`}>
           <div className="flex gap-2">
             {!isNewProject && (
-              <button
-                onClick={handleDelete}
-                disabled={loading}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {loading ? <Loader size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                Delete Project
-              </button>
+              <>
+                {!showDeleteConfirm ? (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={loading}
+                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Trash2 size={16} />
+                    Delete Project
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 px-3 py-1 rounded-lg">
+                    <AlertTriangle size={16} className="text-red-500" />
+                    <span className="text-sm text-red-700 dark:text-red-400">Confirm deletion?</span>
+                    <button
+                      onClick={handleDelete}
+                      disabled={loading}
+                      className="px-3 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700"
+                    >
+                      Yes, Delete
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="px-3 py-1 bg-gray-500 text-white rounded text-xs font-medium hover:bg-gray-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
           
           <div className="flex gap-2">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               disabled={loading}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 darkMode 
@@ -633,6 +1040,9 @@ const Edit = ({
           </div>
         </div>
       </div>
+      
+      {/* PDC Calculator Panel */}
+      {showPDCCalculator && <PDCCalculator />}
     </div>
   );
 };

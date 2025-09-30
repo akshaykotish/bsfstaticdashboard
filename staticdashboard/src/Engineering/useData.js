@@ -1,5 +1,37 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+const API_URL = 'http://172.21.188.201:3456';
+
+// Import database configurations - handle both default and named exports
+let databaseConfigs;
+try {
+  // Try to import from config.js
+  const configModule = require('../System/config');
+  databaseConfigs = configModule.databaseConfigs || configModule.default || configModule;
+} catch (error) {
+  console.warn('Could not load config.js, using fallback configuration');
+  // Fallback configuration if config.js is not available
+  databaseConfigs = {
+    engineering: {
+      displayName: 'Engineering Database',
+      fileName: 'engineering.csv',
+      idField: 's_no',
+      idPrefix: 'ENG',
+      columns: [
+        's_no', 'source_sheet', 'budget_head', 'sub_scheme_name', 
+        'ftr_hq_name', 'shq_name', 'work_description', 'executive_agency',
+        'aa_es_reference', 'sd_amount_lakh', 'ts_date', 'tender_date',
+        'acceptance_date', 'award_date', 'time_allowed_days', 
+        'pdc_agreement', 'pdc_revised', 'firm_name', 
+        'physical_progress_percent', 'expenditure_previous_fy',
+        'expenditure_current_fy', 'expenditure_total', 
+        'expenditure_percent', 'remarks', 'created_at', 'updated_at',
+        'completion_date_actual', 'name_of_scheme', 'location'
+      ]
+    }
+  };
+}
+
 // Helper functions for data processing
 
 // Enhanced date parser to handle multiple formats including short year formats
@@ -99,7 +131,7 @@ const parseMultiFormatDate = (dateValue) => {
 
 // Calculate expected progress based on time elapsed
 const calculateExpectedProgress = (row) => {
-  const awardDate = parseMultiFormatDate(row.award_date || row.date_award);
+  const awardDate = parseMultiFormatDate(row.award_date);
   if (!awardDate) return 0;
 
   try {
@@ -107,9 +139,8 @@ const calculateExpectedProgress = (row) => {
     const today = new Date();
     
     // Get PDC date (use revised if available, otherwise original)
-    let pdcDateStr = parseMultiFormatDate(row.revised_pdc) || 
-                     parseMultiFormatDate(row.pdc_agreement) || 
-                     parseMultiFormatDate(row.pdc_agreement_1);
+    let pdcDateStr = parseMultiFormatDate(row.pdc_revised) || 
+                     parseMultiFormatDate(row.pdc_agreement);
     
     let pdcDate = pdcDateStr ? new Date(pdcDateStr) : null;
     
@@ -154,7 +185,7 @@ const calculateExpectedProgress = (row) => {
 
 // Enhanced health calculation based on pace
 const calculateHealthScore = (row) => {
-  const actualProgress = parseFloat(row.physical_progress) || 0;
+  const actualProgress = parseFloat(row.physical_progress_percent) || 0;
   const expectedProgress = calculateExpectedProgress(row);
   
   // Special case: Payment Pending (completed but not fully paid)
@@ -163,7 +194,7 @@ const calculateHealthScore = (row) => {
   }
   
   // If project hasn't started yet and no award date
-  const awardDate = parseMultiFormatDate(row.award_date || row.date_award);
+  const awardDate = parseMultiFormatDate(row.award_date);
   if (!awardDate) {
     return 'NOT_APPLICABLE';
   }
@@ -202,11 +233,11 @@ const getHealthScoreNumeric = (healthStatus) => {
 
 // Enhanced physical progress categorization
 const determineProgressStatus = (row) => {
-  const progress = parseFloat(row.physical_progress) || 0;
+  const progress = parseFloat(row.physical_progress_percent) || 0;
   
   // Check tender and award status first
-  const tenderDate = parseMultiFormatDate(row.tender_date || row.date_tender);
-  const awardDate = parseMultiFormatDate(row.award_date || row.date_award);
+  const tenderDate = parseMultiFormatDate(row.tender_date);
+  const awardDate = parseMultiFormatDate(row.award_date);
   
   if (!tenderDate) {
     return 'TENDER_PROGRESS';
@@ -238,11 +269,10 @@ const determineProgressStatus = (row) => {
 
 // Calculate delay with proper date parsing
 const calculateDelay = (row) => {
-  if (row.physical_progress >= 100) return 0;
+  if (row.physical_progress_percent >= 100) return 0;
   
-  const pdcStr = parseMultiFormatDate(row.revised_pdc) || 
-                 parseMultiFormatDate(row.pdc_agreement) || 
-                 parseMultiFormatDate(row.pdc_agreement_1);
+  const pdcStr = parseMultiFormatDate(row.pdc_revised) || 
+                 parseMultiFormatDate(row.pdc_agreement);
   
   if (!pdcStr) return 0;
   
@@ -253,9 +283,17 @@ const calculateDelay = (row) => {
   return Math.max(0, diffDays);
 };
 
+// Calculate efficiency
+const calculateEfficiency = (row) => {
+  const progress = parseFloat(row.physical_progress_percent) || 0;
+  const expdr = parseFloat(row.expenditure_percent) || 0;
+  if (expdr === 0) return progress > 0 ? 100 : 0;
+  return Math.min(100, (progress / expdr) * 100);
+};
+
 // Enhanced risk calculation
 const calculateRiskLevel = (row) => {
-  const progress = parseFloat(row.physical_progress) || 0;
+  const progress = parseFloat(row.physical_progress_percent) || 0;
   const healthStatus = row.health_status || calculateHealthScore(row);
   const delay = calculateDelay(row);
   const efficiency = calculateEfficiency(row);
@@ -279,18 +317,10 @@ const calculateRiskLevel = (row) => {
   return 'LOW';
 };
 
-// Calculate efficiency
-const calculateEfficiency = (row) => {
-  const progress = parseFloat(row.physical_progress) || 0;
-  const expdr = parseFloat(row.expenditure_percent) || 0;
-  if (expdr === 0) return progress > 0 ? 100 : 0;
-  return Math.min(100, (progress / expdr) * 100);
-};
-
 // Determine priority
 const determinePriority = (row) => {
-  const amount = parseFloat(row.sanctioned_amount) || parseFloat(row.sd_amount_lakh) || 0;
-  const progress = parseFloat(row.physical_progress) || 0;
+  const amount = parseFloat(row.sd_amount_lakh) || 0;
+  const progress = parseFloat(row.physical_progress_percent) || 0;
   const delay = calculateDelay(row);
   
   if (amount > 10000 || (progress < 30 && amount > 5000) || delay > 90) return 'HIGH';
@@ -322,19 +352,19 @@ const calculateQualityScore = (row) => {
   if (row.delay_days > 0) score -= Math.min(30, row.delay_days / 10);
   if (row.budget_variance > 0) score -= Math.min(20, row.budget_variance / 5);
   if (row.efficiency_score < 70) score -= (70 - row.efficiency_score) / 2;
-  if (row.delay_days === 0 && row.physical_progress > 50) score += 10;
+  if (row.delay_days === 0 && row.physical_progress_percent > 50) score += 10;
   
   return Math.max(0, Math.min(100, score));
 };
 
 // Forecast completion with proper date handling
 const forecastCompletion = (row) => {
-  if (row.physical_progress >= 100) {
+  if (row.physical_progress_percent >= 100) {
     return parseMultiFormatDate(row.completion_date_actual) || 'Completed';
   }
-  if (row.physical_progress === 0) return 'Not Started';
+  if (row.physical_progress_percent === 0) return 'Not Started';
   
-  const awardDateStr = parseMultiFormatDate(row.award_date || row.date_award);
+  const awardDateStr = parseMultiFormatDate(row.award_date);
   if (!awardDateStr) {
     return 'No start date';
   }
@@ -348,8 +378,8 @@ const forecastCompletion = (row) => {
       return 'Project not started';
     }
     
-    const remainingProgress = 100 - row.physical_progress;
-    const avgProgressRate = row.physical_progress / daysSinceAward;
+    const remainingProgress = 100 - row.physical_progress_percent;
+    const avgProgressRate = row.physical_progress_percent / daysSinceAward;
     
     if (avgProgressRate === 0 || !isFinite(avgProgressRate)) {
       return 'Unable to forecast';
@@ -378,172 +408,112 @@ const safeString = (value) => {
   return String(value);
 };
 
-// Safe number conversion helper (ensures amounts are in lakhs)
+// Safe number conversion helper
 const safeNumber = (value, defaultValue = 0) => {
   const parsed = parseFloat(value);
   return isNaN(parsed) ? defaultValue : parsed;
 };
 
 // Main data hook
-export const useData = () => {
+export const useData = (databaseName = 'engineering') => {
   const [rawData, setRawData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [dataStats, setDataStats] = useState(null);
+  const [columns, setColumns] = useState([]);
   const isMountedRef = useRef(true);
   const retryCount = useRef(0);
   const maxRetries = 3;
 
+  // Get database configuration
+  const dbConfig = databaseConfigs[databaseName] || databaseConfigs.engineering || {
+    displayName: 'Engineering Database',
+    fileName: 'engineering.csv',
+    idField: 's_no',
+    idPrefix: 'ENG',
+    columns: []
+  };
+
   // Process raw CSV data with enhanced date processing
   const processData = useCallback((data) => {
     return data
-      .filter(row => row && (row.serial_no || row.s_no || row.scheme_name || row.scheme_name_1))
+      .filter(row => row && row[dbConfig.idField])
       .map((row, index) => {
-        const cleanRow = {};
+        // Apply calculations from config if they exist
+        if (dbConfig.calculations) {
+          const updatedRow = { ...row };
+          Object.entries(dbConfig.calculations).forEach(([field, calculator]) => {
+            if (typeof calculator === 'function') {
+              updatedRow[field] = calculator(updatedRow);
+            }
+          });
+          row = updatedRow;
+        }
+
+        // Process dates and numbers based on field names
+        const processedRow = { ...row };
         
-        // Clean and normalize all keys
-        Object.keys(row).forEach(key => {
-          if (key) {
-            const cleanKey = key.trim().replace(/\s+/g, '_').toLowerCase();
-            cleanRow[cleanKey] = row[key];
+        // Process each field
+        Object.keys(row).forEach(fieldName => {
+          const fieldLower = fieldName.toLowerCase();
+          
+          // Process date fields
+          if (fieldLower.includes('date') || fieldLower.includes('pdc') || fieldLower.includes('sdc')) {
+            if (row[fieldName]) {
+              processedRow[fieldName] = parseMultiFormatDate(row[fieldName]);
+            }
+          } 
+          // Process number fields - BUT EXCLUDE work_description even if it contains "work"
+          else if (fieldName !== 'work_description' && 
+                   (fieldLower.includes('amount') || fieldLower.includes('expdr') || 
+                   fieldLower.includes('expenditure') || fieldLower.includes('percent') ||
+                   fieldLower.includes('progress') || fieldLower.includes('days') ||
+                   fieldLower.includes('lakh') || fieldLower.includes('cr') ||
+                   fieldLower.includes('time_allowed') || fieldLower.includes('physical_progress'))) {
+            processedRow[fieldName] = safeNumber(row[fieldName], 0);
+          }
+          // Ensure string fields are properly handled
+          else {
+            processedRow[fieldName] = safeString(row[fieldName]);
           }
         });
 
-        // Get scheme name
-        const schemeName = safeString(
-          cleanRow.scheme_name_1 || 
-          cleanRow.scheme_name || 
-          'Unnamed Scheme'
-        );
-
-        // Get sanctioned amount (already in lakhs from sd_amount_lakh)
-        const sanctionedAmount = safeNumber(cleanRow.sd_amount_lakh) || 0;
-
-        // Process location field
-        let locationValue = '';
-        if (cleanRow.location !== undefined && cleanRow.location !== null) {
-          if (typeof cleanRow.location === 'number') {
-            locationValue = cleanRow.location.toString();
-          } else if (typeof cleanRow.location === 'string') {
-            locationValue = cleanRow.location;
-          } else if (cleanRow.location && typeof cleanRow.location === 'object' && cleanRow.location.toString) {
-            locationValue = cleanRow.location.toString();
-          } else {
-            locationValue = '';
-          }
-        }
-
-        // Process all date fields with enhanced parser
-        const processedRow = {
-          id: index + 1,
-          serial_no: safeString(cleanRow.serial_no || cleanRow.s_no || index + 1),
-          budget_head: safeString(cleanRow.budget_head || 'N/A'),
-          scheme_name: schemeName,
-          ftr_hq: safeString(cleanRow.ftr_hq || 'Unknown'),
-          shq: safeString(cleanRow.shq || 'Unknown'),
-          location: safeString(locationValue || 'N/A'),
-          work_site: safeString(cleanRow.work_site || locationValue || 'Unknown Location'),
-          executive_agency: safeString(cleanRow.executive_agency || 'Unknown Agency'),
-          sanctioned_amount: sanctionedAmount, // Already in lakhs
-          
-          // Process all date fields with the enhanced parser
-          award_date: parseMultiFormatDate(cleanRow.award_date) || '',
-          date_award: parseMultiFormatDate(cleanRow.award_date) || '',
-          tender_date: parseMultiFormatDate(cleanRow.tender_date) || '',
-          date_tender: parseMultiFormatDate(cleanRow.tender_date) || '',
-          pdc_agreement: parseMultiFormatDate(cleanRow.pdc_agreement || cleanRow.pdc_agreement_1) || '',
-          revised_pdc: parseMultiFormatDate(cleanRow.revised_pdc) || '',
-          completion_date_actual: parseMultiFormatDate(cleanRow.completion_date_actual) || '',
-          actual_completion_date: parseMultiFormatDate(cleanRow.completion_date_actual) || '',
-          acceptance_date: parseMultiFormatDate(cleanRow.acceptance_date) || '',
-          date_acceptance: parseMultiFormatDate(cleanRow.acceptance_date) || '',
-          ts_date: parseMultiFormatDate(cleanRow.ts_date) || '',
-          date_ts: parseMultiFormatDate(cleanRow.ts_date) || '',
-          
-          firm_name: safeString(cleanRow.firm_name || 'Unknown Contractor'),
-          physical_progress: safeNumber(cleanRow.physical_progress, 0),
-          current_status: safeNumber(cleanRow.current_status, 0),
-          
-          // Expenditure fields (ensure they're in lakhs)
-          expenditure_previous_fy: safeNumber(cleanRow.expenditure_previous_fy, 0),
-          expenditure_current_fy: safeNumber(cleanRow.expenditure_current_fy, 0),
-          expenditure_total: safeNumber(cleanRow.expenditure_total, 0),
-          
-          expenditure_percent: safeString(cleanRow.expenditure_percent || '0').replace('%', ''),
-          time_allowed_days: safeNumber(cleanRow.time_allowed_days, 0),
-          remarks: safeString(cleanRow.remarks || ''),
-          aa_es_reference: safeString(cleanRow.aa_es_reference || ''),
-          source_sheet: safeString(cleanRow.source_sheet || '')
-        };
-
-        // Parse expenditure percent
-        processedRow.percent_expdr = safeNumber(processedRow.expenditure_percent, 0);
-        
-        // Map fields for compatibility
-        processedRow.aa_es_ref = processedRow.aa_es_reference;
-        
-        // Calculate total expenditure (in lakhs)
-        processedRow.total_expdr = processedRow.expenditure_total || 
-          (processedRow.expenditure_previous_fy + processedRow.expenditure_current_fy);
-        
-        // Map current FY expenditure
-        processedRow.expdr_cfy = processedRow.expenditure_current_fy;
-        processedRow.expdr_upto_31mar25 = processedRow.expenditure_previous_fy;
-        
-        // Calculate derived fields
-        processedRow.remaining_amount = processedRow.sanctioned_amount - processedRow.total_expdr;
-        processedRow.efficiency_score = calculateEfficiency(processedRow);
+        // Add derived fields for dashboard compatibility
+        processedRow.id = row[dbConfig.idField] || index + 1;
         processedRow.delay_days = calculateDelay(processedRow);
-        
-        // Calculate expected progress
         processedRow.expected_progress = calculateExpectedProgress(processedRow);
-        
-        // Calculate health status
         processedRow.health_status = calculateHealthScore(processedRow);
         processedRow.health_score = getHealthScoreNumeric(processedRow.health_status);
-        
-        // Determine progress status
         processedRow.progress_category = determineProgressStatus(processedRow);
-        
-        // Calculate risk
         processedRow.risk_level = calculateRiskLevel(processedRow);
         processedRow.priority = determinePriority(processedRow);
-        
-        // Map status
         processedRow.status = determineStatus(processedRow.progress_category);
-        processedRow.progress_status = processedRow.current_status || processedRow.status;
+        processedRow.efficiency_score = calculateEfficiency(processedRow);
+        processedRow.quality_score = calculateQualityScore(processedRow);
+        processedRow.forecast_completion = forecastCompletion(processedRow);
         
         // Calculate budget variance
-        processedRow.budget_variance = processedRow.sanctioned_amount > 0 
-          ? ((processedRow.total_expdr - processedRow.sanctioned_amount) / processedRow.sanctioned_amount * 100).toFixed(2)
+        const sanctioned = safeNumber(processedRow.sd_amount_lakh);
+        const expended = safeNumber(processedRow.expenditure_total);
+        processedRow.budget_variance = sanctioned > 0 
+          ? ((expended - sanctioned) / sanctioned * 100).toFixed(2)
           : 0;
         
-        // Calculate completion ratio
-        processedRow.completion_ratio = processedRow.time_allowed_days > 0
-          ? (processedRow.physical_progress / 100 * processedRow.time_allowed_days).toFixed(0)
-          : 0;
-        
-        // Calculate monthly burn rate (in lakhs)
+        // Calculate monthly burn rate
         if (processedRow.award_date) {
           const awardDate = new Date(processedRow.award_date);
           const monthsElapsed = Math.max(1, Math.floor((new Date() - awardDate) / (1000 * 60 * 60 * 24 * 30)));
-          processedRow.monthly_burn_rate = (processedRow.total_expdr / monthsElapsed).toFixed(2);
+          processedRow.monthly_burn_rate = (expended / monthsElapsed).toFixed(2);
         } else {
           processedRow.monthly_burn_rate = 0;
         }
         
-        processedRow.quality_score = calculateQualityScore(processedRow);
-        processedRow.forecast_completion = forecastCompletion(processedRow);
-        
-        // Add placeholder for missing field
-        processedRow.aa_es_pending_with = '';
-        
         return processedRow;
       });
-  }, []);
+  }, [dbConfig]);
 
-  // Load data from CSV using fetch
+  // Load data from server using the API
   const loadData = useCallback(async () => {
     if (!isMountedRef.current) return;
     
@@ -551,10 +521,11 @@ export const useData = () => {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/engineering.csv', {
+      // Fetch data from server API
+      const response = await fetch(`${API_URL}/api/csv/${databaseName}/rows?all=true`, {
         method: 'GET',
         headers: {
-          'Accept': 'text/csv,application/csv,text/plain'
+          'Accept': 'application/json'
         }
       });
       
@@ -564,54 +535,39 @@ export const useData = () => {
         throw new Error(`Failed to load data: ${response.status} ${response.statusText}`);
       }
       
-      const fileContent = await response.text();
-      console.log('CSV file loaded, processing...');
+      const result = await response.json();
+      console.log(`Loaded ${result.rows.length} records from ${databaseName}`);
       
       if (!isMountedRef.current) return;
-      
-      // Parse CSV using dynamic import
-      const Papa = await import('papaparse');
-      
-      const result = Papa.parse(fileContent, {
-        header: true,
-        dynamicTyping: true,
-        skipEmptyLines: true,
-        delimitersToGuess: [',', '\t', '|', ';'],
-        transformHeader: (header) => {
-          if (!header) return '';
-          return header.trim().toLowerCase().replace(/\s+/g, '_');
-        }
-      });
-      
-      if (!isMountedRef.current) return;
-      
-      if (result.errors.length > 0) {
-        console.warn('CSV parsing warnings:', result.errors);
-      }
       
       // Process data with enhanced date handling
-      const processedData = processData(result.data);
+      const processedData = processData(result.rows);
       console.log(`Processed ${processedData.length} records`);
       
-      // Log sample date formats for debugging
+      // Debug: Check if work_description field exists
       if (processedData.length > 0) {
-        console.log('Sample processed dates:', {
-          award_date: processedData[0].award_date,
-          tender_date: processedData[0].tender_date,
-          pdc_agreement: processedData[0].pdc_agreement,
-          completion_date: processedData[0].completion_date_actual
-        });
+        const sampleRow = processedData[0];
+        console.log('Sample row fields:', Object.keys(sampleRow).slice(0, 15));
+        
+        // Check work_description specifically
+        const workDescCount = processedData.filter(d => 
+          d.work_description && d.work_description !== ''
+        ).length;
+        console.log(`Rows with work_description: ${workDescCount}/${processedData.length}`);
       }
+      
+      // Set columns from server response
+      setColumns(result.columns || []);
       
       // Calculate data statistics
       const stats = {
         totalRecords: processedData.length,
         dateRange: {
           earliest: processedData
-            .filter(d => d.date_award && d.date_award !== '')
+            .filter(d => d.award_date && d.award_date !== '')
             .reduce((min, d) => {
               try {
-                const date = new Date(d.date_award);
+                const date = new Date(d.award_date);
                 if (!isNaN(date.getTime())) {
                   return !min || date < min ? date : min;
                 }
@@ -628,8 +584,8 @@ export const useData = () => {
           acc[item.health_status] = (acc[item.health_status] || 0) + 1;
           return acc;
         }, {}),
-        sourceSheets: [...new Set(processedData.map(d => d.source_sheet).filter(Boolean))],
-        uniqueLocations: [...new Set(processedData.map(d => d.location).filter(l => l && l !== 'N/A'))]
+        idField: result.idField,
+        config: result.config
       };
       
       if (!isMountedRef.current) return;
@@ -657,21 +613,18 @@ export const useData = () => {
           }
         }, 1000 * retryCount.current);
       } else {
-        setError(err.message || 'Failed to load engineering data');
+        setError(err.message || 'Failed to load data from server');
         setLoading(false);
       }
     }
-  }, [processData]);
+  }, [databaseName, processData]);
 
   // Calculate data completeness
   const calculateDataCompleteness = (data) => {
     if (!data || data.length === 0) return 0;
     
-    const requiredFields = [
-      'serial_no', 'scheme_name', 'budget_head', 'work_site',
-      'executive_agency', 'sanctioned_amount', 'physical_progress',
-      'location'
-    ];
+    // Use default required fields for engineering database
+    const requiredFields = ['s_no', 'name_of_scheme', 'budget_head', 'executive_agency'];
     
     let totalCompleteness = 0;
     data.forEach(row => {
@@ -692,37 +645,84 @@ export const useData = () => {
   }, [loadData]);
 
   // Update single record
-  const updateRecord = useCallback((id, updates) => {
-    setRawData(prevData => 
-      prevData.map(record => 
-        record.id === id 
-          ? { ...record, ...updates, lastModified: new Date() }
-          : record
-      )
-    );
-  }, []);
-
-  // Batch update records
-  const batchUpdate = useCallback((ids, updates) => {
-    setRawData(prevData =>
-      prevData.map(record =>
-        ids.includes(record.id)
-          ? { ...record, ...updates, lastModified: new Date() }
-          : record
-      )
-    );
-  }, []);
+  const updateRecord = useCallback(async (index, updates) => {
+    try {
+      const response = await fetch(`${API_URL}/api/csv/${databaseName}/rows/${index}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updates)
+      });
+      
+      if (!response.ok) throw new Error('Failed to update record');
+      
+      const result = await response.json();
+      
+      // Update local data
+      setRawData(prevData => 
+        prevData.map((record, i) => 
+          i === index 
+            ? { ...record, ...result.row, lastModified: new Date() }
+            : record
+        )
+      );
+      
+      return result;
+    } catch (err) {
+      console.error('Error updating record:', err);
+      throw err;
+    }
+  }, [databaseName]);
 
   // Add new record
-  const addRecord = useCallback((newRecord) => {
-    const processedRecord = processData([newRecord])[0];
-    setRawData(prevData => [...prevData, processedRecord]);
-  }, [processData]);
+  const addRecord = useCallback(async (newRecord) => {
+    try {
+      const response = await fetch(`${API_URL}/api/csv/${databaseName}/rows`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newRecord)
+      });
+      
+      if (!response.ok) throw new Error('Failed to add record');
+      
+      const result = await response.json();
+      
+      // Process and add to local data
+      const processedRecord = processData([result.row])[0];
+      setRawData(prevData => [...prevData, processedRecord]);
+      
+      return result;
+    } catch (err) {
+      console.error('Error adding record:', err);
+      throw err;
+    }
+  }, [databaseName, processData]);
 
   // Delete records
-  const deleteRecords = useCallback((ids) => {
-    setRawData(prevData => prevData.filter(record => !ids.includes(record.id)));
-  }, []);
+  const deleteRecords = useCallback(async (indices) => {
+    try {
+      const deletePromises = indices.map(index => 
+        fetch(`${API_URL}/api/csv/${databaseName}/rows/${index}`, {
+          method: 'DELETE'
+        })
+      );
+      
+      await Promise.all(deletePromises);
+      
+      // Remove from local data
+      setRawData(prevData => 
+        prevData.filter((_, index) => !indices.includes(index))
+      );
+      
+      return { deleted: indices.length };
+    } catch (err) {
+      console.error('Error deleting records:', err);
+      throw err;
+    }
+  }, [databaseName]);
 
   // Get aggregate statistics
   const getAggregateStats = useCallback(() => {
@@ -745,9 +745,9 @@ export const useData = () => {
         }
         
         grouped[key].count++;
-        grouped[key].totalBudget += item.sanctioned_amount || 0;
-        grouped[key].totalExpenditure += item.total_expdr || 0;
-        grouped[key].avgProgress += item.physical_progress || 0;
+        grouped[key].totalBudget += item.sd_amount_lakh || 0;
+        grouped[key].totalExpenditure += item.expenditure_total || 0;
+        grouped[key].avgProgress += item.physical_progress_percent || 0;
         grouped[key].avgEfficiency += item.efficiency_score || 0;
         grouped[key].projects.push(item.id);
       });
@@ -762,54 +762,13 @@ export const useData = () => {
       return grouped;
     };
 
-    const aggregateByLocation = (data) => {
-      const locations = {};
-      
-      data.forEach(item => {
-        const locationField = safeString(item.location);
-        const workSite = safeString(item.work_site);
-        
-        let location = 'Unknown';
-        if (locationField && locationField !== 'N/A' && locationField !== '') {
-          location = locationField;
-        } else if (workSite && workSite !== 'Unknown Location') {
-          location = workSite.split(',')[0].trim();
-        }
-        
-        if (!locations[location]) {
-          locations[location] = {
-            count: 0,
-            totalBudget: 0,
-            totalExpenditure: 0,
-            avgProgress: 0,
-            coords: null,
-            projects: []
-          };
-        }
-        
-        locations[location].count++;
-        locations[location].totalBudget += item.sanctioned_amount || 0;
-        locations[location].totalExpenditure += item.total_expdr || 0;
-        locations[location].avgProgress += item.physical_progress || 0;
-        locations[location].projects.push(item.id);
-      });
-      
-      Object.keys(locations).forEach(key => {
-        if (locations[key].count > 0) {
-          locations[key].avgProgress /= locations[key].count;
-        }
-      });
-      
-      return locations;
-    };
-
     const generateTimelineStats = (data) => {
       const timeline = {};
       
       data.forEach(item => {
-        if (item.date_award) {
+        if (item.award_date) {
           try {
-            const date = new Date(item.date_award);
+            const date = new Date(item.award_date);
             if (!isNaN(date.getTime())) {
               const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
               
@@ -823,15 +782,15 @@ export const useData = () => {
               }
               
               timeline[monthKey].started++;
-              timeline[monthKey].budget += item.sanctioned_amount || 0;
-              timeline[monthKey].expenditure += item.total_expdr || 0;
+              timeline[monthKey].budget += item.sd_amount_lakh || 0;
+              timeline[monthKey].expenditure += item.expenditure_total || 0;
               
-              if (item.physical_progress >= 100) {
+              if (item.physical_progress_percent >= 100) {
                 timeline[monthKey].completed++;
               }
             }
           } catch (err) {
-            console.warn('Invalid date in timeline stats:', item.date_award);
+            console.warn('Invalid date in timeline stats:', item.award_date);
           }
         }
       });
@@ -844,15 +803,13 @@ export const useData = () => {
       byBudgetHead: aggregateByField(rawData, 'budget_head'),
       byRiskLevel: aggregateByField(rawData, 'risk_level'),
       byStatus: aggregateByField(rawData, 'status'),
-      byLocation: aggregateByLocation(rawData),
-      byLocationField: aggregateByField(rawData, 'location'),
+      byLocation: aggregateByField(rawData, 'location'),
       byContractor: aggregateByField(rawData, 'firm_name'),
-      byFrontierHQ: aggregateByField(rawData, 'ftr_hq'),
-      bySectorHQ: aggregateByField(rawData, 'shq'),
+      byFrontierHQ: aggregateByField(rawData, 'ftr_hq_name'),
+      bySectorHQ: aggregateByField(rawData, 'shq_name'),
       timeline: generateTimelineStats(rawData),
       byHealthStatus: aggregateByField(rawData, 'health_status'),
-      byProgressCategory: aggregateByField(rawData, 'progress_category'),
-      bySourceSheet: aggregateByField(rawData, 'source_sheet')
+      byProgressCategory: aggregateByField(rawData, 'progress_category')
     };
   }, [rawData]);
 
@@ -872,11 +829,12 @@ export const useData = () => {
     error,
     lastUpdate,
     dataStats,
+    columns,
     refetch,
     updateRecord,
-    batchUpdate,
     addRecord,
     deleteRecords,
-    getAggregateStats
+    getAggregateStats,
+    databaseConfig: dbConfig
   };
 };

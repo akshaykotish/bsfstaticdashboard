@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   ComposedChart, ScatterChart, Scatter, Treemap,
@@ -8,8 +8,11 @@ import {
 import {
   IndianRupee, TrendingUp, TrendingDown, AlertCircle,
   DollarSign, PieChart as PieChartIcon, BarChart3,
-  AlertTriangle, CheckCircle, Info, ArrowUpRight, ArrowDownRight
+  AlertTriangle, CheckCircle, Info, ArrowUpRight, ArrowDownRight,
+  X, Eye, Filter, ChevronRight, Building
 } from 'lucide-react';
+import DataTable from '../DataTable';
+import FitViewModal from '../FitView';
 
 const COLORS = {
   budget: {
@@ -28,6 +31,12 @@ const COLORS = {
 };
 
 const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
+  const [showDataTableModal, setShowDataTableModal] = useState(false);
+  const [selectedDataForTable, setSelectedDataForTable] = useState([]);
+  const [modalTitle, setModalTitle] = useState('');
+  const [showFitViewModal, setShowFitViewModal] = useState(false);
+  const [selectedProjectForFitView, setSelectedProjectForFitView] = useState(null);
+
   const budgetMetrics = useMemo(() => {
     if (!data || data.length === 0) {
       return {
@@ -38,12 +47,16 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
         overrunProjects: [],
         underutilizedProjects: [],
         budgetTrend: [],
-        departmentComparison: []
+        departmentComparison: [],
+        budgetHeadProjects: {},
+        departmentProjects: {}
       };
     }
 
     // Budget by Head Analysis
     const budgetHeads = {};
+    const budgetHeadProjects = {};
+    
     data.forEach(item => {
       const head = item.budget_head || 'Unspecified';
       if (!budgetHeads[head]) {
@@ -59,17 +72,19 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
           avgProgress: 0,
           totalProgress: 0
         };
+        budgetHeadProjects[head] = [];
       }
-      budgetHeads[head].allocated += (item.sanctioned_amount || 0) / 100;
-      budgetHeads[head].spent += (item.total_expdr || 0) / 100;
+      budgetHeads[head].allocated += (item.sd_amount_lakh || 0);
+      budgetHeads[head].spent += (item.expenditure_total || 0);
       budgetHeads[head].projects++;
-      budgetHeads[head].totalProgress += item.physical_progress || 0;
+      budgetHeads[head].totalProgress += item.physical_progress_percent || 0;
+      budgetHeadProjects[head].push(item);
       
-      if (item.percent_expdr > 100) {
-        budgetHeads[head].overrun += ((item.total_expdr || 0) - (item.sanctioned_amount || 0)) / 100;
+      if (item.expenditure_percent > 100) {
+        budgetHeads[head].overrun += ((item.expenditure_total || 0) - (item.sd_amount_lakh || 0));
       }
-      if (item.percent_expdr < 50 && item.physical_progress > 50) {
-        budgetHeads[head].underutilized += ((item.sanctioned_amount || 0) - (item.total_expdr || 0)) / 100;
+      if (item.expenditure_percent < 50 && item.physical_progress_percent > 50) {
+        budgetHeads[head].underutilized += ((item.sd_amount_lakh || 0) - (item.expenditure_total || 0));
       }
     });
 
@@ -84,18 +99,18 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
 
     // Cost Variance Analysis
     const costVariance = data
-      .filter(d => d.sanctioned_amount > 0)
+      .filter(d => d.sd_amount_lakh > 0)
       .map(d => ({
         ...d,
-        project: d.scheme_name?.substring(0, 30) || 'Unknown',
-        budgeted: d.sanctioned_amount / 100,
-        actual: (d.total_expdr || 0) / 100,
-        variance: ((d.total_expdr - d.sanctioned_amount) / d.sanctioned_amount * 100).toFixed(1),
-        progress: d.physical_progress || 0,
-        status: d.total_expdr > d.sanctioned_amount ? 'Overrun' : 
-               d.percent_expdr < 50 && d.physical_progress > 50 ? 'Underutilized' : 'Normal',
-        color: d.total_expdr > d.sanctioned_amount ? COLORS.budget.overrun :
-               d.percent_expdr < 50 && d.physical_progress > 50 ? COLORS.budget.underutilized : COLORS.budget.spent
+        project: d.sub_scheme_name?.substring(0, 30) || d.name_of_scheme?.substring(0, 30) || 'Unknown',
+        budgeted: d.sd_amount_lakh,
+        actual: (d.expenditure_total || 0),
+        variance: ((d.expenditure_total - d.sd_amount_lakh) / d.sd_amount_lakh * 100).toFixed(1),
+        progress: d.physical_progress_percent || 0,
+        status: d.expenditure_total > d.sd_amount_lakh ? 'Overrun' : 
+               d.expenditure_percent < 50 && d.physical_progress_percent > 50 ? 'Underutilized' : 'Normal',
+        color: d.expenditure_total > d.sd_amount_lakh ? COLORS.budget.overrun :
+               d.expenditure_percent < 50 && d.physical_progress_percent > 50 ? COLORS.budget.underutilized : COLORS.budget.spent
       }))
       .filter(d => Math.abs(d.variance) > 5)
       .sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance))
@@ -103,17 +118,17 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
 
     // Efficiency Matrix (Progress vs Budget Utilization)
     const efficiencyMatrix = data
-      .filter(d => d.sanctioned_amount > 0)
+      .filter(d => d.sd_amount_lakh > 0)
       .slice(0, 100)
       .map(d => ({
         ...d,
-        x: d.percent_expdr || 0,
-        y: d.physical_progress || 0,
-        z: d.sanctioned_amount / 100,
-        name: d.scheme_name?.substring(0, 20) || 'Unknown',
-        efficiency: d.percent_expdr > 0 ? ((d.physical_progress / d.percent_expdr) * 100).toFixed(1) : 0,
-        fill: d.percent_expdr > 100 ? COLORS.budget.overrun :
-              d.percent_expdr < 50 && d.physical_progress > 50 ? COLORS.budget.allocated :
+        x: d.expenditure_percent || 0,
+        y: d.physical_progress_percent || 0,
+        z: d.sd_amount_lakh,
+        name: d.sub_scheme_name?.substring(0, 20) || d.name_of_scheme?.substring(0, 20) || 'Unknown',
+        efficiency: d.expenditure_percent > 0 ? ((d.physical_progress_percent / d.expenditure_percent) * 100).toFixed(1) : 0,
+        fill: d.expenditure_percent > 100 ? COLORS.budget.overrun :
+              d.expenditure_percent < 50 && d.physical_progress_percent > 50 ? COLORS.budget.allocated :
               COLORS.budget.spent
       }));
 
@@ -128,45 +143,46 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
 
     const utilizationDistribution = utilizationRanges.map(range => ({
       ...range,
-      count: data.filter(d => d.percent_expdr >= range.min && d.percent_expdr <= range.max).length,
+      count: data.filter(d => d.expenditure_percent >= range.min && d.expenditure_percent <= range.max).length,
       budget: data
-        .filter(d => d.percent_expdr >= range.min && d.percent_expdr <= range.max)
-        .reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0) / 100,
+        .filter(d => d.expenditure_percent >= range.min && d.expenditure_percent <= range.max)
+        .reduce((sum, d) => sum + (d.sd_amount_lakh || 0), 0),
+      projects: data.filter(d => d.expenditure_percent >= range.min && d.expenditure_percent <= range.max),
       fill: range.min > 100 ? COLORS.budget.overrun :
             range.min > 75 ? COLORS.budget.spent :
             range.min > 50 ? COLORS.budget.allocated :
             range.min > 25 ? COLORS.budget.remaining : COLORS.budget.underutilized
     }));
 
-    // Top Overrun Projects - FIXED: Now includes all original data
+    // Top Overrun Projects
     const overrunProjects = data
-      .filter(d => d.percent_expdr > 100)
-      .sort((a, b) => b.percent_expdr - a.percent_expdr)
+      .filter(d => d.expenditure_percent > 100)
+      .sort((a, b) => b.expenditure_percent - a.expenditure_percent)
       .slice(0, 10)
       .map(d => ({
         // Keep all original data fields
         ...d,
         // Add computed fields for display
-        project: d.scheme_name?.substring(0, 30) || 'Unknown',
-        overrunAmount: ((d.total_expdr - d.sanctioned_amount) / 100).toFixed(2),
-        overrunPercent: (d.percent_expdr - 100).toFixed(1),
-        progress: d.physical_progress || 0,
+        project: d.sub_scheme_name?.substring(0, 30) || d.name_of_scheme?.substring(0, 30) || 'Unknown',
+        overrunAmount: ((d.expenditure_total - d.sd_amount_lakh)).toFixed(2),
+        overrunPercent: (d.expenditure_percent - 100).toFixed(1),
+        progress: d.physical_progress_percent || 0,
         agency: d.executive_agency || 'Unknown'
       }));
 
-    // Underutilized Projects - FIXED: Now includes all original data
+    // Underutilized Projects
     const underutilizedProjects = data
-      .filter(d => d.percent_expdr < 50 && d.physical_progress > 50)
-      .sort((a, b) => a.percent_expdr - b.percent_expdr)
+      .filter(d => d.expenditure_percent < 50 && d.physical_progress_percent > 50)
+      .sort((a, b) => a.expenditure_percent - b.expenditure_percent)
       .slice(0, 10)
       .map(d => ({
         // Keep all original data fields
         ...d,
         // Add computed fields for display
-        project: d.scheme_name?.substring(0, 30) || 'Unknown',
-        unutilizedAmount: ((d.sanctioned_amount - d.total_expdr) / 100).toFixed(2),
-        utilizationPercent: d.percent_expdr?.toFixed(1) || 0,
-        progress: d.physical_progress || 0,
+        project: d.sub_scheme_name?.substring(0, 30) || d.name_of_scheme?.substring(0, 30) || 'Unknown',
+        unutilizedAmount: ((d.sd_amount_lakh - d.expenditure_total)).toFixed(2),
+        utilizationPercent: d.expenditure_percent?.toFixed(1) || 0,
+        progress: d.physical_progress_percent || 0,
         agency: d.executive_agency || 'Unknown'
       }));
 
@@ -175,8 +191,8 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
     const monthlyBudget = {};
     
     data.forEach(d => {
-      if (d.date_award) {
-        const date = new Date(d.date_award);
+      if (d.award_date) {
+        const date = new Date(d.award_date);
         if (!isNaN(date.getTime())) {
           const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
           if (!monthlyBudget[monthKey]) {
@@ -187,8 +203,8 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
               utilization: 0
             };
           }
-          monthlyBudget[monthKey].allocated += (d.sanctioned_amount || 0) / 100;
-          monthlyBudget[monthKey].spent += (d.total_expdr || 0) / 100;
+          monthlyBudget[monthKey].allocated += (d.sd_amount_lakh || 0);
+          monthlyBudget[monthKey].spent += (d.expenditure_total || 0);
         }
       }
     });
@@ -203,6 +219,8 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
 
     // Department/Agency Budget Comparison
     const agencyBudget = {};
+    const departmentProjects = {};
+    
     data.forEach(d => {
       const agency = d.executive_agency || 'Unknown';
       if (!agencyBudget[agency]) {
@@ -212,10 +230,12 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
           spent: 0,
           projects: 0
         };
+        departmentProjects[agency] = [];
       }
-      agencyBudget[agency].allocated += (d.sanctioned_amount || 0) / 100;
-      agencyBudget[agency].spent += (d.total_expdr || 0) / 100;
+      agencyBudget[agency].allocated += (d.sd_amount_lakh || 0);
+      agencyBudget[agency].spent += (d.expenditure_total || 0);
       agencyBudget[agency].projects++;
+      departmentProjects[agency].push(d);
     });
 
     const departmentComparison = Object.values(agencyBudget)
@@ -235,9 +255,38 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
       overrunProjects,
       underutilizedProjects,
       budgetTrend,
-      departmentComparison
+      departmentComparison,
+      budgetHeadProjects,
+      departmentProjects
     };
   }, [data]);
+
+  // Handle opening DataTable modal
+  const handleOpenDataTable = (projects, title) => {
+    setSelectedDataForTable(projects);
+    setModalTitle(title);
+    setShowDataTableModal(true);
+  };
+
+  // Handle opening FitView modal for project details
+  const handleOpenFitView = (project) => {
+    setSelectedProjectForFitView(project);
+    setShowFitViewModal(true);
+  };
+
+  // Handle closing FitView modal
+  const handleCloseFitView = () => {
+    setShowFitViewModal(false);
+    setSelectedProjectForFitView(null);
+  };
+
+  // Handle project click from within DataTable
+  const handleProjectClick = (project) => {
+    setShowDataTableModal(false);
+    if (onChartClick) {
+      onChartClick(project, 'project');
+    }
+  };
 
   // Custom Tooltip
   const CustomTooltip = ({ active, payload, label }) => {
@@ -252,8 +301,8 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></span>
               <span className="font-medium">{entry.name}:</span>
               <span className="font-semibold">
-                {typeof entry.value === 'number' && (entry.name.includes('Amount') || entry.name.includes('Budget'))
-                  ? formatAmount(entry.value * 100)
+                {typeof entry.value === 'number' && (entry.name.includes('Amount') || entry.name.includes('Budget') || entry.name.includes('Allocated') || entry.name.includes('Spent'))
+                  ? formatAmount(entry.value)
                   : entry.value}
               </span>
             </div>
@@ -262,6 +311,57 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
       );
     }
     return null;
+  };
+
+  // DataTable Modal Component
+  const DataTableModal = () => {
+    if (!showDataTableModal) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4">
+        <div 
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowDataTableModal(false)}
+        />
+        
+        <div className={`relative w-[90vw] max-w-[1600px] h-[85vh] ${
+          darkMode ? 'bg-gray-900' : 'bg-white'
+        } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
+          
+          {/* Header */}
+          <div className={`px-6 py-4 border-b ${
+            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
+          }`}>
+            <div className="flex justify-between items-center">
+              <h2 className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                {modalTitle}
+              </h2>
+              <button
+                onClick={() => setShowDataTableModal(false)}
+                className={`p-2 rounded-lg ${
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
+                } transition-colors`}
+              >
+                <X size={18} className={darkMode ? 'text-gray-300' : 'text-white'} />
+              </button>
+            </div>
+          </div>
+
+          {/* DataTable */}
+          <div className="flex-1 overflow-hidden">
+            <DataTable
+              data={selectedDataForTable}
+              darkMode={darkMode}
+              onRowClick={handleProjectClick}
+              compareMode={false}
+              selectedProjects={[]}
+              isEmbedded={true}
+              maxHeight="100%"
+            />
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -278,18 +378,50 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={budgetMetrics.budgetByHead}>
               <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 9 }} />
-              <YAxis yAxisId="left" label={{ value: 'Amount (Cr)', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} tick={{ fontSize: 10 }} />
+              <XAxis 
+                dataKey="name" 
+                angle={-45} 
+                textAnchor="end" 
+                height={80} 
+                tick={{ fontSize: 9, cursor: 'pointer' }}
+                onClick={(e) => {
+                  if (e && e.value && budgetMetrics.budgetHeadProjects[e.value]) {
+                    handleOpenDataTable(
+                      budgetMetrics.budgetHeadProjects[e.value],
+                      `${e.value} - Budget Head Projects`
+                    );
+                  }
+                }}
+              />
+              <YAxis yAxisId="left" label={{ value: 'Amount (Lakh)', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} tick={{ fontSize: 10 }} />
               <YAxis yAxisId="right" orientation="right" label={{ value: 'Utilization %', angle: 90, position: 'insideRight', style: { fontSize: 10 } }} tick={{ fontSize: 10 }} />
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: '11px' }} />
-              <Bar yAxisId="left" dataKey="allocated" fill={COLORS.budget.allocated} name="Allocated (Cr)" />
-              <Bar yAxisId="left" dataKey="spent" fill={COLORS.budget.spent} name="Spent (Cr)" />
-              <Bar yAxisId="left" dataKey="remaining" fill={COLORS.budget.remaining} name="Remaining (Cr)" />
+              <Bar 
+                yAxisId="left" 
+                dataKey="allocated" 
+                fill={COLORS.budget.allocated} 
+                name="Allocated (Lakh)"
+                onClick={(data) => {
+                  if (data && budgetMetrics.budgetHeadProjects[data.name]) {
+                    handleOpenDataTable(
+                      budgetMetrics.budgetHeadProjects[data.name],
+                      `${data.name} - Budget Head Projects`
+                    );
+                  }
+                }}
+                style={{ cursor: 'pointer' }}
+              />
+              <Bar yAxisId="left" dataKey="spent" fill={COLORS.budget.spent} name="Spent (Lakh)" />
+              <Bar yAxisId="left" dataKey="remaining" fill={COLORS.budget.remaining} name="Remaining (Lakh)" />
               <Line yAxisId="right" type="monotone" dataKey="utilization" stroke="#ef4444" name="Utilization %" strokeWidth={2} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
+        <p className="text-xs text-gray-500 mt-2 flex items-center gap-2">
+          <Eye size={12} />
+          Click on bars or labels to view detailed project list
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -308,7 +440,16 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
                 <XAxis dataKey="x" name="Budget Spent %" domain={[0, 120]} tick={{ fontSize: 10 }} />
                 <YAxis dataKey="y" name="Progress %" domain={[0, 100]} tick={{ fontSize: 10 }} />
                 <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
-                <Scatter name="Projects" data={budgetMetrics.efficiencyMatrix}>
+                <Scatter 
+                  name="Projects" 
+                  data={budgetMetrics.efficiencyMatrix}
+                  onClick={(data) => {
+                    if (onChartClick) {
+                      onChartClick(data, 'project');
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
                   {budgetMetrics.efficiencyMatrix.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
@@ -326,7 +467,7 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
             <PieChartIcon size={16} className="text-purple-500" />
             Budget Utilization Distribution
           </h3>
-          <div className="w-full h-[350px]">
+          <div className="w-full h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -338,6 +479,15 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="count"
+                  onClick={(data) => {
+                    if (data.projects && data.projects.length > 0) {
+                      handleOpenDataTable(
+                        data.projects,
+                        `Projects with ${data.range} Budget Utilization`
+                      );
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
                 >
                   {budgetMetrics.utilizationDistribution.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -346,6 +496,33 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
+          </div>
+          <div className="mt-4 space-y-2">
+            {budgetMetrics.utilizationDistribution.map((item, index) => (
+              <div 
+                key={index} 
+                className={`flex justify-between items-center text-xs p-2 rounded cursor-pointer hover:${
+                  darkMode ? 'bg-gray-700' : 'bg-gray-100'
+                } transition-colors`}
+                onClick={() => {
+                  if (item.projects && item.projects.length > 0) {
+                    handleOpenDataTable(
+                      item.projects,
+                      `Projects with ${item.range} Budget Utilization`
+                    );
+                  }
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }}></div>
+                  <span>{item.range}</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="font-medium">{item.count} projects</span>
+                  <ChevronRight size={14} className="text-gray-400" />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -367,13 +544,98 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
-                <Area type="monotone" dataKey="allocated" stackId="1" stroke={COLORS.budget.allocated} fill={COLORS.budget.allocated} name="Allocated" />
-                <Area type="monotone" dataKey="spent" stackId="2" stroke={COLORS.budget.spent} fill={COLORS.budget.spent} name="Spent" />
+                <Area type="monotone" dataKey="allocated" stackId="1" stroke={COLORS.budget.allocated} fill={COLORS.budget.allocated} name="Allocated (Lakh)" />
+                <Area type="monotone" dataKey="spent" stackId="2" stroke={COLORS.budget.spent} fill={COLORS.budget.spent} name="Spent (Lakh)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
       )}
+
+      {/* Department Comparison Table */}
+      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm p-6 border ${
+        darkMode ? 'border-gray-700' : 'border-gray-100'
+      }`}>
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Building size={16} className="text-indigo-500" />
+          Department Budget Comparison
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className={`${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+              <tr>
+                <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Department</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Projects</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Allocated</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Spent</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Utilization %</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Avg/Project</th>
+                <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Action</th>
+              </tr>
+            </thead>
+            <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+              {budgetMetrics.departmentComparison.map((dept, index) => (
+                <tr 
+                  key={index} 
+                  className={`hover:${darkMode ? 'bg-gray-700' : 'bg-blue-50'} transition-colors cursor-pointer`}
+                  onClick={() => {
+                    if (budgetMetrics.departmentProjects[dept.name]) {
+                      handleOpenDataTable(
+                        budgetMetrics.departmentProjects[dept.name],
+                        `${dept.name} - Department Projects`
+                      );
+                    }
+                  }}
+                >
+                  <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{dept.name}</td>
+                  <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{dept.projects}</td>
+                  <td className="px-3 py-2 text-center font-medium">{formatAmount ? formatAmount(dept.allocated) : `₹${dept.allocated.toFixed(2)}L`}</td>
+                  <td className="px-3 py-2 text-center font-medium">{formatAmount ? formatAmount(dept.spent) : `₹${dept.spent.toFixed(2)}L`}</td>
+                  <td className="px-3 py-2 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className={`font-bold ${
+                        dept.utilization > 90 ? 'text-red-600' :
+                        dept.utilization > 70 ? 'text-yellow-600' : 'text-green-600'
+                      }`}>
+                        {dept.utilization}%
+                      </span>
+                      <div className="w-14 bg-gray-200 rounded-full h-1.5">
+                        <div 
+                          className={`h-1.5 rounded-full ${
+                            dept.utilization > 90 ? 'bg-red-500' :
+                            dept.utilization > 70 ? 'bg-yellow-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${Math.min(100, dept.utilization)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-center">{formatAmount ? formatAmount(parseFloat(dept.avgBudgetPerProject)) : `₹${dept.avgBudgetPerProject}L`}</td>
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (budgetMetrics.departmentProjects[dept.name]) {
+                          handleOpenDataTable(
+                            budgetMetrics.departmentProjects[dept.name],
+                            `${dept.name} - Department Projects`
+                          );
+                        }
+                      }}
+                      className={`px-2 py-1 rounded-lg text-xs flex items-center gap-1 mx-auto ${
+                        darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-blue-50 hover:bg-blue-100'
+                      } transition-colors text-blue-600 dark:text-blue-400`}
+                    >
+                      <Eye size={12} />
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Critical Projects */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -384,6 +646,18 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
             <AlertTriangle size={16} className="text-red-500" />
             Top Budget Overruns
+            {budgetMetrics.overrunProjects.length > 0 && (
+              <button
+                onClick={() => {
+                  const allOverruns = data.filter(d => d.expenditure_percent > 100);
+                  handleOpenDataTable(allOverruns, 'All Budget Overrun Projects');
+                }}
+                className="ml-auto text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              >
+                View All ({data.filter(d => d.expenditure_percent > 100).length})
+                <ChevronRight size={12} />
+              </button>
+            )}
           </h3>
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {budgetMetrics.overrunProjects.map((project, index) => (
@@ -392,18 +666,24 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
                 className={`p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.01] ${
                   darkMode ? 'border-red-800 bg-red-900/20' : 'border-red-200 bg-red-50'
                 }`}
-                onClick={() => onChartClick(project, 'project')}
+                onClick={() => handleOpenFitView(project)}
               >
                 <p className="text-xs font-semibold truncate text-gray-900 dark:text-gray-100">{project.project}</p>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-xs text-gray-500">Overrun</span>
                   <span className="font-bold text-red-600 text-xs">
-                    ₹{project.overrunAmount} Cr ({project.overrunPercent}%)
+                    ₹{project.overrunAmount} L ({project.overrunPercent}%)
                   </span>
                 </div>
                 <div className="flex justify-between items-center mt-1">
                   <span className="text-xs text-gray-500">Progress</span>
                   <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{project.progress}%</span>
+                </div>
+                <div className="flex justify-between items-center mt-1">
+                  <span className="text-xs text-gray-500 flex items-center gap-1">
+                    <Eye size={10} />
+                    Click for detailed analytics
+                  </span>
                 </div>
               </div>
             ))}
@@ -417,6 +697,18 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-gray-100">
             <AlertCircle size={16} className="text-yellow-500" />
             Underutilized Budgets
+            {budgetMetrics.underutilizedProjects.length > 0 && (
+              <button
+                onClick={() => {
+                  const allUnderutilized = data.filter(d => d.expenditure_percent < 50 && d.physical_progress_percent > 50);
+                  handleOpenDataTable(allUnderutilized, 'All Underutilized Budget Projects');
+                }}
+                className="ml-auto text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              >
+                View All ({data.filter(d => d.expenditure_percent < 50 && d.physical_progress_percent > 50).length})
+                <ChevronRight size={12} />
+              </button>
+            )}
           </h3>
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {budgetMetrics.underutilizedProjects.map((project, index) => (
@@ -425,24 +717,41 @@ const BudgetAnalysis = ({ data, darkMode, onChartClick, formatAmount }) => {
                 className={`p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.01] ${
                   darkMode ? 'border-yellow-800 bg-yellow-900/20' : 'border-yellow-200 bg-yellow-50'
                 }`}
-                onClick={() => onChartClick(project, 'project')}
+                onClick={() => handleOpenFitView(project)}
               >
                 <p className="text-xs font-semibold truncate text-gray-900 dark:text-gray-100">{project.project}</p>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-xs text-gray-500">Unutilized</span>
                   <span className="font-bold text-yellow-600 text-xs">
-                    ₹{project.unutilizedAmount} Cr
+                    ₹{project.unutilizedAmount} L
                   </span>
                 </div>
                 <div className="flex justify-between items-center mt-1">
                   <span className="text-xs text-gray-500">Utilization</span>
                   <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{project.utilizationPercent}%</span>
                 </div>
+                <div className="flex justify-between items-center mt-1">
+                  <span className="text-xs text-gray-500 flex items-center gap-1">
+                    <Eye size={10} />
+                    Click for detailed analytics
+                  </span>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </div>
+
+      {/* DataTable Modal */}
+      <DataTableModal />
+
+      {/* FitView Modal */}
+      <FitViewModal
+        row={selectedProjectForFitView}
+        isOpen={showFitViewModal}
+        onClose={handleCloseFitView}
+        darkMode={darkMode}
+      />
     </div>
   );
 };

@@ -80,9 +80,9 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
       }
       
       agencies[agency].projects++;
-      agencies[agency].allocated += (item.sanctioned_amount || 0) / 100;
-      agencies[agency].spent += (item.total_expdr || 0) / 100;
-      agencies[agency].totalProgress += item.physical_progress || 0;
+      agencies[agency].allocated += (item.sd_amount_lakh || 0);
+      agencies[agency].spent += (item.expenditure_total || 0);
+      agencies[agency].totalProgress += item.physical_progress_percent || 0;
       agencies[agency].totalEfficiency += item.efficiency_score || 0;
       agencies[agency].totalDelay += item.delay_days || 0;
       agencies[agency].projectList.push(item);
@@ -90,10 +90,10 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
       // Store complete project data for modal
       agencyProjects[agency].push(item);
       
-      if (item.physical_progress >= 100) agencies[agency].completed++;
-      if (item.physical_progress === 0) agencies[agency].notStarted++;
+      if (item.physical_progress_percent >= 100) agencies[agency].completed++;
+      if (item.physical_progress_percent === 0) agencies[agency].notStarted++;
       if (item.delay_days > 0) agencies[agency].delayed++;
-      if (item.delay_days === 0 && item.physical_progress > 0) agencies[agency].onTrack++;
+      if (item.delay_days === 0 && item.physical_progress_percent > 0) agencies[agency].onTrack++;
       
       // Risk level distribution
       if (item.risk_level === 'CRITICAL') agencies[agency].critical++;
@@ -321,11 +321,11 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div className="text-center">
                   <p className="text-xs text-gray-500 uppercase">Total Budget</p>
-                  <p className="text-base font-bold">{formatAmount(selectedAgency.stats.allocated * 100)}</p>
+                  <p className="text-base font-bold">{formatAmount(selectedAgency.stats.allocated)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-500 uppercase">Spent</p>
-                  <p className="text-base font-bold">{formatAmount(selectedAgency.stats.spent * 100)}</p>
+                  <p className="text-base font-bold">{formatAmount(selectedAgency.stats.spent)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-500 uppercase">Utilization</p>
@@ -500,9 +500,9 @@ const AgencyPerformance = ({ data, darkMode, onChartClick, formatAmount }) => {
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: '11px' }} />
-              <Bar dataKey="allocated" fill="#3b82f6" name="Allocated (Cr)" onClick={(data) => handleAgencyClick(data.fullName)} style={{ cursor: 'pointer' }} />
-              <Bar dataKey="spent" fill="#10b981" name="Spent (Cr)" />
-              <Bar dataKey="remaining" fill="#f59e0b" name="Remaining (Cr)" />
+              <Bar dataKey="allocated" fill="#3b82f6" name="Allocated (Lakh)" onClick={(data) => handleAgencyClick(data.fullName)} style={{ cursor: 'pointer' }} />
+              <Bar dataKey="spent" fill="#10b981" name="Spent (Lakh)" />
+              <Bar dataKey="remaining" fill="#f59e0b" name="Remaining (Lakh)" />
             </BarChart>
           </ResponsiveContainer>
         </div>

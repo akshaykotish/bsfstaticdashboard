@@ -1,88 +1,456 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { 
-  Search, Calendar, DollarSign, TrendingUp, AlertTriangle,
-  Filter, X, ChevronDown, ChevronUp, Sliders, RotateCcw,
-  Building2, Users, MapPin, Clock, Package, Target,
-  Check, ChevronRight, Sparkles, Zap, Info, RefreshCw,
-  FileText, Briefcase, CreditCard, PieChart, Database, Eye,
-  Activity, Heart, Gauge, PauseCircle, PlayCircle,
-  AlertCircle, CheckCircle, XCircle, Timer, CalendarDays,
-  Edit, Plus, Home, Building, Award, IndianRupee,
-  TrendingDown, BarChart, Percent, CalendarClock,
-  GitBranch, Shield, ThermometerSun
+  Search, X, ChevronDown, ChevronUp, RotateCcw,
+  Building2, MapPin, TrendingUp, AlertTriangle,
+  Clock, Target, Zap, Info, RefreshCw,
+  Eye, Edit, Plus, Download, Filter,
+  DollarSign, Calendar, CheckCircle, AlertCircle,
+  Timer, Gauge, IndianRupee, Flag, Maximize2,
+  PauseCircle, CreditCard, PlayCircle, TrendingDown,
+  Activity, Heart, Award, Hash, Layers
 } from 'lucide-react';
 
-// Import the Report and Edit components
+// Import components
 import Report from './Reports';
-import EditComponent from './Edit';
+import EditRow from '../System/EditRow';
+import AddRow from '../System/AddRow';
+import FitViewModal from './FitView';
 
-// ReportModal Component
-const ReportModal = ({ isOpen, onClose, projectData, darkMode }) => {
-  const modalRef = useRef(null);
-  const modalContentRef = useRef(null);
+// Import database configurations
+import { databaseConfigs, getConfig, getDatabaseNames, generateId, applyCalculations } from '../System/config.js';
+
+// Inject enhanced progress animation styles
+const animatedStripesStyle = `
+  @keyframes progress-stripes {
+    0% { background-position: 0 0; }
+    100% { background-position: 40px 0; }
+  }
   
+  .progress-animated {
+    background-image: linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.15) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.15) 50%,
+      rgba(255, 255, 255, 0.15) 75%,
+      transparent 75%,
+      transparent
+    );
+    background-size: 40px 40px;
+    animation: progress-stripes 1s linear infinite;
+  }
+  
+  .pace-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.625rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+  
+  .progress-variance {
+    font-size: 0.5rem;
+    opacity: 0.8;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  .sleep-pace-pulse {
+    animation: pulse 2s infinite;
+  }
+`;
+
+if (typeof document !== 'undefined' && !document.getElementById('datatable-progress-styles')) {
+  const styleSheet = document.createElement('style');
+  styleSheet.id = 'datatable-progress-styles';
+  styleSheet.textContent = animatedStripesStyle;
+  document.head.appendChild(styleSheet);
+}
+
+// Helper functions
+const formatCurrency = (amount) => {
+  if (!amount || amount === 0) return '₹0';
+  if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)}Cr`;
+  if (amount >= 100000) return `₹${(amount / 100000).toFixed(2)}L`;
+  return `₹${(amount / 1000).toFixed(1)}K`;
+};
+
+const getProgressStatus = (progress) => {
+  if (progress >= 100) return 'Completed';
+  if (progress >= 75) return '75-99%';
+  if (progress >= 50) return '50-74%';  
+  if (progress >= 25) return '25-49%';
+  if (progress > 0) return '1-24%';
+  return 'Not Started';
+};
+
+// Parse dates safely
+const parseDate = (dateStr) => {
+  if (!dateStr || dateStr === '' || dateStr === 'N/A') return null;
+  try {
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+};
+
+// Enhanced time metrics calculation with proper monthly progress logic
+const calculateTimeMetrics = (row) => {
+  const awardDate = parseDate(row.award_date);
+  const pdcDate = parseDate(row.pdc_revised) || parseDate(row.pdc_agreement);
+  const today = new Date();
+  
+  if (!awardDate) {
+    return {
+      paceStatus: 'NOT_STARTED',
+      paceDetails: { message: 'Not yet awarded', severity: 'info' }
+    };
+  }
+  
+  if (!pdcDate) {
+    return {
+      paceStatus: 'NO_TIMELINE',
+      paceDetails: { message: 'No PDC set', severity: 'warning' }
+    };
+  }
+  
+  const totalDays = Math.floor((pdcDate - awardDate) / (1000 * 60 * 60 * 24));
+  const elapsedDays = Math.floor((today - awardDate) / (1000 * 60 * 60 * 24));
+  const remainingDays = Math.floor((pdcDate - today) / (1000 * 60 * 60 * 24));
+  
+  // Calculate months for pace determination
+  const totalMonths = Math.max(1, Math.round(totalDays / 30.44));
+  const elapsedMonths = Math.max(0, Math.floor(elapsedDays / 30.44));
+  
+  // Monthly expected progress rate (e.g., for 12 months = 8.33% per month)
+  const monthlyProgressRate = 100 / totalMonths;
+  
+  // Expected progress based on elapsed time
+  const expectedProgress = Math.min(100, elapsedMonths * monthlyProgressRate);
+  const actualProgress = parseFloat(row.physical_progress_percent) || 0;
+  
+  // Track progress history for stuck detection (would need actual historical data)
+  const previousMonthProgress = row.previous_month_progress || null;
+  const progressHistory = row.progress_history || [];
+  
+  // Check if progress is stuck (same as previous period)
+  let isStuck = false;
+  if (progressHistory.length >= 2) {
+    const recentProgress = progressHistory.slice(-3);
+    isStuck = recentProgress.every(p => Math.abs(p - actualProgress) < 1);
+  } else if (previousMonthProgress !== null) {
+    isStuck = Math.abs(actualProgress - previousMonthProgress) < 0.5;
+  }
+  
+  // Calculate monthly progress achieved
+  const actualMonthlyRate = elapsedMonths > 0 ? actualProgress / elapsedMonths : 0;
+  
+  // Determine pace status with enhanced logic
+  let paceStatus = 'NOT_APPLICABLE';
+  let paceDetails = {};
+  
+  // Check for payment pending (completed but not fully paid)
+  if (actualProgress >= 100) {
+    const expenditurePercent = parseFloat(row.expenditure_percent) || 0;
+    if (expenditurePercent < 100) {
+      paceStatus = 'PAYMENT_PENDING';
+      paceDetails = {
+        message: `Payment at ${expenditurePercent.toFixed(0)}%`,
+        severity: 'warning',
+        expenditurePercent
+      };
+    } else {
+      paceStatus = 'COMPLETED';
+      paceDetails = {
+        message: 'Project completed',
+        severity: 'success',
+        completionDays: totalDays - remainingDays
+      };
+    }
+  } else if (elapsedMonths === 0) {
+    // Just started (within first month)
+    if (actualProgress >= monthlyProgressRate * 0.5) {
+      paceStatus = 'PERFECT_PACE';
+      paceDetails = {
+        message: 'Strong start',
+        severity: 'success'
+      };
+    } else {
+      paceStatus = 'SLOW_START';
+      paceDetails = {
+        message: 'Recently started',
+        severity: 'info'
+      };
+    }
+  } else {
+    // Calculate progress variance
+    const progressDifference = actualProgress - expectedProgress;
+    const monthsBehind = progressDifference / monthlyProgressRate;
+    
+    // Check for stuck/sleep pace
+    if (isStuck && elapsedMonths >= 2 && actualProgress < 95) {
+      paceStatus = 'SLEEP_PACE';
+      paceDetails = {
+        message: `Stuck at ${actualProgress.toFixed(0)}% for ${Math.floor(elapsedDays / 30)} days`,
+        severity: 'critical',
+        stuckDuration: Math.floor(elapsedDays / 30),
+        progressDifference
+      };
+    } else if (progressDifference >= -monthlyProgressRate * 0.25) {
+      // Within quarter month tolerance - Perfect Pace
+      paceStatus = 'PERFECT_PACE';
+      paceDetails = {
+        message: progressDifference >= 0 ? 
+          `Ahead by ${Math.abs(monthsBehind).toFixed(1)} months` : 
+          'On track',
+        severity: 'success',
+        progressDifference,
+        monthsAhead: Math.max(0, monthsBehind)
+      };
+    } else if (progressDifference >= -monthlyProgressRate * 1) {
+      // Within one month delay - Slow Pace
+      paceStatus = 'SLOW_PACE';
+      paceDetails = {
+        message: `Behind by ${Math.abs(monthsBehind).toFixed(1)} months`,
+        severity: 'warning',
+        progressDifference,
+        monthsBehind: Math.abs(monthsBehind)
+      };
+    } else if (progressDifference >= -monthlyProgressRate * 2) {
+      // Within two months delay - Bad Pace
+      paceStatus = 'BAD_PACE';
+      paceDetails = {
+        message: `Critical: ${Math.abs(monthsBehind).toFixed(1)} months behind`,
+        severity: 'error',
+        progressDifference,
+        monthsBehind: Math.abs(monthsBehind)
+      };
+    } else {
+      // More than two months behind - Sleep Pace
+      paceStatus = 'SLEEP_PACE';
+      paceDetails = {
+        message: `Severely delayed: ${Math.abs(monthsBehind).toFixed(1)} months behind`,
+        severity: 'critical',
+        progressDifference,
+        monthsBehind: Math.abs(monthsBehind),
+        requiresIntervention: true
+      };
+    }
+    
+    // Add monthly rate info
+    paceDetails.monthlyRate = {
+      expected: monthlyProgressRate,
+      actual: actualMonthlyRate,
+      efficiency: (actualMonthlyRate / monthlyProgressRate * 100).toFixed(1)
+    };
+  }
+  
+  return {
+    totalDays,
+    elapsedDays,
+    remainingDays,
+    totalMonths,
+    elapsedMonths,
+    monthlyProgressRate,
+    expectedProgress,
+    actualProgress,
+    progressRatio: expectedProgress > 0 ? (actualProgress / expectedProgress) : 0,
+    progressDifference: actualProgress - expectedProgress,
+    paceStatus,
+    paceDetails,
+    isOverdue: remainingDays < 0,
+    isStuck,
+    actualMonthlyRate,
+    daysPerPercent: elapsedDays > 0 && actualProgress > 0 ? (elapsedDays / actualProgress).toFixed(1) : null
+  };
+};
+
+// Get pace configuration with enhanced details
+const getPaceConfig = (paceStatus) => {
+  const configs = {
+    'PERFECT_PACE': { 
+      label: 'Perfect Pace', 
+      shortLabel: 'Perfect',
+      color: 'green', 
+      bgClass: 'bg-green-100 dark:bg-green-900/30',
+      textClass: 'text-green-700 dark:text-green-400',
+      icon: Zap,
+      priority: 1
+    },
+    'SLOW_PACE': { 
+      label: 'Slow Pace', 
+      shortLabel: 'Slow',
+      color: 'yellow', 
+      bgClass: 'bg-yellow-100 dark:bg-yellow-900/30',
+      textClass: 'text-yellow-700 dark:text-yellow-400',
+      icon: Clock,
+      priority: 2
+    },
+    'BAD_PACE': { 
+      label: 'Bad Pace', 
+      shortLabel: 'Bad',
+      color: 'orange', 
+      bgClass: 'bg-orange-100 dark:bg-orange-900/30',
+      textClass: 'text-orange-700 dark:text-orange-400',
+      icon: AlertCircle,
+      priority: 3
+    },
+    'SLEEP_PACE': { 
+      label: 'Sleep Pace', 
+      shortLabel: 'Sleep',
+      color: 'red', 
+      bgClass: 'bg-red-100 dark:bg-red-900/30',
+      textClass: 'text-red-700 dark:text-red-400',
+      icon: PauseCircle,
+      priority: 4,
+      pulse: true
+    },
+    'PAYMENT_PENDING': { 
+      label: 'Payment Pending', 
+      shortLabel: 'Payment',
+      color: 'purple', 
+      bgClass: 'bg-purple-100 dark:bg-purple-900/30',
+      textClass: 'text-purple-700 dark:text-purple-400',
+      icon: CreditCard,
+      priority: 2
+    },
+    'COMPLETED': { 
+      label: 'Completed', 
+      shortLabel: 'Done',
+      color: 'blue', 
+      bgClass: 'bg-blue-100 dark:bg-blue-900/30',
+      textClass: 'text-blue-700 dark:text-blue-400',
+      icon: CheckCircle,
+      priority: 0
+    },
+    'NOT_STARTED': { 
+      label: 'Not Started', 
+      shortLabel: 'Not Started',
+      color: 'gray', 
+      bgClass: 'bg-gray-100 dark:bg-gray-900/30',
+      textClass: 'text-gray-700 dark:text-gray-400',
+      icon: PlayCircle,
+      priority: 5
+    },
+    'NO_TIMELINE': { 
+      label: 'No Timeline', 
+      shortLabel: 'No PDC',
+      color: 'gray', 
+      bgClass: 'bg-gray-100 dark:bg-gray-900/30',
+      textClass: 'text-gray-700 dark:text-gray-400',
+      icon: Calendar,
+      priority: 5
+    },
+    'SLOW_START': { 
+      label: 'Slow Start', 
+      shortLabel: 'Starting',
+      color: 'blue', 
+      bgClass: 'bg-blue-100 dark:bg-blue-900/30',
+      textClass: 'text-blue-700 dark:text-blue-400',
+      icon: Activity,
+      priority: 2
+    },
+    'NOT_APPLICABLE': { 
+      label: 'Not Applicable', 
+      shortLabel: 'N/A',
+      color: 'gray', 
+      bgClass: 'bg-gray-100 dark:bg-gray-900/30',
+      textClass: 'text-gray-700 dark:text-gray-400',
+      icon: Info,
+      priority: 6
+    }
+  };
+  return configs[paceStatus] || configs.NOT_APPLICABLE;
+};
+
+// Progress bar component with enhanced visualization
+const ProgressBar = ({ progress, expected, paceStatus, showAnimation = true }) => {
+  const isDelayed = progress < expected - 5;
+  const isAhead = progress > expected + 5;
+  
+  return (
+    <div className="w-full">
+      <div className="flex justify-between items-center mb-1">
+        <span className={`text-sm font-bold ${
+          progress >= 100 ? 'text-green-600' :
+          progress >= 75 ? 'text-blue-600' :
+          progress >= 50 ? 'text-yellow-600' :
+          progress >= 25 ? 'text-orange-600' :
+          progress > 0 ? 'text-red-600' :
+          'text-gray-600'
+        }`}>
+          {progress.toFixed(0)}%
+        </span>
+        {expected !== undefined && (
+          <span className="text-[10px] text-gray-500 dark:text-gray-400">
+            Expected: {expected.toFixed(0)}%
+          </span>
+        )}
+      </div>
+      <div className="relative">
+        <div className="w-full h-[3px] bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          {/* Expected progress indicator */}
+          {expected !== undefined && expected > 0 && expected < 100 && (
+            <div 
+              className="absolute top-0 h-full w-0.5 bg-gray-400 dark:bg-gray-500 z-10"
+              style={{ left: `${expected}%` }}
+              title={`Expected: ${expected.toFixed(0)}%`}
+            />
+          )}
+          {/* Actual progress bar */}
+          <div
+            className={`h-full transition-all duration-500 rounded-full ${
+              progress >= 100 ? 'bg-gradient-to-r from-green-500 to-green-600' :
+              isAhead ? 'bg-gradient-to-r from-blue-500 to-blue-600' :
+              isDelayed ? 'bg-gradient-to-r from-red-500 to-orange-500' :
+              'bg-gradient-to-r from-blue-500 to-blue-600'
+            } ${showAnimation && progress > 0 && progress < 100 ? 'progress-animated' : ''}`}
+            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+          />
+        </div>
+      </div>
+      {/* Progress variance indicator */}
+      {expected !== undefined && Math.abs(progress - expected) > 5 && (
+        <div className={`text-[10px] mt-0.5 ${
+          isDelayed ? 'text-red-500' : 'text-green-500'
+        }`}>
+          {isDelayed ? '▼' : '▲'} {Math.abs(progress - expected).toFixed(0)}% {isDelayed ? 'behind' : 'ahead'}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Memoized Report Modal
+const ReportModal = React.memo(({ isOpen, onClose, projectData, darkMode }) => {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
     }
-
     return () => {
       document.body.style.overflow = 'unset';
     };
   }, [isOpen]);
 
-  useEffect(() => {
-    const handleEsc = (event) => {
-      if (event.keyCode === 27) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEsc);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEsc);
-    };
-  }, [isOpen, onClose]);
-
   if (!isOpen) return null;
 
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center animate-fadeIn">
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
-      <div 
-        ref={modalRef}
-        className="relative w-full h-full max-w-[900px] max-h-[95vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slideUp m-4"
-        style={{
-          maxWidth: 'min(900px, calc(100vw - 2rem))',
-          maxHeight: 'calc(100vh - 2rem)',
-        }}
-      >
-        <div 
-          ref={modalContentRef}
-          className="flex-1 overflow-auto bg-white dark:bg-gray-900"
-          style={{
-            WebkitOverflowScrolling: 'touch',
-            scrollPaddingTop: '20px',
-            scrollPaddingBottom: '20px'
-          }}
-        >
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full h-full max-w-[900px] max-h-[95vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-slideUp m-4">
+        <div className="flex-1 overflow-auto bg-white dark:bg-gray-900">
           <div className="w-full flex justify-center">
-            <div 
-              className="w-full max-w-[794px]" 
-              style={{
-                width: '100%',
-                maxWidth: '794px',
-                margin: '0 auto'
-              }}
-            >
+            <div className="w-full max-w-[794px]">
               <Report 
                 projectData={projectData} 
                 darkMode={darkMode} 
@@ -96,8 +464,9 @@ const ReportModal = ({ isOpen, onClose, projectData, darkMode }) => {
     </div>,
     document.body
   );
-};
+});
 
+// Main DataTable Component
 const DataTable = ({ 
   data, 
   darkMode, 
@@ -107,316 +476,80 @@ const DataTable = ({
   maxHeight = '100%',
   maxWidth = '100%',
   isEmbedded = false,
-  onRefreshData
+  onRefreshData,
+  databaseName = 'engineering'
 }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedColumns, setSelectedColumns] = useState([
-    'serial_no', 'scheme_name', 'work_site', 'sanctioned_amount',
-    'physical_progress', 'progress_status_display', 'total_expdr', 
-    'calculated_time_allowed'
-  ]);
-  const [expandedRows, setExpandedRows] = useState([]);
-  const [showColumnSelector, setShowColumnSelector] = useState(false);
-  const tableContainerRef = useRef(null);
-  const [isSticky, setIsSticky] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showAdvancedMetrics, setShowAdvancedMetrics] = useState(false);
   
-  // Modal states for Report and Edit
+  // Modal states
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedProjectForReport, setSelectedProjectForReport] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedProjectForEdit, setSelectedProjectForEdit] = useState(null);
-  const [isNewProject, setIsNewProject] = useState(false);
+  const [editRowIndex, setEditRowIndex] = useState(null);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [fitViewModalOpen, setFitViewModalOpen] = useState(false);
+  const [selectedRowForFitView, setSelectedRowForFitView] = useState(null);
 
-  // Calculate Time Allowed for each project
-  const calculateTimeAllowed = (row) => {
-    if (!row.date_award || row.date_award === '' || row.date_award === 'N/A') {
-      return { days: 0, formatted: 'N/A', status: 'not_started' };
-    }
+  // Filter states
+  const [filters, setFilters] = useState({
+    frontier: '',
+    sector: '',
+    paceStatus: '',
+    progressStatus: ''
+  });
 
-    try {
-      const awardDate = new Date(row.date_award);
-      if (isNaN(awardDate.getTime())) {
-        return { days: 0, formatted: 'Invalid Date', status: 'error' };
-      }
+  // Get database configuration
+  const dbConfig = useMemo(() => getConfig(databaseName), [databaseName]);
 
-      let targetDate = null;
-      let dateType = 'none';
-      
-      if (row.revised_pdc && row.revised_pdc !== '' && row.revised_pdc !== 'N/A') {
-        targetDate = new Date(row.revised_pdc);
-        dateType = 'revised';
-        if (isNaN(targetDate.getTime())) targetDate = null;
-      }
-      
-      if (!targetDate && row.pdc_agreement && row.pdc_agreement !== '' && row.pdc_agreement !== 'N/A') {
-        targetDate = new Date(row.pdc_agreement);
-        dateType = 'original';
-        if (isNaN(targetDate.getTime())) targetDate = null;
-      }
-
-      if (!targetDate) {
-        if (row.time_allowed_days && row.time_allowed_days > 0) {
-          return { 
-            days: row.time_allowed_days, 
-            formatted: `${row.time_allowed_days} days (Contract)`,
-            status: 'contract'
-          };
-        }
-        return { days: 0, formatted: 'No PDC Set', status: 'no_pdc' };
-      }
-
-      const diffTime = targetDate - awardDate;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      const formatString = `${Math.abs(diffDays)} days (${dateType === 'revised' ? 'Revised PDC' : 'PDC'})`;
-      
-      return {
-        days: diffDays,
-        formatted: diffDays < 0 ? `Overdue: ${formatString}` : formatString,
-        status: diffDays < 0 ? 'overdue' : 'normal',
-        dateType: dateType
-      };
-    } catch (err) {
-      console.warn('Error calculating time allowed:', err);
-      return { days: 0, formatted: 'Error', status: 'error' };
-    }
-  };
-
-  // Calculate time elapsed and additional timeline metrics
-  const calculateTimelineMetrics = (row) => {
-    const metrics = {
-      timeElapsed: 0,
-      timeElapsedFormatted: 'N/A',
-      timeRemaining: 0,
-      timeRemainingFormatted: 'N/A',
-      percentTimeUsed: 0,
-      isOverdue: false,
-      overdueByDays: 0
-    };
-
-    if (!row.date_award || row.date_award === '' || row.date_award === 'N/A') {
-      return metrics;
-    }
-
-    try {
-      const awardDate = new Date(row.date_award);
-      const today = new Date();
-      
-      if (isNaN(awardDate.getTime())) {
-        return metrics;
-      }
-
-      // Calculate time elapsed
-      const elapsedMs = today - awardDate;
-      const elapsedDays = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
-      metrics.timeElapsed = elapsedDays;
-      metrics.timeElapsedFormatted = `${elapsedDays} days`;
-
-      // Get PDC date
-      let pdcDate = null;
-      if (row.revised_pdc && row.revised_pdc !== '' && row.revised_pdc !== 'N/A') {
-        pdcDate = new Date(row.revised_pdc);
-        if (isNaN(pdcDate.getTime())) pdcDate = null;
-      }
-      
-      if (!pdcDate && row.pdc_agreement && row.pdc_agreement !== '' && row.pdc_agreement !== 'N/A') {
-        pdcDate = new Date(row.pdc_agreement);
-        if (isNaN(pdcDate.getTime())) pdcDate = null;
-      }
-
-      if (pdcDate) {
-        const totalDays = Math.floor((pdcDate - awardDate) / (1000 * 60 * 60 * 24));
-        
-        if (today <= pdcDate) {
-          // Project is not overdue
-          const remainingMs = pdcDate - today;
-          const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
-          metrics.timeRemaining = remainingDays;
-          metrics.timeRemainingFormatted = `${remainingDays} days`;
-        } else {
-          // Project is overdue
-          const overdueMs = today - pdcDate;
-          const overdueDays = Math.floor(overdueMs / (1000 * 60 * 60 * 24));
-          metrics.isOverdue = true;
-          metrics.overdueByDays = overdueDays;
-          metrics.timeRemainingFormatted = `Overdue by ${overdueDays} days`;
-        }
-        
-        // Calculate percent of time used
-        if (totalDays > 0) {
-          metrics.percentTimeUsed = Math.min(100, (elapsedDays / totalDays) * 100);
-        }
-      }
-    } catch (err) {
-      console.warn('Error calculating timeline metrics:', err);
-    }
-
-    return metrics;
-  };
-
-  // Get progress status display
-  const getProgressStatusDisplay = (row) => {
-    const progress = parseFloat(row.physical_progress) || 0;
-    const category = row.progress_category || 'UNKNOWN';
-    const healthStatus = row.health_status || 'NOT_APPLICABLE';
-    
-    const categoryMap = {
-      'NOT_SANCTIONED': { label: 'Not Sanctioned', color: 'text-gray-600', icon: XCircle },
-      'TENDER_PROGRESS': { label: 'Tender in Progress', color: 'text-gray-600', icon: FileText },
-      'TENDERED_NOT_AWARDED': { label: 'Tendered (Not Awarded)', color: 'text-yellow-600', icon: PauseCircle },
-      'AWARDED_NOT_STARTED': { label: 'Awarded (Not Started)', color: 'text-orange-600', icon: PlayCircle },
-      'NOT_STARTED': { label: 'Not Started', color: 'text-red-600', icon: XCircle },
-      'PROGRESS_1_TO_50': { label: `Progress: ${progress.toFixed(0)}%`, color: 'text-red-500', icon: Activity },
-      'PROGRESS_51_TO_71': { label: `Progress: ${progress.toFixed(0)}%`, color: 'text-yellow-500', icon: Activity },
-      'PROGRESS_71_TO_99': { label: `Progress: ${progress.toFixed(0)}%`, color: 'text-blue-500', icon: Target },
-      'COMPLETED': { label: 'Completed', color: 'text-green-600', icon: CheckCircle },
-      'UNKNOWN': { label: 'Unknown', color: 'text-gray-600', icon: AlertCircle }
-    };
-
-    const healthMap = {
-      'PERFECT_PACE': { label: 'Perfect Pace', color: 'text-green-500', icon: Zap },
-      'SLOW_PACE': { label: 'Slow Pace', color: 'text-yellow-500', icon: Timer },
-      'BAD_PACE': { label: 'Bad Pace', color: 'text-orange-500', icon: AlertTriangle },
-      'SLEEP_PACE': { label: 'Sleep Pace', color: 'text-red-500', icon: PauseCircle },
-      'PAYMENT_PENDING': { label: 'Payment Pending', color: 'text-amber-600', icon: CreditCard },
-      'NOT_APPLICABLE': { label: 'N/A', color: 'text-gray-400', icon: Info }
-    };
-
-    const categoryInfo = categoryMap[category] || categoryMap['UNKNOWN'];
-    const healthInfo = healthMap[healthStatus] || healthMap['NOT_APPLICABLE'];
-
-    return {
-      primary: categoryInfo,
-      secondary: healthInfo,
-      progress: progress,
-      category: category,
-      health: healthStatus
-    };
-  };
-
-  // Helper function to determine progress status if not present
-  const determineProgressStatus = (row) => {
-    const progress = parseFloat(row.physical_progress) || 0;
-    
-    if (!row.date_tender) return 'TENDER_PROGRESS';
-    if (row.date_tender && !row.date_award) return 'TENDERED_NOT_AWARDED';
-    if (row.date_award && progress === 0) return 'AWARDED_NOT_STARTED';
-    if (progress === 0) return 'NOT_STARTED';
-    if (progress > 0 && progress <= 50) return 'PROGRESS_1_TO_50';
-    if (progress > 50 && progress <= 71) return 'PROGRESS_51_TO_71';
-    if (progress > 71 && progress < 100) return 'PROGRESS_71_TO_99';
-    if (progress >= 100) return 'COMPLETED';
-    
-    return 'UNKNOWN';
-  };
-
-  // Helper function for calculating expected progress
-  const calculateExpectedProgress = (row) => {
-    if (!row.date_award || row.date_award === '' || row.date_award === 'N/A') {
-      return 0;
-    }
-
-    try {
-      const awardDate = new Date(row.date_award);
-      if (isNaN(awardDate.getTime())) return 0;
-
-      const today = new Date();
-      let pdcDate = null;
-      
-      if (row.revised_pdc && row.revised_pdc !== '' && row.revised_pdc !== 'N/A') {
-        pdcDate = new Date(row.revised_pdc);
-      } else if (row.pdc_agreement && row.pdc_agreement !== '' && row.pdc_agreement !== 'N/A') {
-        pdcDate = new Date(row.pdc_agreement);
-      }
-      
-      if (!pdcDate || isNaN(pdcDate.getTime())) {
-        if (row.time_allowed_days && row.time_allowed_days > 0) {
-          pdcDate = new Date(awardDate);
-          pdcDate.setDate(pdcDate.getDate() + parseInt(row.time_allowed_days));
-        } else {
-          pdcDate = new Date(awardDate);
-          pdcDate.setFullYear(pdcDate.getFullYear() + 1);
-        }
-      }
-
-      const totalDurationMs = pdcDate - awardDate;
-      const elapsedMs = today - awardDate;
-      
-      if (today >= pdcDate) return 100;
-      
-      const progressPercentage = (elapsedMs / totalDurationMs) * 100;
-      return Math.min(100, Math.max(0, progressPercentage));
-    } catch (err) {
-      console.warn('Error calculating expected progress:', err);
-      return 0;
-    }
-  };
-
-  // Updated columns mapping to match processed data structure
-  const columns = [
-    { key: 'serial_no', label: 'S.No', width: '60px', align: 'center' },
-    { key: 'scheme_name', label: 'Scheme Name', width: '250px', sticky: true },
-    { key: 'budget_head', label: 'Budget Head', width: '150px' },
-    { key: 'ftr_hq', label: 'Frontier HQ', width: '80px' },
-    { key: 'shq', label: 'Sector HQ', width: '80px' },
-    { key: 'work_site', label: 'Location', width: '200px' },
-    { key: 'executive_agency', label: 'Agency', width: '180px' },
-    { key: 'firm_name', label: 'Contractor', width: '180px' },
-    { key: 'sanctioned_amount', label: 'Project Cost', width: '120px', align: 'right', format: 'currency' },
-    { key: 'total_expdr', label: 'Expenditure', width: '120px', align: 'right', format: 'currency' },
-    { key: 'physical_progress', label: 'Progress', width: '120px', align: 'center', format: 'progress' },
-    { key: 'progress_status_display', label: 'Progress Status', width: '180px', align: 'center', format: 'progress_status' },
-    { key: 'calculated_time_allowed', label: 'Time Allowed', width: '150px', align: 'center', format: 'time_allowed' },
-    { key: 'percent_expdr', label: 'Spent %', width: '80px', align: 'center', format: 'percent' },
-    { key: 'status', label: 'Status', width: '120px', align: 'center', format: 'status' },
-    { key: 'health_status', label: 'Health', width: '120px', align: 'center', format: 'health' },
-    { key: 'risk_level', label: 'Risk', width: '100px', align: 'center', format: 'risk' },
-    { key: 'date_award', label: 'Award Date', width: '100px', format: 'date' },
-    { key: 'pdc_agreement', label: 'PDC', width: '100px', format: 'date' },
-    { key: 'revised_pdc', label: 'Revised PDC', width: '100px', format: 'date' },
-    { key: 'time_allowed_days', label: 'Contract Days', width: '90px', align: 'center' },
-    { key: 'delay_days', label: 'Delay', width: '80px', align: 'center', format: 'delay' },
-    { key: 'expdr_cfy', label: 'Current FY Expdr', width: '120px', align: 'right', format: 'currency' },
-    { key: 'expdr_upto_31mar25', label: 'Previous FY Expdr', width: '120px', align: 'right', format: 'currency' },
-    { key: 'efficiency_score', label: 'Efficiency', width: '80px', align: 'center', format: 'percent' },
-    { key: 'expected_progress', label: 'Expected %', width: '80px', align: 'center', format: 'percent' }
-  ];
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (tableContainerRef.current) {
-        setIsSticky(tableContainerRef.current.scrollTop > 0);
-      }
-    };
-
-    const container = tableContainerRef.current;
-    if (container) {
-      container.addEventListener('scroll', handleScroll);
-      return () => container.removeEventListener('scroll', handleScroll);
-    }
-  }, []);
-
-  // Process data to add calculated fields
+  // Process and filter data
   const processedData = useMemo(() => {
     if (!data || !Array.isArray(data)) return [];
     
-    let processed = data.map(item => ({
-      ...item,
-      calculated_time_allowed: calculateTimeAllowed(item),
-      progress_status_display: getProgressStatusDisplay(item),
-      timeline_metrics: calculateTimelineMetrics(item)
-    }));
+    let processed = data.map(item => {
+      if (dbConfig && dbConfig.calculations) {
+        return applyCalculations(databaseName, item);
+      }
+      return item;
+    });
 
     // Apply search filter
     if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
       processed = processed.filter(item =>
         Object.values(item || {}).some(value =>
-          value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+          value?.toString().toLowerCase().includes(searchLower)
         )
       );
+    }
+    
+    // Apply filters
+    if (filters.frontier) {
+      processed = processed.filter(item => item.ftr_hq_name === filters.frontier);
+    }
+    
+    if (filters.sector) {
+      processed = processed.filter(item => item.shq_name === filters.sector);
+    }
+    
+    if (filters.paceStatus) {
+      processed = processed.filter(item => {
+        const metrics = calculateTimeMetrics(item);
+        return metrics?.paceStatus === filters.paceStatus;
+      });
+    }
+    
+    if (filters.progressStatus) {
+      processed = processed.filter(item => {
+        const progress = parseFloat(item.physical_progress_percent) || 0;
+        const status = getProgressStatus(progress);
+        return status === filters.progressStatus;
+      });
     }
 
     // Apply sorting
@@ -425,26 +558,31 @@ const DataTable = ({
         let aVal = a[sortConfig.key];
         let bVal = b[sortConfig.key];
         
-        // Handle calculated fields
-        if (sortConfig.key === 'calculated_time_allowed') {
-          aVal = a.calculated_time_allowed?.days || 0;
-          bVal = b.calculated_time_allowed?.days || 0;
-        } else if (sortConfig.key === 'progress_status_display') {
-          aVal = a.progress_status_display?.progress || 0;
-          bVal = b.progress_status_display?.progress || 0;
+        // Special handling for pace status
+        if (sortConfig.key === 'paceStatus') {
+          const aMetrics = calculateTimeMetrics(a);
+          const bMetrics = calculateTimeMetrics(b);
+          const aPriority = getPaceConfig(aMetrics?.paceStatus).priority;
+          const bPriority = getPaceConfig(bMetrics?.paceStatus).priority;
+          return sortConfig.direction === 'asc' ? aPriority - bPriority : bPriority - aPriority;
         }
         
-        aVal = aVal || 0;
-        bVal = bVal || 0;
+        if (aVal == null) aVal = '';
+        if (bVal == null) bVal = '';
         
-        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
+        const aNum = parseFloat(aVal);
+        const bNum = parseFloat(bVal);
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          return sortConfig.direction === 'asc' ? aNum - bNum : bNum - aNum;
+        }
+        
+        const comparison = String(aVal).localeCompare(String(bVal));
+        return sortConfig.direction === 'asc' ? comparison : -comparison;
       });
     }
 
     return processed;
-  }, [data, searchTerm, sortConfig]);
+  }, [data, searchTerm, sortConfig, dbConfig, databaseName, filters]);
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -453,444 +591,139 @@ const DataTable = ({
 
   const totalPages = Math.ceil(processedData.length / itemsPerPage);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [data]);
+  // Get unique values for filters
+  const uniqueFrontiers = [...new Set(processedData.map(row => row.ftr_hq_name).filter(Boolean))];
+  const uniqueSectors = [...new Set(processedData.map(row => row.shq_name).filter(Boolean))];
+  const uniquePaceStatuses = ['PERFECT_PACE', 'SLOW_PACE', 'BAD_PACE', 'SLEEP_PACE', 'PAYMENT_PENDING', 'COMPLETED', 'NOT_STARTED'];
 
-  const summaryStats = useMemo(() => {
-    if (!processedData || processedData.length === 0) {
-      return {
-        totalProjects: 0,
-        budgetAllocated: 0,
-        budgetExpenditure: 0,
-        remainingAmount: 0,
-        onTimeProjects: 0,
-        delayedProjects: 0,
-        averageTimeAllowed: 0
-      };
-    }
-
-    const onTimeProjects = processedData.filter(d => 
-      d.calculated_time_allowed?.status === 'normal' && (d.delay_days || 0) <= 0
-    ).length;
+  // Calculate aggregate statistics
+  const aggregateStats = useMemo(() => {
+    const paceDistribution = {};
+    let totalExpectedProgress = 0;
+    let totalActualProgress = 0;
+    let criticalCount = 0;
+    let onTrackCount = 0;
     
-    const delayedProjects = processedData.filter(d => (d.delay_days || 0) > 0).length;
+    processedData.forEach(row => {
+      const metrics = calculateTimeMetrics(row);
+      if (metrics) {
+        paceDistribution[metrics.paceStatus] = (paceDistribution[metrics.paceStatus] || 0) + 1;
+        totalExpectedProgress += metrics.expectedProgress || 0;
+        totalActualProgress += metrics.actualProgress || 0;
+        
+        if (metrics.paceStatus === 'SLEEP_PACE' || metrics.paceStatus === 'BAD_PACE') {
+          criticalCount++;
+        } else if (metrics.paceStatus === 'PERFECT_PACE') {
+          onTrackCount++;
+        }
+      }
+    });
     
-    const validTimeAllowed = processedData
-      .filter(d => d.calculated_time_allowed?.days > 0)
-      .map(d => d.calculated_time_allowed.days);
-    
-    const averageTimeAllowed = validTimeAllowed.length > 0
-      ? validTimeAllowed.reduce((sum, days) => sum + days, 0) / validTimeAllowed.length
-      : 0;
-
     return {
-      totalProjects: processedData.length,
-      budgetAllocated: processedData.reduce((sum, d) => sum + (d.sanctioned_amount || 0), 0),
-      budgetExpenditure: processedData.reduce((sum, d) => sum + (d.total_expdr || 0), 0),
-      remainingAmount: processedData.reduce((sum, d) => sum + (d.remaining_amount || 0), 0),
-      onTimeProjects,
-      delayedProjects,
-      averageTimeAllowed: Math.round(averageTimeAllowed)
+      paceDistribution,
+      avgExpectedProgress: processedData.length > 0 ? totalExpectedProgress / processedData.length : 0,
+      avgActualProgress: processedData.length > 0 ? totalActualProgress / processedData.length : 0,
+      criticalCount,
+      onTrackCount,
+      totalProjects: processedData.length
     };
   }, [processedData]);
 
-  const handleSort = (key) => {
+  // Handlers
+  const handleSort = useCallback((key) => {
     setSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
-  };
+  }, []);
 
-  const formatCellValue = (value, format, row) => {
-    if (value === null || value === undefined) return '-';
-
-    switch (format) {
-      case 'currency':
-        const amount = typeof value === 'number' ? value : parseFloat(value) || 0;
-        // Values are already in lakhs from useData.js
-        return (
-          <span className="font-semibold text-gray-900 dark:text-gray-100">
-            ₹{amount >= 100 ? `${(amount / 100).toFixed(2)} Cr` : `${amount.toFixed(2)} L`}
-          </span>
-        );
-
-      case 'progress':
-        const progressValue = parseFloat(value) || 0;
-        return (
-          <div className="flex items-center gap-2">
-            <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div 
-                className="h-2 rounded-full transition-all bg-gradient-to-r"
-                style={{
-                  width: `${Math.min(100, Math.max(0, progressValue))}%`,
-                  backgroundImage: progressValue >= 75 ? 'linear-gradient(to right, #10b981, #059669)' :
-                                  progressValue >= 50 ? 'linear-gradient(to right, #3b82f6, #2563eb)' :
-                                  progressValue >= 25 ? 'linear-gradient(to right, #f59e0b, #d97706)' : 
-                                  'linear-gradient(to right, #ef4444, #dc2626)'
-                }}
-              />
-            </div>
-            <span className="text-sm font-medium whitespace-nowrap text-gray-700 dark:text-gray-300">
-              {progressValue.toFixed(0)}%
-            </span>
-          </div>
-        );
-
-      case 'progress_status':
-        const statusInfo = row.progress_status_display;
-        if (!statusInfo) return '-';
-        
-        const StatusIcon = statusInfo.primary.icon;
-        const HealthIcon = statusInfo.secondary?.icon;
-        
-        return (
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex items-center gap-2">
-              <StatusIcon size={14} className={statusInfo.primary.color} />
-              <span className={`text-xs font-medium ${statusInfo.primary.color}`}>
-                {statusInfo.primary.label}
-              </span>
-            </div>
-            {statusInfo.secondary && (
-              <div className="flex items-center gap-1">
-                <HealthIcon size={12} className={statusInfo.secondary.color} />
-                <span className={`text-[10px] ${statusInfo.secondary.color}`}>
-                  {statusInfo.secondary.label}
-                </span>
-              </div>
-            )}
-          </div>
-        );
-
-      case 'time_allowed':
-        const timeData = row.calculated_time_allowed;
-        if (!timeData) return '-';
-        
-        const timeColorClass = timeData.status === 'overdue' ? 'text-red-600 font-bold' :
-                              timeData.status === 'no_pdc' ? 'text-gray-500' :
-                              timeData.status === 'error' ? 'text-red-500 italic' :
-                              'text-gray-700 dark:text-gray-300';
-        
-        return (
-          <div className="flex items-center gap-1">
-            {timeData.status === 'overdue' && <AlertCircle size={12} className="text-red-500" />}
-            {timeData.status === 'contract' && <CalendarDays size={12} className="text-blue-500" />}
-            <span className={`text-xs ${timeColorClass}`}>
-              {timeData.formatted}
-            </span>
-          </div>
-        );
-
-      case 'delay':
-        const delayDays = parseInt(value) || 0;
-        const delayColor = delayDays > 90 ? 'text-red-600 font-bold' :
-                          delayDays > 30 ? 'text-orange-600 font-semibold' :
-                          delayDays > 0 ? 'text-yellow-600' :
-                          'text-green-600';
-        
-        return (
-          <div className="flex items-center gap-1">
-            {delayDays > 0 && <Clock size={12} className={delayColor} />}
-            <span className={`text-sm ${delayColor}`}>
-              {delayDays > 0 ? `${delayDays}d` : 'On Time'}
-            </span>
-          </div>
-        );
-
-      case 'health':
-        const healthStatus = value || 'NOT_APPLICABLE';
-        const healthColors = {
-          'PERFECT_PACE': 'text-green-600 bg-green-100 dark:bg-green-900/20',
-          'SLOW_PACE': 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/20',
-          'BAD_PACE': 'text-orange-600 bg-orange-100 dark:bg-orange-900/20',
-          'SLEEP_PACE': 'text-red-600 bg-red-100 dark:bg-red-900/20',
-          'PAYMENT_PENDING': 'text-amber-600 bg-amber-100 dark:bg-amber-900/20',
-          'NOT_APPLICABLE': 'text-gray-600 bg-gray-100 dark:bg-gray-900/20'
-        };
-        
-        const healthLabels = {
-          'PERFECT_PACE': 'Perfect',
-          'SLOW_PACE': 'Slow',
-          'BAD_PACE': 'Bad',
-          'SLEEP_PACE': 'Sleep',
-          'PAYMENT_PENDING': 'Payment',
-          'NOT_APPLICABLE': 'N/A'
-        };
-        
-        const colorClass = healthColors[healthStatus] || 'text-gray-600 bg-gray-100';
-        const label = healthLabels[healthStatus] || healthStatus;
-        
-        return (
-          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
-            {label}
-          </span>
-        );
-
-      case 'risk':
-        const riskLevel = value || 'LOW';
-        const riskColors = {
-          'CRITICAL': 'text-red-600 bg-red-100 dark:bg-red-900/20',
-          'HIGH': 'text-orange-600 bg-orange-100 dark:bg-orange-900/20',
-          'MEDIUM': 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/20',
-          'LOW': 'text-green-600 bg-green-100 dark:bg-green-900/20'
-        };
-        
-        return (
-          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${riskColors[riskLevel] || riskColors['LOW']}`}>
-            {riskLevel}
-          </span>
-        );
-
-      case 'percent':
-        const percentValue = typeof value === 'number' ? value : parseFloat(value) || 0;
-        return (
-          <span className={`font-medium ${
-            percentValue > 80 ? 'text-green-600' :
-            percentValue > 60 ? 'text-blue-600' :
-            percentValue > 40 ? 'text-yellow-600' : 'text-red-600'
-          }`}>
-            {percentValue.toFixed(1)}%
-          </span>
-        );
-
-      case 'status':
-        const statusValue = value || 'UNKNOWN';
-        const statusIcons = {
-          NOT_STARTED: <XCircle size={14} className="text-gray-500" />,
-          TENDER_PROGRESS: <FileText size={14} className="text-gray-500" />,
-          TENDERED: <PauseCircle size={14} className="text-yellow-500" />,
-          IN_PROGRESS: <TrendingUp size={14} className="text-orange-500" />,
-          ADVANCED: <TrendingUp size={14} className="text-blue-500" />,
-          NEAR_COMPLETION: <AlertTriangle size={14} className="text-yellow-500" />,
-          COMPLETED: <CheckCircle size={14} className="text-green-500" />
-        };
-        return (
-          <div className="flex items-center gap-1 justify-center">
-            {statusIcons[statusValue] || <Clock size={14} className="text-gray-500" />}
-            <span className="text-xs text-gray-700 dark:text-gray-300">
-              {statusValue.replace(/_/g, ' ')}
-            </span>
-          </div>
-        );
-
-      case 'date':
-        if (!value || value === 'N/A' || value === '') return '-';
-        try {
-          return new Date(value).toLocaleDateString('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-          });
-        } catch {
-          return value;
-        }
-
-      default:
-        return value || '-';
-    }
-  };
-
-  const toggleRowExpansion = (rowId) => {
-    setExpandedRows(prev =>
-      prev.includes(rowId)
-        ? prev.filter(id => id !== rowId)
-        : [...prev, rowId]
-    );
-  };
-
-  const isProjectSelected = (project) => {
-    if (!selectedProjects || !Array.isArray(selectedProjects)) return false;
-    return selectedProjects.some(p => p?.id === project?.id);
-  };
-
-  const handleRefreshData = () => {
+  const handleRefreshData = useCallback(() => {
     setCurrentPage(1);
     if (onRefreshData && typeof onRefreshData === 'function') {
       onRefreshData();
     }
-    console.log('Data refresh requested');
-  };
+  }, [onRefreshData]);
 
-  const handleRowClick = (row, event) => {
-    // Don't open modal if clicking on action buttons
-    if (event.target.closest('button')) return;
-    
-    // Open Report modal when row is clicked
-    openReportModal(row);
-  };
-
-  const openReportModal = (row) => {
-    // Ensure all required fields are present in the row data
-    const rowWithCalculatedFields = {
-      ...row,
-      calculated_time_allowed: row.calculated_time_allowed || calculateTimeAllowed(row),
-      progress_status_display: row.progress_status_display || getProgressStatusDisplay(row),
-      expected_progress: calculateExpectedProgress(row),
-      // Add timeline metrics if not present
-      timeline_metrics: row.timeline_metrics || calculateTimelineMetrics(row),
-      // Ensure all required fields have default values
-      serial_no: row.serial_no || 'N/A',
-      scheme_name: row.scheme_name || 'Unknown Project',
-      budget_head: row.budget_head || 'N/A',
-      work_site: row.work_site || 'N/A',
-      executive_agency: row.executive_agency || 'N/A',
-      firm_name: row.firm_name || 'N/A',
-      ftr_hq: row.ftr_hq || 'N/A',
-      shq: row.shq || 'N/A',
-      physical_progress: row.physical_progress || 0,
-      efficiency_score: row.efficiency_score || 0,
-      health_score: row.health_score || 0,
-      health_status: row.health_status || 'NOT_APPLICABLE',
-      delay_days: row.delay_days || 0,
-      risk_level: row.risk_level || 'LOW',
-      status: row.status || 'NOT_STARTED',
-      priority: row.priority || 'LOW',
-      sanctioned_amount: row.sanctioned_amount || 0,
-      total_expdr: row.total_expdr || 0,
-      percent_expdr: row.percent_expdr || 0,
-      remaining_amount: row.remaining_amount || 0,
-      expdr_cfy: row.expdr_cfy || 0,
-      expdr_upto_31mar25: row.expdr_upto_31mar25 || 0,
-      date_tender: row.date_tender || row.tender_date || '',
-      date_award: row.date_award || row.award_date || '',
-      pdc_agreement: row.pdc_agreement || '',
-      revised_pdc: row.revised_pdc || '',
-      actual_completion_date: row.actual_completion_date || row.completion_date_actual || '',
-      date_acceptance: row.date_acceptance || row.acceptance_date || '',
-      date_ts: row.date_ts || row.ts_date || '',
-      remarks: row.remarks || '',
-      aa_es_ref: row.aa_es_ref || row.aa_es_reference || '',
-      source_sheet: row.source_sheet || '',
-      progress_category: row.progress_category || determineProgressStatus(row)
-    };
-    
-    setSelectedProjectForReport(rowWithCalculatedFields);
+  const openReportModal = useCallback((row) => {
+    setSelectedProjectForReport(row);
     setReportModalOpen(true);
-  };
+  }, []);
 
-  const openEditModal = (row, isNew = false) => {
-    if (isNew) {
-      setSelectedProjectForEdit(null);
-      setIsNewProject(true);
-    } else {
-      const rowWithCalculatedFields = {
-        ...row,
-        calculated_time_allowed: row.calculated_time_allowed || calculateTimeAllowed(row),
-        progress_status_display: row.progress_status_display || getProgressStatusDisplay(row),
-        expected_progress: calculateExpectedProgress(row),
-        rowIndex: row.id - 1 // Add rowIndex for Edit component
-      };
-      setSelectedProjectForEdit(rowWithCalculatedFields);
-      setIsNewProject(false);
+  const openEditModal = useCallback((row, index, event) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
     }
+    setSelectedProjectForEdit(row);
+    setEditRowIndex(index);
     setEditModalOpen(true);
-  };
+  }, []);
 
-  const handleEditSaveSuccess = (savedData) => {
-    console.log('Project saved:', savedData);
+  const openAddModal = useCallback(() => {
+    setAddModalOpen(true);
+  }, []);
+
+  const openFitViewModal = useCallback((row) => {
+    setSelectedRowForFitView(row);
+    setFitViewModalOpen(true);
+  }, []);
+
+  const handleEditSaveSuccess = useCallback(() => {
+    setEditModalOpen(false);
     handleRefreshData();
-  };
+  }, [handleRefreshData]);
 
-  const handleEditDeleteSuccess = (deletedData) => {
-    console.log('Project deleted:', deletedData);
+  const handleAddSuccess = useCallback(() => {
+    setAddModalOpen(false);
     handleRefreshData();
-  };
+  }, [handleRefreshData]);
 
-  const exportTableData = () => {
+  const exportTableData = useCallback(() => {
     const csvContent = [
-      [...selectedColumns, 'calculated_time_allowed_days'].join(','),
-      ...processedData.map(row => {
-        const values = selectedColumns.map(col => {
-          if (col === 'calculated_time_allowed') {
-            return row.calculated_time_allowed?.days || 0;
-          } else if (col === 'progress_status_display') {
-            return row.progress_status_display?.primary?.label || '';
-          }
-          const value = row[col];
-          if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
-            return `"${value.replace(/"/g, '""')}"`;
-          }
-          return value || '';
-        });
-        values.push(row.calculated_time_allowed?.days || 0);
-        return values.join(',');
+      ['S.No', 'Scheme Name', 'Frontier', 'Sector', 'Project Cost', 'Total Expense', 'Progress %', 'Expected %', 'Pace Status', 'Monthly Rate', 'Time Status', 'Days Per %'],
+      ...processedData.map((row, index) => {
+        const metrics = calculateTimeMetrics(row);
+        return [
+          index + 1,
+          row.sub_scheme_name || row.name_of_scheme || '',
+          row.ftr_hq_name || '',
+          row.shq_name || '',
+          row.sd_amount_lakh || 0,
+          (parseFloat(row.expenditure_previous_fy || 0) + parseFloat(row.expenditure_current_fy || 0)).toFixed(2),
+          row.physical_progress_percent || 0,
+          metrics?.expectedProgress?.toFixed(1) || 0,
+          metrics?.paceStatus || 'N/A',
+          metrics?.actualMonthlyRate?.toFixed(2) || 0,
+          metrics?.isOverdue ? `Overdue by ${Math.abs(metrics.remainingDays)} days` : `${metrics?.remainingDays || 0} days remaining`,
+          metrics?.daysPerPercent || 'N/A'
+        ];
       })
-    ].join('\n');
+    ].map(row => row.join(',')).join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `projects-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `${databaseName}-pace-analysis-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  };
-
-  const formatAmount = (value) => {
-    // Handle null, undefined, or empty values
-    if (value === null || value === undefined || value === '') return '₹0 L';
-    
-    // Convert to number - handle all types
-    let numValue;
-    
-    if (typeof value === 'number') {
-      numValue = value;
-    } else if (typeof value === 'string') {
-      // Remove any non-numeric characters except decimal point and minus
-      const cleanedValue = value.replace(/[^0-9.-]/g, '');
-      numValue = cleanedValue === '' ? 0 : parseFloat(cleanedValue);
-    } else if (value && typeof value === 'object' && value.toString) {
-      // If it's an object with toString method, try to convert
-      const strValue = value.toString();
-      const cleanedValue = strValue.replace(/[^0-9.-]/g, '');
-      numValue = cleanedValue === '' ? 0 : parseFloat(cleanedValue);
-    } else {
-      // Last resort - try Number conversion
-      numValue = Number(value);
-    }
-    
-    // Check if conversion resulted in a valid number
-    if (typeof numValue !== 'number' || isNaN(numValue) || !isFinite(numValue)) {
-      return '₹0 L';
-    }
-    
-    // Ensure numValue is definitely a number before calling toFixed
-    numValue = Number(numValue);
-    
-    // Format based on value with extra safety check
-    try {
-      if (numValue >= 100) {
-        return `₹${(numValue / 100).toFixed(2)} Cr`;
-      }
-      return `₹${numValue.toFixed(2)} L`;
-    } catch (e) {
-      console.error('Error formatting amount:', value, numValue, e);
-      return '₹0 L';
-    }
-  };
-
-  const formatDate = (dateStr) => {
-    if (!dateStr || dateStr === 'N/A' || dateStr === '') return 'N/A';
-    try {
-      return new Date(dateStr).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
-      });
-    } catch {
-      return dateStr;
-    }
-  };
+  }, [processedData, databaseName]);
 
   if (!data || data.length === 0) {
     return (
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm border ${darkMode ? 'border-gray-700' : 'border-gray-100'} overflow-hidden flex flex-col h-full`} style={{ maxWidth }}>
+      <div className={`${darkMode ? 'bg-gray-900' : 'bg-white'} rounded-xl shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} overflow-hidden flex flex-col h-full`}>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <AlertTriangle size={48} className="mx-auto text-gray-400 mb-4" />
+            <Building2 size={48} className="mx-auto text-gray-400 mb-4" />
             <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">No Data Available</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">No projects found matching your criteria</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">No records found in the database</p>
+            <button
+              onClick={openAddModal}
+              className="mt-4 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg flex items-center gap-2 mx-auto"
+            >
+              <Plus size={18} />
+              Add First Record
+            </button>
           </div>
         </div>
       </div>
@@ -899,62 +732,12 @@ const DataTable = ({
 
   return (
     <>
-      <div 
-        className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-sm border ${darkMode ? 'border-gray-700' : 'border-gray-100'} overflow-hidden flex flex-col h-full`}
-        style={{ maxWidth }}
-      >
-        {/* Header with Stats and Controls */}
-        <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-          {/* Statistics Row */}
-          <div className="flex flex-wrap items-center gap-4 mb-3 text-sm">
-            <div className="flex items-center gap-2">
-              <Briefcase size={16} className="text-blue-500" />
-              <span className="text-gray-600 dark:text-gray-400">
-                <strong className="text-gray-900 dark:text-gray-100">{summaryStats.totalProjects}</strong> Projects
-              </span>
-            </div>
-            
-            <div className="text-gray-400">|</div>
-            
-            <div className="flex items-center gap-2">
-              <Database size={16} className="text-blue-500" />
-              <span className="text-gray-600 dark:text-gray-400">
-                Budget: <strong className="text-blue-600 dark:text-blue-400">{formatAmount(summaryStats.budgetAllocated)}</strong>
-              </span>
-            </div>
-            
-            <div className="text-gray-400">|</div>
-            
-            <div className="flex items-center gap-2">
-              <CreditCard size={16} className="text-green-500" />
-              <span className="text-gray-600 dark:text-gray-400">
-                Spent: <strong className="text-green-600 dark:text-green-400">{formatAmount(summaryStats.budgetExpenditure)}</strong>
-              </span>
-            </div>
-            
-            <div className="text-gray-400">|</div>
-            
-            <div className="flex items-center gap-2">
-              <Timer size={16} className="text-purple-500" />
-              <span className="text-gray-600 dark:text-gray-400">
-                Avg Time: <strong className="text-purple-600 dark:text-purple-400">{summaryStats.averageTimeAllowed} days</strong>
-              </span>
-            </div>
-            
-            <div className="text-gray-400">|</div>
-            
-            <div className="flex items-center gap-2">
-              <Clock size={16} className="text-orange-500" />
-              <span className="text-gray-600 dark:text-gray-400">
-                Delayed: <strong className="text-orange-600 dark:text-orange-400">{summaryStats.delayedProjects}</strong>
-              </span>
-            </div>
-          </div>
-
-          {/* Controls Bar */}
-          <div className="flex flex-wrap gap-3">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[200px]">
+      <div className={`${darkMode ? 'bg-gray-900' : 'bg-white'} rounded-xl shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} overflow-hidden flex flex-col h-full`}>
+        {/* Header */}
+        <div className={`p-4 border-b ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}`}>
+          <div className="flex flex-wrap gap-2 items-center justify-between">
+            {/* Search Bar */}
+            <div className="relative flex-1 min-w-[250px] max-w-md">
               <Search size={18} className="absolute left-3 top-2.5 text-gray-400" />
               <input
                 type="text"
@@ -963,609 +746,532 @@ const DataTable = ({
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className={`w-full pl-10 pr-4 py-2 rounded-lg border text-sm ${
                   darkMode 
-                    ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400' 
-                    : 'bg-white border-gray-200 placeholder-gray-500'
-                } focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:outline-none`}
+                    ? 'bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-400' 
+                    : 'bg-white border-gray-300 placeholder-gray-500'
+                } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
               />
             </div>
 
-            {/* Items per page */}
-            <select
-              value={itemsPerPage}
-              onChange={(e) => {
-                setItemsPerPage(parseInt(e.target.value));
-                setCurrentPage(1);
-              }}
-              className={`px-3 py-2 rounded-lg border text-sm ${
-                darkMode 
-                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                  : 'bg-white border-gray-200'
-              } focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:outline-none`}
-            >
-              <option value={10}>10 rows</option>
-              <option value={25}>25 rows</option>
-              <option value={50}>50 rows</option>
-              <option value={100}>100 rows</option>
-            </select>
-
-            {/* Column Selector */}
-            <div className="relative">
+            {/* Right Controls */}
+            <div className="flex items-center gap-2">
+              {/* Advanced Metrics Toggle */}
               <button
-                onClick={() => setShowColumnSelector(!showColumnSelector)}
-                className={`px-3 py-2 rounded-lg border flex items-center gap-2 text-sm ${
+                onClick={() => setShowAdvancedMetrics(!showAdvancedMetrics)}
+                className={`px-3 py-2 rounded-lg border flex items-center gap-2 text-sm font-medium ${
                   darkMode 
-                    ? 'bg-gray-700 border-gray-600 text-gray-100 hover:bg-gray-600' 
-                    : 'bg-white border-gray-200 hover:bg-gray-50'
-                } transition-colors`}
+                    ? 'bg-gray-800 border-gray-600 text-gray-100 hover:bg-gray-700' 
+                    : 'bg-white border-gray-300 hover:bg-gray-50'
+                } ${showAdvancedMetrics ? 'ring-2 ring-purple-500' : ''}`}
+                title="Show Advanced Metrics"
+              >
+                <Gauge size={16} />
+                Metrics
+              </button>
+
+              {/* Filter Button */}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`px-3 py-2 rounded-lg border flex items-center gap-2 text-sm font-medium ${
+                  darkMode 
+                    ? 'bg-gray-800 border-gray-600 text-gray-100 hover:bg-gray-700' 
+                    : 'bg-white border-gray-300 hover:bg-gray-50'
+                } ${showFilters ? 'ring-2 ring-blue-500' : ''}`}
               >
                 <Filter size={16} />
-                Columns
+                Filters
+                {(filters.frontier || filters.sector || filters.paceStatus || filters.progressStatus) && (
+                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                )}
               </button>
-              
-              {showColumnSelector && (
-                <div className={`absolute right-0 mt-2 w-64 rounded-xl shadow-xl z-50 ${
-                  darkMode ? 'bg-gray-900' : 'bg-white'
-                } border ${darkMode ? 'border-gray-700' : 'border-gray-200'} p-3 max-h-96 overflow-y-auto`}>
-                  <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">Select Columns</span>
-                    <button
-                      onClick={() => setShowColumnSelector(false)}
-                      className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                    >
-                      <X size={14} className="text-gray-500" />
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {columns.map(col => (
-                      <label key={col.key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1 rounded-lg transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={selectedColumns.includes(col.key)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedColumns([...selectedColumns, col.key]);
-                            } else {
-                              setSelectedColumns(selectedColumns.filter(k => k !== col.key));
-                            }
-                          }}
-                          className="accent-blue-500"
-                        />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">{col.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
+
+              {/* Items per page */}
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(parseInt(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className={`px-3 py-2 rounded-lg border text-sm ${
+                  darkMode 
+                    ? 'bg-gray-800 border-gray-600 text-gray-100' 
+                    : 'bg-white border-gray-300'
+                } focus:ring-2 focus:ring-blue-500`}
+              >
+                <option value={10}>10 rows</option>
+                <option value={25}>25 rows</option>
+                <option value={50}>50 rows</option>
+                <option value={100}>100 rows</option>
+              </select>
+
+              {/* Action Buttons */}
+              <button
+                onClick={openAddModal}
+                className="px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:opacity-90 flex items-center gap-2 text-sm font-medium shadow-sm"
+              >
+                <Plus size={16} />
+                Add
+              </button>
+
+              <button
+                onClick={exportTableData}
+                className="px-3 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:opacity-90 flex items-center gap-2 text-sm font-medium shadow-sm"
+              >
+                <Download size={16} />
+                Export
+              </button>
+
+              <button
+                onClick={handleRefreshData}
+                className={`p-2 rounded-lg border ${
+                  darkMode ? 'bg-gray-800 border-gray-600 text-gray-100 hover:bg-gray-700' : 'bg-white border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <RefreshCw size={16} />
+              </button>
             </div>
-
-            {/* Add New Project Button */}
-            <button
-              onClick={() => openEditModal(null, true)}
-              className="px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:opacity-90 flex items-center gap-2 text-sm transition-all shadow-sm whitespace-nowrap"
-            >
-              <Plus size={16} />
-              <span>Add Project</span>
-            </button>
-
-            {/* Export */}
-            <button
-              onClick={exportTableData}
-              className="px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:opacity-90 flex items-center gap-2 text-sm transition-all shadow-sm whitespace-nowrap"
-            >
-              <TrendingUp size={16} />
-              <span>Export</span>
-            </button>
           </div>
+          
+          {/* Advanced Metrics Panel */}
+          {showAdvancedMetrics && (
+            <div className={`mt-4 p-3 rounded-lg ${
+              darkMode ? 'bg-gray-900' : 'bg-gray-50'
+            } border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
+                <div className="text-center">
+                  <div className="font-bold text-lg text-blue-600">{aggregateStats.totalProjects}</div>
+                  <div className="text-gray-500">Total Projects</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-lg text-green-600">{aggregateStats.onTrackCount}</div>
+                  <div className="text-gray-500">On Track</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-lg text-red-600">{aggregateStats.criticalCount}</div>
+                  <div className="text-gray-500">Critical</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-lg text-purple-600">
+                    {aggregateStats.avgActualProgress.toFixed(1)}%
+                  </div>
+                  <div className="text-gray-500">Avg Progress</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-lg text-orange-600">
+                    {aggregateStats.avgExpectedProgress.toFixed(1)}%
+                  </div>
+                  <div className="text-gray-500">Avg Expected</div>
+                </div>
+                <div className="text-center">
+                  <div className={`font-bold text-lg ${
+                    aggregateStats.avgActualProgress >= aggregateStats.avgExpectedProgress 
+                      ? 'text-green-600' 
+                      : 'text-red-600'
+                  }`}>
+                    {(aggregateStats.avgActualProgress - aggregateStats.avgExpectedProgress).toFixed(1)}%
+                  </div>
+                  <div className="text-gray-500">Variance</div>
+                </div>
+              </div>
+              
+              {/* Pace Distribution */}
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-xs font-semibold mb-2">Pace Distribution</div>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(aggregateStats.paceDistribution).map(([status, count]) => {
+                    const config = getPaceConfig(status);
+                    return (
+                      <div 
+                        key={status}
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${config.bgClass} ${config.textClass}`}
+                      >
+                        <config.icon size={10} />
+                        <span className="font-semibold">{count}</span>
+                        <span>{config.shortLabel}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Filters Panel */}
+          {showFilters && (
+            <div className={`mt-4 p-3 rounded-lg ${
+              darkMode ? 'bg-gray-900' : 'bg-white'
+            } border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <select
+                  value={filters.frontier}
+                  onChange={(e) => setFilters(prev => ({ ...prev, frontier: e.target.value }))}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                    darkMode 
+                      ? 'bg-gray-800 border-gray-600 text-gray-100' 
+                      : 'bg-white border-gray-300'
+                  } focus:ring-2 focus:ring-blue-500`}
+                >
+                  <option value="">All Frontiers</option>
+                  {uniqueFrontiers.map(frontier => (
+                    <option key={frontier} value={frontier}>{frontier}</option>
+                  ))}
+                </select>
+                
+                <select
+                  value={filters.sector}
+                  onChange={(e) => setFilters(prev => ({ ...prev, sector: e.target.value }))}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                    darkMode 
+                      ? 'bg-gray-800 border-gray-600 text-gray-100' 
+                      : 'bg-white border-gray-300'
+                  } focus:ring-2 focus:ring-blue-500`}
+                >
+                  <option value="">All Sectors</option>
+                  {uniqueSectors.map(sector => (
+                    <option key={sector} value={sector}>{sector}</option>
+                  ))}
+                </select>
+                
+                <select
+                  value={filters.progressStatus}
+                  onChange={(e) => setFilters(prev => ({ ...prev, progressStatus: e.target.value }))}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                    darkMode 
+                      ? 'bg-gray-800 border-gray-600 text-gray-100' 
+                      : 'bg-white border-gray-300'
+                  } focus:ring-2 focus:ring-blue-500`}
+                >
+                  <option value="">All Progress</option>
+                  <option value="Completed">Completed (100%)</option>
+                  <option value="75-99%">Near Completion (75-99%)</option>
+                  <option value="50-74%">Advanced (50-74%)</option>
+                  <option value="25-49%">In Progress (25-49%)</option>
+                  <option value="1-24%">Early Stage (1-24%)</option>
+                  <option value="Not Started">Not Started (0%)</option>
+                </select>
+                
+                <select
+                  value={filters.paceStatus}
+                  onChange={(e) => setFilters(prev => ({ ...prev, paceStatus: e.target.value }))}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                    darkMode 
+                      ? 'bg-gray-800 border-gray-600 text-gray-100' 
+                      : 'bg-white border-gray-300'
+                  } focus:ring-2 focus:ring-blue-500`}
+                >
+                  <option value="">All Pace Status</option>
+                  {uniquePaceStatuses.map(status => {
+                    const config = getPaceConfig(status);
+                    return (
+                      <option key={status} value={status}>{config.label}</option>
+                    );
+                  })}
+                </select>
+                
+                <button
+                  onClick={() => setFilters({ frontier: '', sector: '', paceStatus: '', progressStatus: '' })}
+                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-medium"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Table Content */}
-        <div 
-          ref={tableContainerRef}
-          className="flex-1 overflow-auto"
-          style={{ maxHeight: isEmbedded ? maxHeight : 'calc(100vh - 240px)' }}
-        >
+        {/* Table */}
+        <div className="flex-1 overflow-auto">
           <table className="w-full">
-            <thead className={`${darkMode ? 'bg-gray-900' : 'bg-gray-50'} sticky top-0 z-10 ${
-              isSticky ? 'shadow-md' : ''
-            }`}>
+            <thead className={`sticky top-0 z-10 ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
               <tr>
-                {compareMode && (
-                  <th className="px-3 py-2 text-left">
-                    <input type="checkbox" disabled className="accent-blue-500" />
-                  </th>
-                )}
-                {columns
-                  .filter(col => selectedColumns.includes(col.key))
-                  .map(col => (
-                    <th
-                      key={col.key}
-                      className={`px-3 py-2 text-${col.align || 'left'} ${
-                        col.sticky ? 'sticky left-0 z-20 ' + (darkMode ? 'bg-gray-900' : 'bg-gray-50') : ''
-                      }`}
-                      style={{ minWidth: col.width }}
-                    >
-                      <button
-                        onClick={() => handleSort(col.key)}
-                        className="flex items-center gap-1 font-bold text-xs uppercase tracking-wider text-gray-600 dark:text-gray-400 hover:text-blue-500 transition-colors"
-                      >
-                        {col.label}
-                        {sortConfig.key === col.key && (
-                          sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
-                        )}
-                      </button>
-                    </th>
-                  ))}
-                <th className={`px-3 py-2 text-center sticky right-0 z-20 ${
-                  darkMode ? 'bg-gray-900' : 'bg-gray-50'
-                }`}>
-                  <span className="font-bold text-xs uppercase tracking-wider text-gray-600 dark:text-gray-400">Actions</span>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  #
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => handleSort('sub_scheme_name')}
+                >
+                  <div className="flex items-center gap-2">
+                    Scheme Name
+                    {sortConfig.key === 'sub_scheme_name' && (
+                      sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                    )}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  Location
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => handleSort('sd_amount_lakh')}
+                >
+                  <div className="flex items-center gap-2">
+                    Project Cost
+                    {sortConfig.key === 'sd_amount_lakh' && (
+                      sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                    )}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  Expense
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => handleSort('physical_progress_percent')}
+                >
+                  <div className="flex items-center gap-2">
+                    Progress
+                    {sortConfig.key === 'physical_progress_percent' && (
+                      sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => handleSort('paceStatus')}
+                >
+                  <div className="flex items-center gap-2">
+                    Pace Analysis
+                    {sortConfig.key === 'paceStatus' && (
+                      sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                    )}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  Time Status
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  Actions
                 </th>
               </tr>
             </thead>
             
-            <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-              {paginatedData.map((row, index) => (
-                <React.Fragment key={row.id || index}>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {paginatedData.map((row, index) => {
+                const metrics = calculateTimeMetrics(row);
+                const paceConfig = getPaceConfig(metrics?.paceStatus || 'NOT_STARTED');
+                const PaceIcon = paceConfig.icon;
+                
+                const sanctioned = parseFloat(row.sd_amount_lakh) || 0;
+                const expPrev = parseFloat(row.expenditure_previous_fy) || 0;
+                const expCurr = parseFloat(row.expenditure_current_fy) || 0;
+                const totalExpense = expPrev + expCurr;
+                const utilization = sanctioned > 0 ? (totalExpense / sanctioned * 100) : 0;
+                const progress = parseFloat(row.physical_progress_percent) || 0;
+                
+                return (
                   <tr
+                    key={row[dbConfig?.idField] || index}
                     className={`${
-                      darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-50'
+                      darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-50'
                     } cursor-pointer transition-colors ${
-                      isProjectSelected(row) ? 'bg-blue-100 dark:bg-blue-900/20' : ''
+                      metrics?.paceStatus === 'SLEEP_PACE' ? 'bg-red-50/10 dark:bg-red-900/10' : ''
                     }`}
-                    onClick={(e) => handleRowClick(row, e)}
+                    onClick={(e) => {
+                      if (!e.target.closest('button')) {
+                        openReportModal(row);
+                      }
+                    }}
                   >
-                    {compareMode && (
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={isProjectSelected(row)}
-                          onChange={() => {}}
-                          className="accent-blue-500"
-                        />
-                      </td>
-                    )}
-                    {columns
-                      .filter(col => selectedColumns.includes(col.key))
-                      .map(col => (
-                        <td
-                          key={col.key}
-                          className={`px-3 py-2 text-${col.align || 'left'} text-sm ${
-                            col.sticky ? 'sticky left-0 z-[5] ' + (darkMode ? 'bg-gray-800' : 'bg-white') : ''
-                          }`}
+                    {/* Serial Number */}
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {((currentPage - 1) * itemsPerPage) + index + 1}
+                    </td>
+                    
+                    {/* Scheme Name */}
+                    <td className="px-4 py-3">
+                      <div className="max-w-xs">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                          {row.sub_scheme_name || row.name_of_scheme || 'N/A'}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">
+                          {row.work_description || 'No description'}
+                        </p>
+                      </div>
+                    </td>
+                    
+                    {/* Location */}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Building2 size={12} className="text-purple-500" />
+                          <span className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                            {row.ftr_hq_name || 'N/A'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <MapPin size={12} className="text-blue-500" />
+                          <span className="text-xs text-gray-600 dark:text-gray-400">
+                            {row.shq_name || 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    
+                    {/* Project Cost */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <IndianRupee size={14} className="text-green-600" />
+                        <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                          {formatCurrency(sanctioned * 100000)}
+                        </span>
+                      </div>
+                    </td>
+                    
+                    {/* Total Expense */}
+                    <td className="px-4 py-3">
+                      <div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                            {formatCurrency(totalExpense * 100000)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {utilization.toFixed(1)}% utilized
+                        </div>
+                      </div>
+                    </td>
+                    
+                    {/* Enhanced Progress Display */}
+                    <td className="px-4 py-3">
+                      <ProgressBar 
+                        progress={progress}
+                        expected={metrics?.expectedProgress}
+                        paceStatus={metrics?.paceStatus}
+                      />
+                    </td>
+                    
+                    {/* Enhanced Pace Analysis */}
+                    <td className="px-4 py-3">
+                      <div className="space-y-1">
+                        <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold
+                          ${paceConfig.bgClass} ${paceConfig.textClass} ${paceConfig.pulse ? 'sleep-pace-pulse' : ''}`}
                         >
-                          {col.key === 'scheme_name' ? (
-                            <div className="max-w-xs">
-                              <p className="truncate font-medium text-gray-900 dark:text-gray-100" title={row[col.key]}>
-                                {row[col.key] || 'N/A'}
-                              </p>
-                              {row.budget_head && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{row.budget_head}</p>
-                              )}
-                            </div>
-                          ) : (
-                            formatCellValue(row[col.key], col.format, row)
-                          )}
-                        </td>
-                      ))}
-                    <td className={`px-3 py-2 text-center sticky right-0 z-10 ${
-                      darkMode ? 'bg-gray-800' : 'bg-white'
-                    }`}>
+                          <PaceIcon size={12} />
+                          {paceConfig.label}
+                        </div>
+                        
+                        {metrics?.paceDetails && (
+                          <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                            {metrics.paceDetails.message}
+                            {metrics.monthlyRate && metrics.elapsedMonths > 0 && (
+                              <div className="mt-0.5">
+                                Rate: {metrics.actualMonthlyRate?.toFixed(1)}%/mo 
+                                (Need: {metrics.monthlyProgressRate?.toFixed(1)}%/mo)
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    
+                    {/* Time Status with Enhanced Details */}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col">
+                        {metrics?.isOverdue ? (
+                          <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                            <Timer size={12} />
+                            <span className="text-xs font-semibold">
+                              Overdue: {Math.abs(metrics.remainingDays)}d
+                            </span>
+                          </div>
+                        ) : metrics?.remainingDays !== undefined ? (
+                          <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
+                            <Clock size={12} className={metrics.remainingDays < 30 ? 'text-orange-500' : 'text-green-500'} />
+                            <span className="text-xs font-medium">
+                              {metrics.remainingDays}d remaining
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-500">No timeline</span>
+                        )}
+                        
+                        {row.pdc_revised || row.pdc_agreement ? (
+                          <div className="flex items-center gap-1 mt-1">
+                            <Flag size={10} className="text-gray-400" />
+                            <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                              PDC: {new Date(row.pdc_revised || row.pdc_agreement).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                        ) : null}
+                        
+                        {metrics?.daysPerPercent && (
+                          <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                            {metrics.daysPerPercent} days/%
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    
+                    {/* Actions */}
+                    <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             openReportModal(row);
                           }}
-                          className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                          title="View Report"
+                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all group"
+                          title="View Details"
                         >
-                          <Eye size={14} className="text-blue-500" />
+                          <Eye size={14} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-500" />
                         </button>
                         
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            openEditModal(row, false);
+                            const actualIndex = processedData.findIndex(r => r[dbConfig?.idField] === row[dbConfig?.idField]);
+                            openEditModal(row, actualIndex, e);
                           }}
-                          className="p-1 hover:bg-green-100 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                          title="Edit Project"
+                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all group"
+                          title="Edit"
                         >
-                          <Edit size={14} className="text-green-500" />
+                          <Edit size={14} className="text-gray-700 dark:text-gray-300 group-hover:text-green-500" />
                         </button>
                         
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleRowExpansion(row.id || index);
+                            openFitViewModal(row);
                           }}
-                          className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                          title="Expand"
+                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all group"
+                          title="Analytics View"
                         >
-                          {expandedRows.includes(row.id || index) ? 
-                            <ChevronUp size={14} className="text-gray-600 dark:text-gray-400" /> : 
-                            <ChevronDown size={14} className="text-gray-600 dark:text-gray-400" />
-                          }
+                          <Maximize2 size={14} className="text-gray-700 dark:text-gray-300 group-hover:text-purple-500" />
                         </button>
                       </div>
                     </td>
                   </tr>
-                  
-                  {/* Expanded Row Content - remains the same */}
-                  {expandedRows.includes(row.id || index) && (
-                    <tr>
-                      <td colSpan={selectedColumns.length + (compareMode ? 2 : 1)} 
-                          className={`px-3 py-4 ${darkMode ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                        <div className="space-y-4">
-                          {/* Header Section */}
-                          <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                            <h3 className="font-semibold text-base mb-1 text-blue-600 dark:text-blue-400">
-                              {row.scheme_name || 'Project Details'}
-                            </h3>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                              S.No: {row.serial_no} | Budget Head: {row.budget_head || 'N/A'} | AA/ES: {row.aa_es_ref || 'N/A'}
-                            </p>
-                          </div>
-
-                          {/* Main 4 Cards Grid */}
-                          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-                            {/* 1. Basic Information */}
-                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                              <div className="flex items-center gap-2 mb-3">
-                                <FileText size={14} className="text-blue-500" />
-                                <h4 className="font-semibold text-sm text-gray-900 dark:text-gray-100">Basic Information</h4>
-                              </div>
-                              <div className="space-y-2 text-xs">
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">Serial:</span>
-                                  <span className="font-medium">{row.serial_no || 'N/A'}</span>
-                                </div>
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">Budget Head:</span>
-                                  <span className="font-medium text-[11px]">{row.budget_head || 'N/A'}</span>
-                                </div>
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">AA/ES Ref:</span>
-                                  <span className="font-medium text-[11px]">{row.aa_es_ref || 'N/A'}</span>
-                                </div>
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">Status:</span>
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
-                                    row.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
-                                    row.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' :
-                                    'bg-gray-100 text-gray-700'
-                                  }`}>{row.status || 'N/A'}</span>
-                                </div>
-                                <div className="flex justify-between py-1">
-                                  <span className="text-gray-600 dark:text-gray-400">Priority:</span>
-                                  <span className={`font-medium ${
-                                    row.priority === 'HIGH' ? 'text-red-600' :
-                                    row.priority === 'MEDIUM' ? 'text-yellow-600' :
-                                    'text-green-600'
-                                  }`}>{row.priority || 'N/A'}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 2. Location & Organization */}
-                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                              <div className="flex items-center gap-2 mb-3">
-                                <MapPin size={14} className="text-green-500" />
-                                <h4 className="font-semibold text-sm text-gray-900 dark:text-gray-100">Location & Organization</h4>
-                              </div>
-                              <div className="space-y-2 text-xs">
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">Frontier HQ:</span>
-                                  <span className="font-medium">{row.ftr_hq || 'N/A'}</span>
-                                </div>
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">Sector HQ:</span>
-                                  <span className="font-medium">{row.shq || 'N/A'}</span>
-                                </div>
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">Location:</span>
-                                  <span className="font-medium text-right text-[11px] max-w-[120px] truncate" title={row.location || 'N/A'}>
-                                    {row.location || 'N/A'}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">Agency:</span>
-                                  <span className="font-medium text-right text-[11px] max-w-[120px] truncate" title={row.executive_agency || 'N/A'}>
-                                    {row.executive_agency || 'N/A'}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between py-1">
-                                  <span className="text-gray-600 dark:text-gray-400">Contractor:</span>
-                                  <span className="font-medium text-right text-[11px] max-w-[120px] truncate" title={row.firm_name || 'N/A'}>
-                                    {row.firm_name || 'N/A'}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 3. Timeline & Dates */}
-                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                              <div className="flex items-center gap-2 mb-3">
-                                <Calendar size={14} className="text-purple-500" />
-                                <h4 className="font-semibold text-sm text-gray-900 dark:text-gray-100">Timeline & Dates</h4>
-                              </div>
-                              <div className="space-y-2 text-xs">
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">Tender:</span>
-                                  <span className="font-medium text-[11px]">{formatDate(row.date_tender)}</span>
-                                </div>
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">Award:</span>
-                                  <span className="font-medium text-[11px]">{formatDate(row.date_award)}</span>
-                                </div>
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">PDC:</span>
-                                  <span className="font-medium text-[11px]">{formatDate(row.pdc_agreement)}</span>
-                                </div>
-                                {row.revised_pdc && (
-                                  <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                    <span className="text-gray-600 dark:text-gray-400">Rev PDC:</span>
-                                    <span className="font-medium text-orange-600 text-[11px]">{formatDate(row.revised_pdc)}</span>
-                                  </div>
-                                )}
-                                <div className="flex justify-between py-1">
-                                  <span className="text-gray-600 dark:text-gray-400">Delay:</span>
-                                  <span className={`font-medium ${
-                                    row.delay_days > 0 ? 'text-red-600' : 'text-green-600'
-                                  }`}>{row.delay_days > 0 ? `${row.delay_days}d` : 'On Time'}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 4. Financial Details */}
-                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                              <div className="flex items-center gap-2 mb-3">
-                                <IndianRupee size={14} className="text-green-500" />
-                                <h4 className="font-semibold text-sm text-gray-900 dark:text-gray-100">Financial Details</h4>
-                              </div>
-                              <div className="space-y-2 text-xs">
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">Project Cost:</span>
-                                  <span className="font-bold text-blue-600">{formatAmount(row.sanctioned_amount)}</span>
-                                </div>
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">Spent:</span>
-                                  <span className="font-bold text-green-600">{formatAmount(row.total_expdr)}</span>
-                                </div>
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">Current FY:</span>
-                                  <span className="font-medium">{formatAmount(row.expdr_cfy)}</span>
-                                </div>
-                                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-gray-700">
-                                  <span className="text-gray-600 dark:text-gray-400">Prev FY:</span>
-                                  <span className="font-medium">{formatAmount(row.expdr_upto_31mar25)}</span>
-                                </div>
-                                <div className="flex justify-between py-1">
-                                  <span className="text-gray-600 dark:text-gray-400">Spent %:</span>
-                                  <span className={`font-medium ${
-                                    parseFloat(row.percent_expdr) > 80 ? 'text-green-600' :
-                                    parseFloat(row.percent_expdr) > 50 ? 'text-blue-600' :
-                                    'text-orange-600'
-                                  }`}>{row.percent_expdr || 0}%</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Progress & Performance - Full Width */}
-                          <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                            <div className="flex items-center gap-2 mb-3">
-                              <Activity size={14} className="text-orange-500" />
-                              <h4 className="font-semibold text-sm text-gray-900 dark:text-gray-100">Progress & Performance</h4>
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                              {/* Physical Progress */}
-                              <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs text-gray-600 dark:text-gray-400">Physical Progress:</span>
-                                  <span className="text-sm font-bold text-blue-600">{row.physical_progress || 0}%</span>
-                                </div>
-                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                  <div 
-                                    className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all"
-                                    style={{ width: `${Math.min(100, Math.max(0, row.physical_progress || 0))}%` }}
-                                  />
-                                </div>
-                                <div className="text-[10px] text-gray-500">
-                                  {row.progress_category?.replace(/_/g, ' ') || 'N/A'}
-                                </div>
-                              </div>
-
-                              {/* Expected vs Actual */}
-                              <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs text-gray-600 dark:text-gray-400">Expected:</span>
-                                  <span className="text-sm font-bold text-purple-600">{row.expected_progress?.toFixed(1) || 0}%</span>
-                                </div>
-                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 relative">
-                                  <div 
-                                    className="h-2 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 opacity-50"
-                                    style={{ width: `${Math.min(100, Math.max(0, row.expected_progress || 0))}%` }}
-                                  />
-                                  <div 
-                                    className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 absolute top-0"
-                                    style={{ 
-                                      width: `${Math.min(100, Math.max(0, row.physical_progress || 0))}%`,
-                                      opacity: 0.8
-                                    }}
-                                  />
-                                </div>
-                                <div className="text-[10px] text-gray-500">
-                                  Variance: {((row.physical_progress || 0) - (row.expected_progress || 0)).toFixed(1)}%
-                                </div>
-                              </div>
-
-                              {/* Efficiency Score */}
-                              <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs text-gray-600 dark:text-gray-400">Efficiency:</span>
-                                  <span className={`text-sm font-bold ${
-                                    row.efficiency_score > 80 ? 'text-green-600' :
-                                    row.efficiency_score > 60 ? 'text-yellow-600' :
-                                    'text-red-600'
-                                  }`}>{row.efficiency_score?.toFixed(1) || 0}%</span>
-                                </div>
-                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                  <div 
-                                    className={`h-2 rounded-full transition-all ${
-                                      row.efficiency_score > 80 ? 'bg-gradient-to-r from-green-500 to-green-600' :
-                                      row.efficiency_score > 60 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
-                                      'bg-gradient-to-r from-red-500 to-red-600'
-                                    }`}
-                                    style={{ width: `${Math.min(100, Math.max(0, row.efficiency_score || 0))}%` }}
-                                  />
-                                </div>
-                                <div className="text-[10px] text-gray-500">
-                                  Progress/Expenditure Ratio
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Performance Indicators Grid */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                              {/* Health Status */}
-                              <div className="text-center">
-                                <div className="text-[10px] text-gray-600 dark:text-gray-400 mb-1">Health</div>
-                                <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ${
-                                  row.health_status === 'PERFECT_PACE' ? 'bg-green-100 text-green-700 dark:bg-green-900/30' :
-                                  row.health_status === 'SLOW_PACE' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30' :
-                                  row.health_status === 'BAD_PACE' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30' :
-                                  row.health_status === 'SLEEP_PACE' ? 'bg-red-100 text-red-700 dark:bg-red-900/30' :
-                                  row.health_status === 'PAYMENT_PENDING' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30' :
-                                  'bg-gray-100 text-gray-700 dark:bg-gray-900/30'
-                                }`}>
-                                  {row.health_status === 'PERFECT_PACE' && <Zap size={10} />}
-                                  {row.health_status === 'SLOW_PACE' && <Timer size={10} />}
-                                  {row.health_status === 'BAD_PACE' && <AlertTriangle size={10} />}
-                                  {row.health_status === 'SLEEP_PACE' && <PauseCircle size={10} />}
-                                  {row.health_status === 'PAYMENT_PENDING' && <CreditCard size={10} />}
-                                  <span>{row.health_status?.replace(/_/g, ' ').substring(0, 12) || 'N/A'}</span>
-                                </div>
-                                <div className="text-[9px] text-gray-500 mt-1">
-                                  Score: {row.health_score?.toFixed(0) || 0}/100
-                                </div>
-                              </div>
-
-                              {/* Risk Level */}
-                              <div className="text-center">
-                                <div className="text-[10px] text-gray-600 dark:text-gray-400 mb-1">Risk</div>
-                                <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ${
-                                  row.risk_level === 'CRITICAL' ? 'bg-red-100 text-red-700 dark:bg-red-900/30' :
-                                  row.risk_level === 'HIGH' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30' :
-                                  row.risk_level === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30' :
-                                  'bg-green-100 text-green-700 dark:bg-green-900/30'
-                                }`}>
-                                  {row.risk_level === 'CRITICAL' && <AlertCircle size={10} />}
-                                  {row.risk_level === 'HIGH' && <AlertTriangle size={10} />}
-                                  {row.risk_level === 'MEDIUM' && <Shield size={10} />}
-                                  {row.risk_level === 'LOW' && <CheckCircle size={10} />}
-                                  <span>{row.risk_level || 'LOW'}</span>
-                                </div>
-                              </div>
-
-                              {/* Quality Score */}
-                              <div className="text-center">
-                                <div className="text-[10px] text-gray-600 dark:text-gray-400 mb-1">Quality</div>
-                                <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ${
-                                  row.quality_score > 80 ? 'bg-green-100 text-green-700 dark:bg-green-900/30' :
-                                  row.quality_score > 60 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30' :
-                                  row.quality_score > 40 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30' :
-                                  'bg-red-100 text-red-700 dark:bg-red-900/30'
-                                }`}>
-                                  <ThermometerSun size={10} />
-                                  <span>{row.quality_score?.toFixed(0) || 0}%</span>
-                                </div>
-                                <div className="text-[9px] text-gray-500 mt-1">
-                                  {row.quality_score > 80 ? 'Excellent' :
-                                   row.quality_score > 60 ? 'Good' :
-                                   row.quality_score > 40 ? 'Fair' :
-                                   'Poor'}
-                                </div>
-                              </div>
-
-                              {/* Forecast */}
-                              <div className="text-center">
-                                <div className="text-[10px] text-gray-600 dark:text-gray-400 mb-1">Forecast</div>
-                                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30">
-                                  <CalendarClock size={10} />
-                                  <span className="text-[10px]">
-                                    {row.forecast_completion === 'Completed' ? 'Done' :
-                                     row.forecast_completion === 'Not Started' ? 'N/A' :
-                                     row.forecast_completion === 'Unable to forecast' ? 'Unknown' :
-                                     formatDate(row.forecast_completion).substring(0, 11)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Remarks Section (if available) */}
-                          {row.remarks && (
-                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                              <div className="flex items-center gap-2 mb-2">
-                                <FileText size={12} className="text-gray-500" />
-                                <h4 className="font-semibold text-xs text-gray-900 dark:text-gray-100">Remarks</h4>
-                              </div>
-                              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                                {row.remarks}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Quick Actions */}
-                          <div className="flex gap-2 justify-center pt-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openReportModal(row);
-                              }}
-                              className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-md hover:opacity-90 flex items-center gap-1 text-xs transition-all shadow-sm"
-                            >
-                              <Eye size={12} />
-                              View Report
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEditModal(row, false);
-                              }}
-                              className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-md hover:opacity-90 flex items-center gap-1 text-xs transition-all shadow-sm"
-                            >
-                              <Edit size={12} />
-                              Edit
-                            </button>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
 
         {/* Pagination */}
-        <div className={`p-3 border-t ${darkMode ? 'border-gray-700' : 'border-gray-100'} flex-shrink-0`}>
+        <div className={`p-4 border-t ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}`}>
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
-            <div className="text-xs text-gray-600 dark:text-gray-400">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, processedData.length)} of {processedData.length} entries
+              {aggregateStats.criticalCount > 0 && (
+                <span className="ml-2 text-red-600 font-semibold">
+                  ({aggregateStats.criticalCount} critical)
+                </span>
+              )}
             </div>
             
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className={`px-2 py-1 text-xs rounded-md ${
+                className={`px-3 py-1.5 text-sm rounded font-medium ${
                   currentPage === 1
                     ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm'
-                } transition-all`}
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750'
+                }`}
               >
                 First
               </button>
@@ -1573,27 +1279,43 @@ const DataTable = ({
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className={`px-2 py-1 text-xs rounded-md ${
+                className={`px-3 py-1.5 text-sm rounded font-medium ${
                   currentPage === 1
                     ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm'
-                } transition-all`}
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750'
+                }`}
               >
-                Prev
+                Previous
               </button>
               
-              <span className="px-3 py-1 text-xs text-gray-700 dark:text-gray-300">
-                Page {currentPage} of {totalPages || 1}
-              </span>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = currentPage <= 3 ? i + 1 : currentPage + i - 2;
+                  if (pageNum > totalPages) return null;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-3 py-1.5 text-sm rounded font-medium ${
+                        currentPage === pageNum
+                          ? 'bg-blue-500 text-white shadow'
+                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                }).filter(Boolean)}
+              </div>
               
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages || totalPages === 0}
-                className={`px-2 py-1 text-xs rounded-md ${
+                className={`px-3 py-1.5 text-sm rounded font-medium ${
                   currentPage === totalPages || totalPages === 0
                     ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm'
-                } transition-all`}
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750'
+                }`}
               >
                 Next
               </button>
@@ -1601,11 +1323,11 @@ const DataTable = ({
               <button
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages || totalPages === 0}
-                className={`px-2 py-1 text-xs rounded-md ${
+                className={`px-3 py-1.5 text-sm rounded font-medium ${
                   currentPage === totalPages || totalPages === 0
                     ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90 shadow-sm'
-                } transition-all`}
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750'
+                }`}
               >
                 Last
               </button>
@@ -1614,59 +1336,56 @@ const DataTable = ({
         </div>
       </div>
 
-      {/* Report Modal */}
-      <ReportModal 
-        isOpen={reportModalOpen}
-        onClose={() => {
-          setReportModalOpen(false);
-          setSelectedProjectForReport(null);
-        }}
-        projectData={selectedProjectForReport}
-        darkMode={darkMode}
-      />
+      {/* Modals */}
+      {typeof Report !== 'undefined' && (
+        <ReportModal 
+          isOpen={reportModalOpen}
+          onClose={() => {
+            setReportModalOpen(false);
+            setSelectedProjectForReport(null);
+          }}
+          projectData={selectedProjectForReport}
+          darkMode={darkMode}
+        />
+      )}
 
-      {/* Edit Modal */}
-      <EditComponent 
+      <EditRow
         isOpen={editModalOpen}
         onClose={() => {
           setEditModalOpen(false);
           setSelectedProjectForEdit(null);
-          setIsNewProject(false);
+          setEditRowIndex(null);
         }}
-        projectData={selectedProjectForEdit}
         darkMode={darkMode}
-        isNewProject={isNewProject}
-        onSaveSuccess={handleEditSaveSuccess}
-        onDeleteSuccess={handleEditDeleteSuccess}
-        onRefreshData={handleRefreshData}
+        databaseName={databaseName}
+        idField={dbConfig?.idField}
+        rowIndex={editRowIndex}
+        rowData={selectedProjectForEdit}
+        onSuccess={handleEditSaveSuccess}
+        onDelete={handleEditSaveSuccess}
       />
 
-      {/* Animation styles */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-in-out;
-        }
-        
-        .animate-slideUp {
-          animation: slideUp 0.3s ease-out;
-        }
-      `}</style>
+      <AddRow
+        isOpen={addModalOpen}
+        onClose={() => {
+          setAddModalOpen(false);
+        }}
+        darkMode={darkMode}
+        databaseName={databaseName}
+        idField={dbConfig?.idField}
+        onSuccess={handleAddSuccess}
+        defaultValues={{}}
+      />
+
+      <FitViewModal
+        row={selectedRowForFitView}
+        isOpen={fitViewModalOpen}
+        onClose={() => {
+          setFitViewModalOpen(false);
+          setSelectedRowForFitView(null);
+        }}
+        darkMode={darkMode}
+      />
     </>
   );
 };

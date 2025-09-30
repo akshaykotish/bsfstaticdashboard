@@ -128,6 +128,44 @@ const Engineering = () => {
 
   // Get filtered data from filters
   const filteredData = filters.filteredData || [];
+  
+  // Create comprehensive filter object for patch data
+  const patchFilters = useMemo(() => {
+    const mappedFilters = {
+      searchTerm: filters.searchTerm || '',
+      selectedBudgetHeads: filters.selectedBudgetHeads || [],
+      selectedFrontierHQs: filters.selectedFrontierHQs || [],
+      selectedSectorHQs: filters.selectedSectorHQs || [],
+      selectedRiskLevels: filters.selectedRiskLevels || [],
+      selectedHealthStatuses: filters.selectedHealthStatuses || [],
+      selectedSchemes: filters.selectedSchemes || [],
+      utilizationRange: null
+    };
+    
+    // Map utilization range if available from efficiency range
+    if (filters.efficiencyRange && filters.efficiencyRange[0] !== undefined && filters.efficiencyRange[1] !== undefined) {
+      mappedFilters.utilizationRange = filters.efficiencyRange;
+    }
+    
+    // Log for debugging
+    console.log('[Engineering] Mapped patch filters:', {
+      searchTerm: mappedFilters.searchTerm,
+      budgetHeads: mappedFilters.selectedBudgetHeads.length,
+      frontierHQs: mappedFilters.selectedFrontierHQs.length,
+      schemes: mappedFilters.selectedSchemes.length
+    });
+    
+    return mappedFilters;
+  }, [
+    filters.searchTerm,
+    filters.selectedBudgetHeads,
+    filters.selectedFrontierHQs,
+    filters.selectedSectorHQs,
+    filters.selectedRiskLevels,
+    filters.selectedHealthStatuses,
+    filters.selectedSchemes,
+    filters.efficiencyRange
+  ]);
 
   // Get filter relationships for display
   const filterRelationships = useMemo(() => {
@@ -993,22 +1031,15 @@ const Engineering = () => {
             rawData={rawData}
           />
 
-          {/* Metrics Cards */}
+          {/* Metrics Cards - Pass patchFilters */}
           <MetricsCards 
-          metrics={metrics} 
-          darkMode={darkMode}
-          filteredData={filteredData}
-          onMetricClick={handleDrillDown}
-          onProjectSelect={handleProjectSelect}
-          filters={filters.getFilterState ? filters.getFilterState() : {
-            searchTerm: filters.searchTerm,
-            selectedBudgetHeads: filters.selectedBudgetHeads,
-            selectedFrontierHQs: filters.selectedFrontierHQs,
-            selectedSectorHQs: filters.selectedSectorHQs,
-            selectedAgencies: filters.selectedAgencies,
-            selectedSchemes: filters.selectedSchemes
-          }}
-        />
+            metrics={metrics} 
+            darkMode={darkMode}
+            filteredData={filteredData}
+            onMetricClick={handleDrillDown}
+            onProjectSelect={handleProjectSelect}
+            filters={patchFilters}
+          />
 
           {/* Chart Tabs */}
           <ChartTabs
@@ -1034,13 +1065,14 @@ const Engineering = () => {
     // Default content for other view modes
     return (
       <>
-        {/* Metrics Cards */}
+        {/* Metrics Cards - Pass patchFilters */}
         <MetricsCards 
           metrics={metrics} 
           darkMode={darkMode}
           filteredData={filteredData}
           onMetricClick={handleDrillDown}
           onProjectSelect={handleProjectSelect}
+          filters={patchFilters}
         />
 
         {/* Main Content Based on View Mode */}
