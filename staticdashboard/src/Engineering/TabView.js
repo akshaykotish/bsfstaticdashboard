@@ -99,20 +99,14 @@ const TabView = ({ filters, darkMode, rawData = [], databaseName = 'engineering'
     }
   ];
 
-  // Get available options from filters or data
+  // Get available options from filters.availableOptions - now uses cascade filtering
   const getFieldOptions = (field) => {
-    // Try from filters first
+    // Try from filters first - this now uses cascade filtering!
     if (filters.availableOptions && filters.availableOptions[field]) {
       return filters.availableOptions[field];
     }
     
-    // Try from column filters
-    if (filters.columnFilters && field in filters.columnFilters) {
-      const uniqueValues = [...new Set(rawData.map(d => d[field]))].filter(Boolean);
-      return uniqueValues.sort();
-    }
-    
-    // Fallback to extracting from raw data
+    // Fallback to extracting from raw data (should not be needed with the improved implementation)
     if (rawData && rawData.length > 0) {
       const uniqueValues = [...new Set(rawData.map(d => d[field]))].filter(Boolean);
       return uniqueValues.sort();
@@ -274,6 +268,7 @@ const TabView = ({ filters, darkMode, rawData = [], databaseName = 'engineering'
     field,
     config = {}
   }) => {
+    // Use cascade filtering through the availableOptions from useFilters
     const items = getFieldOptions(field);
     const allItems = getAllFieldOptions(field);
     const selectedItems = getSelectedValues(field);

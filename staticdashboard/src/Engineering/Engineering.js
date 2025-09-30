@@ -129,7 +129,17 @@ const Engineering = () => {
   // Get filtered data from filters
   const filteredData = filters.filteredData || [];
   
-  // Create comprehensive filter object for patch data
+  // Normalized scheme name helper function to improve matching
+  const normalizeScheme = useCallback((schemeName) => {
+    if (!schemeName) return '';
+    return schemeName.toLowerCase()
+      .replace(/\s+/g, ' ')
+      .replace(/-/g, ' ')
+      .replace(/\(|\)|,|\.|\//g, '')
+      .trim();
+  }, []);
+
+  // Create comprehensive filter object for patch data with enhanced scheme name mapping
   const patchFilters = useMemo(() => {
     const mappedFilters = {
       searchTerm: filters.searchTerm || '',
@@ -138,9 +148,35 @@ const Engineering = () => {
       selectedSectorHQs: filters.selectedSectorHQs || [],
       selectedRiskLevels: filters.selectedRiskLevels || [],
       selectedHealthStatuses: filters.selectedHealthStatuses || [],
-      selectedSchemes: filters.selectedSchemes || [],
+      selectedSchemes: [],
       utilizationRange: null
     };
+    
+    // Enhanced scheme name mapping
+    if (filters.selectedSchemes?.length > 0 || filters.columnFilters?.name_of_scheme?.length > 0 || 
+        filters.columnFilters?.sub_scheme_name?.length > 0) {
+      
+      // Gather scheme names from all possible sources
+      const schemeNames = [
+        ...(filters.selectedSchemes || []),
+        ...(filters.columnFilters?.name_of_scheme || []),
+        ...(filters.columnFilters?.sub_scheme_name || []),
+        ...(filters.columnFilters?.['Name of scheme'] || []),
+        ...(filters.columnFilters?.['Sub head'] || [])
+      ];
+      
+      // Normalize and deduplicate scheme names
+      mappedFilters.selectedSchemes = Array.from(new Set(
+        schemeNames
+          .filter(Boolean)
+          .map(scheme => normalizeScheme(scheme))
+      )).filter(Boolean);
+      
+      console.log('[Engineering] Normalized scheme names for patch data:', 
+        mappedFilters.selectedSchemes.slice(0, 3), 
+        `(${mappedFilters.selectedSchemes.length} total)`
+      );
+    }
     
     // Map utilization range if available from efficiency range
     if (filters.efficiencyRange && filters.efficiencyRange[0] !== undefined && filters.efficiencyRange[1] !== undefined) {
@@ -164,8 +200,24 @@ const Engineering = () => {
     filters.selectedRiskLevels,
     filters.selectedHealthStatuses,
     filters.selectedSchemes,
-    filters.efficiencyRange
+    filters.columnFilters,
+    filters.efficiencyRange,
+    normalizeScheme
   ]);
+
+  // Enhanced patch data processor with scheme name matching
+  const processPatchData = useCallback((data) => {
+    if (!data) return [];
+    
+    return data.map(item => {
+      // Add normalized scheme names for better matching
+      if (item.scheme_name || item.sub_head) {
+        item.normalized_scheme_name = normalizeScheme(item.scheme_name || '') || 
+                                       normalizeScheme(item.sub_head || '');
+      }
+      return item;
+    });
+  }, [normalizeScheme]);
 
   // Get filter relationships for display
   const filterRelationships = useMemo(() => {
@@ -600,7 +652,11 @@ const Engineering = () => {
         sanctioned_amount: project.sanctioned_amount || 0,
         total_expdr: project.total_expdr || 0,
         percent_expdr: project.percent_expdr || 0,
-        remaining_amount: project.remaining_amount || 0
+        remaining_amount: project.remaining_amount || 0,
+        // Add normalized scheme name if not already present
+        normalized_scheme_name: project.normalized_scheme_name || 
+                                normalizeScheme(project.scheme_name || '') || 
+                                normalizeScheme(project.sub_scheme_name || '')
       };
       
       console.log('Engineering: Setting selected project and opening modal', projectWithDefaults);
@@ -608,7 +664,7 @@ const Engineering = () => {
       setModalOpen(true);
       setModalAnimating(true);
     }
-  }, [compareMode]);
+  }, [compareMode, normalizeScheme]);
 
   // Handler for drill-down from MetricsCards
   const handleDrillDown = useCallback((typeOrId, dataOrFilter) => {
@@ -1010,6 +1066,22 @@ const Engineering = () => {
             </div>
           )}
           
+          {filters.selectedSchemes?.length > 0 && (
+            <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded">
+              <p className="font-semibold text-green-700 dark:text-green-400">
+                Schemes: {filters.selectedSchemes.length > 0 ? 
+                  (filters.selectedSchemes[0].length > 25 ? 
+                    `${filters.selectedSchemes[0].substring(0, 25)}...` : 
+                    filters.selectedSchemes[0]) : 
+                  'None'} 
+                {filters.selectedSchemes.length > 1 && ` +${filters.selectedSchemes.length - 1} more`}
+              </p>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                <strong>Note:</strong> Scheme names will also match with sub-scheme names across databases.
+              </p>
+            </div>
+          )}
+          
           <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
             <p className="text-gray-500 dark:text-gray-400">
               Smart filtering automatically shows only related options when you select filters.
@@ -1029,6 +1101,7 @@ const Engineering = () => {
             filters={filters}
             darkMode={darkMode}
             rawData={rawData}
+            normalizeScheme={normalizeScheme}
           />
 
           {/* Metrics Cards - Pass patchFilters */}
@@ -1039,6 +1112,7 @@ const Engineering = () => {
             onMetricClick={handleDrillDown}
             onProjectSelect={handleProjectSelect}
             filters={patchFilters}
+            processPatchData={processPatchData}
           />
 
           {/* Chart Tabs */}
@@ -1057,6 +1131,7 @@ const Engineering = () => {
             setModalOpen={setModalOpen}
             onExportReport={handleExportReport}
             onPrintReport={handlePrintReport}
+            normalizeScheme={normalizeScheme}
           />
         </>
       );
@@ -1073,6 +1148,7 @@ const Engineering = () => {
           onMetricClick={handleDrillDown}
           onProjectSelect={handleProjectSelect}
           filters={patchFilters}
+          processPatchData={processPatchData}
         />
 
         {/* Main Content Based on View Mode */}
@@ -1092,6 +1168,7 @@ const Engineering = () => {
             setModalOpen={setModalOpen}
             onExportReport={handleExportReport}
             onPrintReport={handlePrintReport}
+            normalizeScheme={normalizeScheme}
           />
         )}
 
@@ -1103,6 +1180,7 @@ const Engineering = () => {
               onRowClick={handleProjectSelect}
               compareMode={compareMode}
               selectedProjects={selectedProjects}
+              normalizeScheme={normalizeScheme}
             />
           </div>
         )}
@@ -1384,6 +1462,38 @@ const Engineering = () => {
             </div>
           </div>
 
+          {/* Scheme Name Mapping Info Banner - NEW ADDITION */}
+          {(patchFilters.selectedSchemes.length > 0 || (filters.selectedSchemes?.length > 0)) && (
+            <div className={`${
+              darkMode ? 'bg-green-900/20 border-green-800' : 'bg-green-50 border-green-200'
+            } rounded-xl p-3 border flex items-center gap-3`}>
+              <Info size={16} className="text-green-500 flex-shrink-0" />
+              <div className="flex-1 text-sm">
+                <span className="font-semibold text-green-700 dark:text-green-400">
+                  Enhanced Scheme Mapping Active:
+                </span>
+                <span className={darkMode ? 'text-gray-300 ml-2' : 'text-gray-600 ml-2'}>
+                  Filtering will match scheme names with sub-scheme names across both databases for more comprehensive results.
+                  {patchFilters.selectedSchemes.length > 0 && ` Currently filtering with ${patchFilters.selectedSchemes.length} scheme name patterns.`}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  filters.setSelectedSchemes([]);
+                  if (filters.columnFilters?.name_of_scheme) {
+                    filters.setColumnFilter('name_of_scheme', []);
+                  }
+                  if (filters.columnFilters?.sub_scheme_name) {
+                    filters.setColumnFilter('sub_scheme_name', []);
+                  }
+                }}
+                className="px-3 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+              >
+                Clear Scheme Filters
+              </button>
+            </div>
+          )}
+
           {/* Cascading Filter Info Banner */}
           {isCascadingActive && filters.availableOptions && viewMode !== 'fastfilter' && (
             <div className={`${
@@ -1412,7 +1522,12 @@ const Engineering = () => {
 
           {/* Filter Panel */}
           {viewMode !== 'fastfilter' && (
-            <FilterPanel filters={filters} darkMode={darkMode} rawData={rawData} />
+            <FilterPanel 
+              filters={filters} 
+              darkMode={darkMode} 
+              rawData={rawData}
+              normalizeScheme={normalizeScheme}
+            />
           )}
 
           {/* Main Content */}
@@ -1619,6 +1734,5 @@ const Engineering = () => {
     </div>
   );
 };
-
 
 export default Engineering;

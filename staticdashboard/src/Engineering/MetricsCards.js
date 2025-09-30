@@ -274,6 +274,7 @@ const MetricsCards = ({
         tenderNotCalled: 0,
         underCodalFormality: 0,
         awarded: 0,
+        tendersCalled: 0,  // New metric for tenders called
         
         // Budget Section
         totalBudget: 0,
@@ -362,6 +363,15 @@ const MetricsCards = ({
         (!tenderDate || tenderDate === '') && 
         progress === 0;
     }).length;
+    
+    // New metric: Tenders Called - tender date is filled but award date is empty
+    const tendersCalled = filteredData.filter(d => {
+      const tenderDate = getFieldValue(d, 'dateTender', '');
+      const awardDate = getFieldValue(d, 'dateAward', '');
+      return tenderDate && tenderDate !== '' && 
+        (!awardDate || awardDate === '');
+    }).length;
+    
     const underCodalFormality = filteredData.filter(d => {
       const aaEs = getFieldValue(d, 'aaEsRef', '');
       const awardDate = getFieldValue(d, 'dateAward', '');
@@ -755,6 +765,7 @@ const MetricsCards = ({
       tenderNotCalled,
       underCodalFormality,
       awarded,
+      tendersCalled, // New metric added
       
       // Budget
       totalBudget,
@@ -866,6 +877,13 @@ const MetricsCards = ({
           return aaEs && aaEs !== '' &&
             (!tenderDate || tenderDate === '') && 
             progress === 0;
+        });
+      case 'tenders-called':  // New metric - tenders called
+        return filteredData.filter(d => {
+          const tenderDate = getFieldValue(d, 'dateTender', '');
+          const awardDate = getFieldValue(d, 'dateAward', '');
+          return tenderDate && tenderDate !== '' && 
+            (!awardDate || awardDate === '');
         });
       case 'codal':
         return filteredData.filter(d => {
@@ -1088,6 +1106,18 @@ const MetricsCards = ({
       gradient: 'from-orange-500 to-orange-600',
       infoText: "Projects undergoing legal and procedural checks before final contractor selection."
     },
+    // New metric for Tenders Called
+    {
+      id: 'tenders-called',
+      group: 'projects',
+      title: 'Tenders Called',
+      value: displayMetrics.tendersCalled || 0,
+      subtitle: 'Awaiting award',
+      icon: FileText,
+      color: 'purple',
+      gradient: 'from-purple-500 to-purple-600',
+      infoText: "Projects where tender has been called but award is not yet given."
+    },
     {
       id: 'tender-not-called',
       group: 'projects',
@@ -1216,7 +1246,27 @@ const MetricsCards = ({
     // Add patch data metrics if enabled and data is loaded
     if (showPatchData && !patchLoading && patchMetrics) {
       const patchBudgetMetrics = generatePatchBudgetMetrics(patchMetrics, darkMode);
-      return [...baseMetrics, ...patchBudgetMetrics];
+      
+      // Add a divider for Current Year metrics
+      const metricsWithDivider = [
+        ...baseMetrics,
+        // Current Year divider
+        {
+          id: 'current-year-divider',
+          group: 'budget',
+          title: 'Current Year',
+          value: '',
+          subtitle: `Financial Year ${new Date().getFullYear()}`,
+          icon: CalendarDays,
+          color: 'indigo',
+          gradient: 'from-indigo-500 to-indigo-600',
+          isDivider: true, // Add flag to identify as divider
+          infoText: "Data for the current financial year from patch file."
+        },
+        ...patchBudgetMetrics
+      ];
+      
+      return metricsWithDivider;
     }
     
     return baseMetrics;
@@ -1546,6 +1596,27 @@ const MetricsCards = ({
       normal: 'p-4',
       large: 'p-6'
     };
+
+    // For divider cards
+    if (metric.isDivider) {
+      return (
+        <div className={`col-span-full ${darkMode ? 'bg-gray-750/50' : 'bg-gray-50'} rounded-xl p-3 my-2`}>
+          <div className="flex items-center gap-2">
+            <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.gradient}`}>
+              <metric.icon size={16} className="text-white" />
+            </div>
+            <div>
+              <h3 className={`text-sm font-bold ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                {metric.title}
+              </h3>
+              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                {metric.subtitle}
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <>
@@ -2025,7 +2096,7 @@ const MetricsCards = ({
                 <span className={`px-2 py-0.5 rounded-full text-xs ${
                   darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
                 }`}>
-                  {budgetMetrics.length} metrics
+                  {budgetMetrics.filter(m => !m.isDivider).length} metrics
                 </span>
               </div>
             </div>

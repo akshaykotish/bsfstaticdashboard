@@ -25,6 +25,9 @@ export const useFilters = (databaseName = 'engineering') => {
   
   // Flag to track initial load
   const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Track which filter was selected first to keep it unfiltered
+  const [firstSelectedFilter, setFirstSelectedFilter] = useState(null);
 
   // Initialize filters structure based on config columns
   useEffect(() => {
@@ -140,7 +143,28 @@ export const useFilters = (databaseName = 'engineering') => {
     return true;
   }, [parseDate]);
 
-  // Get available options based on current data
+  // Check if any filter is active
+  const hasAnyActiveFilter = useCallback(() => {
+    // Check column filters
+    for (const [field, values] of Object.entries(columnFilters)) {
+      if (values && values.length > 0) return true;
+    }
+
+    // Check range filters
+    for (const range of Object.values(rangeFilters)) {
+      if (range && range.current !== null) return true;
+    }
+
+    // Check date filters
+    for (const filter of Object.values(dateFilters)) {
+      if (filter && filter.enabled && (filter.start || filter.end)) return true;
+    }
+
+    // Check search term
+    return !!(searchTerm && searchTerm.trim() !== '');
+  }, [columnFilters, rangeFilters, dateFilters, searchTerm]);
+
+  // Get available options based on current data and applied filters (cascade filtering)
   const availableOptions = useMemo(() => {
     if (!rawData || rawData.length === 0) {
       return {};
@@ -154,18 +178,103 @@ export const useFilters = (databaseName = 'engineering') => {
       ...dbConfig.columns?.filter(c => c.type === 'text' || c.type === 'textarea').map(c => c.name) || []
     ]);
     
-    allFields.forEach(field => {
-      const values = [...new Set(rawData.map(d => d[field]))]
+    // First, create a base filtered dataset
+    let baseFilteredData = [...rawData];
+    
+    // If we have a first selected filter, apply it to create the base filtered data
+    if (firstSelectedFilter && columnFilters[firstSelectedFilter]?.length > 0) {
+      const selectedValues = columnFilters[firstSelectedFilter];
+      baseFilteredData = baseFilteredData.filter(item => {
+        const itemValue = item[firstSelectedFilter];
+        return selectedValues.includes(itemValue);
+      });
+      
+      // Log the filtering effect
+      console.log(`Applied first filter (${firstSelectedFilter}): filtered from ${rawData.length} to ${baseFilteredData.length} records`);
+    }
+    
+    // For the first selected filter, get all options from the raw data (not filtered)
+    if (firstSelectedFilter) {
+      const allValues = [...new Set(rawData.map(d => d[firstSelectedFilter]))]
         .filter(v => v !== null && v !== undefined && v !== '')
-        .sort((a, b) => {
-          // Natural sort for better ordering
-          return String(a).localeCompare(String(b), undefined, { numeric: true });
-        });
+        .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+      options[firstSelectedFilter] = allValues;
+      
+      // Log the options count
+      console.log(`Options for ${firstSelectedFilter}: ${allValues.length} (all values shown)`);
+    }
+    
+    // For each field, create a filtered dataset excluding its own filter
+    allFields.forEach(field => {
+      // Skip processing the first selected filter as we've already handled it
+      if (field === firstSelectedFilter) return;
+      
+      // Start with the base filtered data (filtered by first filter if applicable)
+      let filteredForField = [...baseFilteredData];
+      
+      // Apply all active column filters except the current field and the first selected filter
+      Object.entries(columnFilters).forEach(([colField, selectedValues]) => {
+        if (selectedValues && selectedValues.length > 0 && colField !== field && colField !== firstSelectedFilter) {
+          filteredForField = filteredForField.filter(item => {
+            const itemValue = item[colField];
+            return selectedValues.includes(itemValue);
+          });
+        }
+      });
+      
+      // Apply range filters
+      Object.entries(rangeFilters).forEach(([rangeField, range]) => {
+        if (range && range.current !== null) {
+          const [min, max] = range.current;
+          filteredForField = filteredForField.filter(item => {
+            const value = parseFloat(item[rangeField]);
+            if (isNaN(value)) return false;
+            return value >= min && value <= max;
+          });
+        }
+      });
+      
+      // Apply date filters
+      Object.entries(dateFilters).forEach(([dateField, filter]) => {
+        if (filter && filter.enabled && (filter.start || filter.end)) {
+          filteredForField = filteredForField.filter(item =>
+            isDateInRange(item[dateField], filter.start, filter.end)
+          );
+        }
+      });
+      
+      // Apply search term if present
+      if (searchTerm && searchTerm.trim() !== '') {
+        const searchLower = searchTerm.toLowerCase().trim();
+        const searchableFields = dbConfig.columns
+          ?.filter(col => col.type === 'text' || col.type === 'textarea' || col.type === 'id')
+          .map(col => col.name) || [];
+        
+        // Add common fields that might not be in config
+        searchableFields.push('id', 'name', 'description', 'title', 'remarks');
+        
+        filteredForField = filteredForField.filter(item => 
+          searchableFields.some(searchField => {
+            const value = item[searchField];
+            if (value === null || value === undefined) return false;
+            return String(value).toLowerCase().includes(searchLower);
+          })
+        );
+      }
+      
+      // Extract available options for the current field from the filtered data
+      const values = [...new Set(filteredForField.map(d => d[field]))]
+        .filter(v => v !== null && v !== undefined && v !== '')
+        .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+      
       options[field] = values;
+      
+      // Log the options count
+      console.log(`Options for ${field}: ${values.length} (filtered)`);
     });
     
     return options;
-  }, [rawData, columnFilters, dbConfig]);
+  }, [rawData, columnFilters, rangeFilters, dateFilters, searchTerm, dbConfig, firstSelectedFilter, isDateInRange]);
 
   // Apply all filters to data
   const applyFilters = useCallback((data) => {
@@ -231,27 +340,57 @@ export const useFilters = (databaseName = 'engineering') => {
     return applyFilters(rawData);
   }, [rawData, applyFilters]);
 
-  // Set filter for a specific column
+  // Set filter for a specific column - Modified to track first selected filter
   const setColumnFilter = useCallback((column, values) => {
+    // Check if this is the first active filter being set
+    const isFirstFilter = !hasAnyActiveFilter() && values.length > 0 && !firstSelectedFilter;
+
+    // If this is the first filter, set it as the firstSelectedFilter
+    if (isFirstFilter) {
+      setFirstSelectedFilter(column);
+      console.log(`Setting ${column} as first selected filter`);
+    }
+
+    // Set the column filter values
     setColumnFilters(prev => ({
       ...prev,
       [column]: Array.isArray(values) ? values : []
     }));
-  }, []);
 
-  // Toggle value in column filter
+    // If the first selected filter is being cleared, reset it
+    if (column === firstSelectedFilter && (!values || values.length === 0)) {
+      console.log(`Clearing first selected filter: ${column}`);
+      setFirstSelectedFilter(null);
+    }
+  }, [hasAnyActiveFilter, firstSelectedFilter]);
+
+  // Toggle value in column filter - preserves first filter tracking
   const toggleColumnFilterValue = useCallback((column, value) => {
     setColumnFilters(prev => {
       const current = prev[column] || [];
       const newValues = current.includes(value)
         ? current.filter(v => v !== value)
         : [...current, value];
+
+      // Check if this is the first active filter
+      const noActiveFilters = !hasAnyActiveFilter();
+      if (noActiveFilters && newValues.length > 0 && !firstSelectedFilter) {
+        setFirstSelectedFilter(column);
+        console.log(`Setting ${column} as first selected filter (toggle)`);
+      }
+
+      // If the first selected filter is being cleared, reset it
+      if (column === firstSelectedFilter && newValues.length === 0) {
+        console.log(`Clearing first selected filter: ${column}`);
+        setFirstSelectedFilter(null);
+      }
+
       return {
         ...prev,
         [column]: newValues
       };
     });
-  }, []);
+  }, [hasAnyActiveFilter, firstSelectedFilter]);
 
   // Set range filter
   const setRangeFilter = useCallback((field, range) => {
@@ -290,7 +429,7 @@ export const useFilters = (databaseName = 'engineering') => {
     });
   }, []);
 
-  // Reset all filters to cleared state
+  // Reset all filters to cleared state - also resets first selected filter
   const resetFilters = useCallback(() => {
     setSearchTerm('');
     
@@ -317,6 +456,9 @@ export const useFilters = (databaseName = 'engineering') => {
     
     // Clear date filters
     clearAllDateFilters();
+
+    // Reset first selected filter
+    setFirstSelectedFilter(null);
   }, [clearAllDateFilters]);
 
   // Get filter state for persistence
@@ -324,8 +466,9 @@ export const useFilters = (databaseName = 'engineering') => {
     searchTerm,
     columnFilters,
     rangeFilters,
-    dateFilters
-  }), [searchTerm, columnFilters, rangeFilters, dateFilters]);
+    dateFilters,
+    firstSelectedFilter
+  }), [searchTerm, columnFilters, rangeFilters, dateFilters, firstSelectedFilter]);
 
   // Load filter state from saved configuration
   const loadFilterState = useCallback((state) => {
@@ -333,6 +476,7 @@ export const useFilters = (databaseName = 'engineering') => {
     if (state.columnFilters !== undefined) setColumnFilters(state.columnFilters || {});
     if (state.rangeFilters !== undefined) setRangeFilters(state.rangeFilters || {});
     if (state.dateFilters !== undefined) setDateFilters(state.dateFilters || {});
+    if (state.firstSelectedFilter !== undefined) setFirstSelectedFilter(state.firstSelectedFilter);
   }, []);
 
   // Quick filter presets
@@ -459,6 +603,36 @@ export const useFilters = (databaseName = 'engineering') => {
     return stats;
   }, [dbConfig, getDateBounds]);
 
+  // Helper to get related field mappings for debugging
+  const getRelatedMappings = useCallback(() => {
+    // Creates a structure showing relationships between filters
+    if (!rawData || rawData.length === 0) return null;
+
+    // Example: frontierToSectors mapping
+    const frontierToSectors = {};
+    rawData.forEach(item => {
+      const frontier = item.ftr_hq_name;
+      const sector = item.shq_name;
+      
+      if (frontier && sector) {
+        if (!frontierToSectors[frontier]) {
+          frontierToSectors[frontier] = new Set();
+        }
+        frontierToSectors[frontier].add(sector);
+      }
+    });
+    
+    // Convert sets to arrays
+    for (const frontier in frontierToSectors) {
+      frontierToSectors[frontier] = Array.from(frontierToSectors[frontier]);
+    }
+
+    return {
+      frontierToSectors,
+      firstSelectedFilter
+    };
+  }, [rawData, firstSelectedFilter]);
+
   // Backwards compatibility mappings for existing components
   const backwardsCompatibilityMappings = useMemo(() => ({
     // Status filters
@@ -546,6 +720,9 @@ export const useFilters = (databaseName = 'engineering') => {
     setDateFilter,
     clearAllDateFilters,
     
+    // NEW: Track first selected filter
+    firstSelectedFilter,
+    
     // Data management
     rawData,
     setRawData,
@@ -560,6 +737,7 @@ export const useFilters = (databaseName = 'engineering') => {
     getFilterCounts,
     hasActiveFilters,
     dateStatistics,
+    getRelatedMappings, // New helper
     
     // Database configuration
     databaseConfig: dbConfig,

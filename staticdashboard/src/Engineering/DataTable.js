@@ -18,7 +18,7 @@ import AddRow from '../System/AddRow';
 import FitViewModal from './FitView';
 
 // Import database configurations
-import { databaseConfigs, getConfig, getDatabaseNames, generateId, applyCalculations } from '../System/config.js';
+import { databaseConfigs, getConfig, getDatabaseNames, generateId, applyCalculations } from '../System/config';
 
 // Inject enhanced progress animation styles
 const animatedStripesStyle = `

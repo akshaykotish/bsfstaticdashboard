@@ -191,6 +191,9 @@ const MultiSelect = ({
     return customLabels[option] || option;
   };
 
+  // Show a filtered indicator when available options are less than total options
+  const isFilteredByOthers = options.length < totalCount;
+
   return (
     <>
       <button
@@ -212,6 +215,11 @@ const MultiSelect = ({
           <span className="text-xs truncate">
             {getDisplayText()}
           </span>
+          {isFilteredByOthers && (
+            <span className="text-[10px] px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 rounded">
+              Filtered
+            </span>
+          )}
         </div>
         <ChevronDown 
           size={14} 
@@ -277,6 +285,7 @@ const MultiSelect = ({
                 darkMode ? 'text-gray-400' : 'text-gray-500'
               }`}>
                 {value.length}/{options.length}
+                {isFilteredByOthers && totalCount > 0 && ` of ${totalCount}`}
               </span>
               <button
                 onClick={(e) => {
@@ -328,8 +337,14 @@ const MultiSelect = ({
                     title={getOptionLabel(option)}>
                       {getOptionLabel(option)}
                     </span>
-                    {value.includes(option) && (
-                      <Check size={12} className="text-blue-500 flex-shrink-0" />
+                    {showCounts && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                        darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {value.includes(option) && (
+                          <Check size={12} className="text-blue-500 flex-shrink-0" />
+                        )}
+                      </span>
                     )}
                   </label>
                 ))
@@ -524,8 +539,33 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
     return grouped;
   }, [dbConfig]);
 
-  // Get available options for text columns
+  // Get available options for text columns from cascade filters
   const availableOptions = useMemo(() => {
+    if (!filters || !filters.availableOptions) {
+      // Fallback if filters not yet initialized
+      const options = {};
+      
+      if (rawData && rawData.length > 0) {
+        columnsByType.text.forEach(col => {
+          const values = [...new Set(rawData.map(d => d[col.name]))].filter(Boolean);
+          options[col.name] = values.sort();
+        });
+        
+        // Add derived fields
+        options.status = [...new Set(rawData.map(d => d.status))].filter(Boolean).sort();
+        options.risk_level = [...new Set(rawData.map(d => d.risk_level))].filter(Boolean).sort();
+        options.health_status = [...new Set(rawData.map(d => d.health_status))].filter(Boolean).sort();
+        options.progress_category = [...new Set(rawData.map(d => d.progress_category))].filter(Boolean).sort();
+      }
+      
+      return options;
+    }
+    
+    return filters.availableOptions;
+  }, [filters, rawData, columnsByType]);
+
+  // Get all unfiltered options for each field
+  const allOptions = useMemo(() => {
     const options = {};
     
     if (rawData && rawData.length > 0) {
@@ -729,6 +769,8 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                 darkMode={darkMode}
                 icon={getFieldIcon(col, dbConfig)}
                 enableSearch={true}
+                totalCount={allOptions[col.name]?.length || 0}
+                isFiltered={availableOptions[col.name]?.length < (allOptions[col.name]?.length || 0)}
               />
             ))}
             
@@ -741,6 +783,8 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                 placeholder="All Statuses"
                 darkMode={darkMode}
                 icon={Package}
+                totalCount={allOptions.status?.length || 0}
+                isFiltered={availableOptions.status?.length < (allOptions.status?.length || 0)}
               />
             )}
             
@@ -752,6 +796,8 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                 placeholder="All Risk Levels"
                 darkMode={darkMode}
                 icon={AlertTriangle}
+                totalCount={allOptions.risk_level?.length || 0}
+                isFiltered={availableOptions.risk_level?.length < (allOptions.risk_level?.length || 0)}
               />
             )}
             
@@ -763,6 +809,8 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                 placeholder="All Health Status"
                 darkMode={darkMode}
                 icon={Heart}
+                totalCount={allOptions.health_status?.length || 0}
+                isFiltered={availableOptions.health_status?.length < (allOptions.health_status?.length || 0)}
               />
             )}
             
@@ -774,6 +822,8 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                 placeholder="Progress Categories"
                 darkMode={darkMode}
                 icon={Activity}
+                totalCount={allOptions.progress_category?.length || 0}
+                isFiltered={availableOptions.progress_category?.length < (allOptions.progress_category?.length || 0)}
               />
             )}
           </div>
@@ -917,7 +967,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                       min={range.min}
                       max={range.max}
                       step={col.name.includes('percent') ? 1 : range.max > 1000 ? 100 : 1}
-                      value={range.current}
+                      value={range.current || [range.min, range.max]}
                       onChange={(newRange) => filters.setRangeFilter(col.name, newRange)}
                       label={col.label || col.name}
                       icon={FieldIcon}
@@ -934,7 +984,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                     min={filters.rangeFilters.delay_days.min}
                     max={filters.rangeFilters.delay_days.max}
                     step={1}
-                    value={filters.rangeFilters.delay_days.current}
+                    value={filters.rangeFilters.delay_days.current || [filters.rangeFilters.delay_days.min, filters.rangeFilters.delay_days.max]}
                     onChange={(newRange) => filters.setRangeFilter('delay_days', newRange)}
                     label="Delay (Days)"
                     icon={Clock}
@@ -948,7 +998,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                     min={0}
                     max={100}
                     step={1}
-                    value={filters.rangeFilters.efficiency_score.current}
+                    value={filters.rangeFilters.efficiency_score.current || [0, 100]}
                     onChange={(newRange) => filters.setRangeFilter('efficiency_score', newRange)}
                     label="Efficiency Score"
                     icon={Target}
@@ -962,7 +1012,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                     min={0}
                     max={100}
                     step={1}
-                    value={filters.rangeFilters.health_score.current}
+                    value={filters.rangeFilters.health_score.current || [0, 100]}
                     onChange={(newRange) => filters.setRangeFilter('health_score', newRange)}
                     label="Health Score"
                     icon={Heart}

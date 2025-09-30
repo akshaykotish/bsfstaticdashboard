@@ -93,7 +93,8 @@ export const usePatchEngineeringCYB = (filters = {}) => {
           ftr_hq: processedRow['Name of Ftr HQ'] || 'Unknown',
           budget_head: processedRow['Budget head'] || 'Unknown',
           sub_head: processedRow['Sub head'] || '',
-          scheme_name: processedRow['Name of scheme'] || '',
+          // Improved scheme mapping to use multiple sources
+          scheme_name: processedRow['Name of scheme'] || processedRow['Sub head'] || '',
           
           // Financial values (assuming in lakhs) - all properly cleaned
           allotment_prev_fy: cleanNumber(processedRow['Allotment Previous Financila year']),
@@ -282,6 +283,110 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     };
   }, [processPatchData]);
 
+  // Create comprehensive filter mapping for patch data
+  const patchFilters = useMemo(() => {
+    if (!filters) return {};
+    
+    const mappedFilters = {
+      searchTerm: filters.searchTerm || '',
+      selectedBudgetHeads: [],
+      selectedFrontierHQs: [],
+      selectedSectorHQs: [],
+      selectedRiskLevels: [],
+      selectedHealthStatuses: [],
+      selectedSchemes: [], // Will map to scheme_name and sub_scheme_name
+      utilizationRange: null
+    };
+
+    // Map budget heads from filters
+    // Note: The patch data uses 'budget_head' field after processing
+    if (filters.selectedBudgetHeads?.length > 0) {
+      mappedFilters.selectedBudgetHeads = filters.selectedBudgetHeads;
+    } else if (filters.columnFilters?.budget_head?.length > 0) {
+      mappedFilters.selectedBudgetHeads = filters.columnFilters.budget_head;
+    } else if (filters.columnFilters?.['Budget head']?.length > 0) {
+      // Handle direct column name from enggcurrentyear
+      mappedFilters.selectedBudgetHeads = filters.columnFilters['Budget head'];
+    }
+
+    // Map frontier HQs - patch data uses 'ftr_hq' field
+    if (filters.selectedFrontierHQs?.length > 0) {
+      mappedFilters.selectedFrontierHQs = filters.selectedFrontierHQs;
+    } else if (filters.columnFilters?.ftr_hq_name?.length > 0) {
+      mappedFilters.selectedFrontierHQs = filters.columnFilters.ftr_hq_name;
+    } else if (filters.columnFilters?.['Name of Ftr HQ']?.length > 0) {
+      // Handle direct column name from enggcurrentyear
+      mappedFilters.selectedFrontierHQs = filters.columnFilters['Name of Ftr HQ'];
+    } else if (filters.columnFilters?.ftr_hq?.length > 0) {
+      // Handle transformed field name
+      mappedFilters.selectedFrontierHQs = filters.columnFilters.ftr_hq;
+    }
+
+    // Map sector HQs if available (not in patch data, but keep for consistency)
+    if (filters.selectedSectorHQs?.length > 0) {
+      mappedFilters.selectedSectorHQs = filters.selectedSectorHQs;
+    } else if (filters.columnFilters?.shq_name?.length > 0) {
+      mappedFilters.selectedSectorHQs = filters.columnFilters.shq_name;
+    }
+
+    // Map risk levels
+    if (filters.selectedRiskLevels?.length > 0) {
+      mappedFilters.selectedRiskLevels = filters.selectedRiskLevels;
+    } else if (filters.columnFilters?.risk_level?.length > 0) {
+      mappedFilters.selectedRiskLevels = filters.columnFilters.risk_level;
+    }
+
+    // Map health statuses
+    if (filters.selectedHealthStatuses?.length > 0) {
+      mappedFilters.selectedHealthStatuses = filters.selectedHealthStatuses;
+    } else if (filters.columnFilters?.health_status?.length > 0) {
+      mappedFilters.selectedHealthStatuses = filters.columnFilters.health_status;
+    }
+
+    // Map utilization range
+    if (filters.rangeFilters?.utilization_rate?.current) {
+      mappedFilters.utilizationRange = filters.rangeFilters.utilization_rate.current;
+    } else if (filters.rangeFilters?.['% Age of total Expdr']?.current) {
+      // Handle direct column name for utilization
+      mappedFilters.utilizationRange = filters.rangeFilters['% Age of total Expdr'].current;
+    }
+
+    // Map scheme names and sub-scheme names - NEW MAPPING
+    if (filters.selectedSchemes?.length > 0) {
+      mappedFilters.selectedSchemes = filters.selectedSchemes;
+    } else if (filters.columnFilters?.['Name of scheme']?.length > 0) {
+      mappedFilters.selectedSchemes = filters.columnFilters['Name of scheme'];
+    } else if (filters.columnFilters?.name_of_scheme?.length > 0) {
+      mappedFilters.selectedSchemes = filters.columnFilters.name_of_scheme;
+    }
+    
+    // Add mapping for sub_scheme_name to name_of_scheme - NEW MAPPING
+    if (filters.columnFilters?.sub_scheme_name?.length > 0) {
+      // If we already have schemes, merge with sub schemes
+      if (mappedFilters.selectedSchemes && mappedFilters.selectedSchemes.length > 0) {
+        mappedFilters.selectedSchemes = [
+          ...mappedFilters.selectedSchemes,
+          ...filters.columnFilters.sub_scheme_name
+        ];
+      } else {
+        mappedFilters.selectedSchemes = filters.columnFilters.sub_scheme_name;
+      }
+    } else if (filters.columnFilters?.['Sub scheme name']?.length > 0) {
+      // If we already have schemes, merge with sub schemes
+      if (mappedFilters.selectedSchemes && mappedFilters.selectedSchemes.length > 0) {
+        mappedFilters.selectedSchemes = [
+          ...mappedFilters.selectedSchemes,
+          ...filters.columnFilters['Sub scheme name']
+        ];
+      } else {
+        mappedFilters.selectedSchemes = filters.columnFilters['Sub scheme name'];
+      }
+    }
+
+    console.log('[MetricsCards] Mapped patch filters:', mappedFilters);
+    return mappedFilters;
+  }, [filters]);
+
   // Apply filters to patch data
   const patchData = useMemo(() => {
     if (!rawPatchData || rawPatchData.length === 0) return [];
@@ -300,43 +405,52 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     }
     
     // Apply budget head filter
-    if (filters?.selectedBudgetHeads?.length > 0) {
+    if (patchFilters?.selectedBudgetHeads?.length > 0) {
       filtered = filtered.filter(item => 
-        filters.selectedBudgetHeads.includes(item.budget_head)
+        patchFilters.selectedBudgetHeads.includes(item.budget_head)
       );
     }
     
     // Apply frontier HQ filter
-    if (filters?.selectedFrontierHQs?.length > 0) {
+    if (patchFilters?.selectedFrontierHQs?.length > 0) {
       filtered = filtered.filter(item => 
-        filters.selectedFrontierHQs.includes(item.ftr_hq)
+        patchFilters.selectedFrontierHQs.includes(item.ftr_hq)
       );
     }
     
-    // Apply scheme filter if present
-    if (filters?.selectedSchemes?.length > 0) {
-      filtered = filtered.filter(item => 
-        filters.selectedSchemes.includes(item.scheme_name)
-      );
+    // Apply scheme filter if present - IMPROVED MATCHING
+    if (patchFilters?.selectedSchemes?.length > 0) {
+      filtered = filtered.filter(item => {
+        // Direct match
+        if (patchFilters.selectedSchemes.includes(item.scheme_name)) {
+          return true;
+        }
+        
+        // Partial match - check if any scheme contains the item's scheme name or vice versa
+        return patchFilters.selectedSchemes.some(scheme => 
+          (scheme && item.scheme_name && 
+           (scheme.includes(item.scheme_name) || item.scheme_name.includes(scheme)))
+        );
+      });
     }
     
     // Apply risk level filter
-    if (filters?.selectedRiskLevels?.length > 0) {
+    if (patchFilters?.selectedRiskLevels?.length > 0) {
       filtered = filtered.filter(item => 
-        filters.selectedRiskLevels.includes(item.risk_level)
+        patchFilters.selectedRiskLevels.includes(item.risk_level)
       );
     }
     
     // Apply health status filter
-    if (filters?.selectedHealthStatuses?.length > 0) {
+    if (patchFilters?.selectedHealthStatuses?.length > 0) {
       filtered = filtered.filter(item => 
-        filters.selectedHealthStatuses.includes(item.health_status)
+        patchFilters.selectedHealthStatuses.includes(item.health_status)
       );
     }
     
     // Apply utilization range filter
-    if (filters?.utilizationRange && Array.isArray(filters.utilizationRange) && filters.utilizationRange.length === 2) {
-      const [min, max] = filters.utilizationRange;
+    if (patchFilters?.utilizationRange && Array.isArray(patchFilters.utilizationRange) && patchFilters.utilizationRange.length === 2) {
+      const [min, max] = patchFilters.utilizationRange;
       filtered = filtered.filter(item => {
         const util = parseFloat(item.utilization_rate) || 0;
         return util >= min && util <= max;
@@ -349,12 +463,7 @@ export const usePatchEngineeringCYB = (filters = {}) => {
   }, [
     rawPatchData, 
     filters?.searchTerm, 
-    filters?.selectedBudgetHeads, 
-    filters?.selectedFrontierHQs,
-    filters?.selectedSchemes,
-    filters?.selectedRiskLevels,
-    filters?.selectedHealthStatuses,
-    filters?.utilizationRange
+    patchFilters
   ]);
 
   // Calculate patch metrics with proper balance fund calculation and NaN prevention
