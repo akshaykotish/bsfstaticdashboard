@@ -33,7 +33,8 @@ const EditRow = ({
   darkMode = false,
   databaseName = '',
   idField = '',
-  rowIndex = null,
+  rowId = null,         // ID of the row to edit (instead of index)
+  rowIndex = null,      // Kept for backward compatibility
   rowData = null,
   onSuccess = () => {},
   onDelete = () => {}
@@ -54,11 +55,21 @@ const EditRow = ({
 
   // Load configuration and data when component opens
   useEffect(() => {
-    if (isOpen && databaseName && (rowIndex !== null || rowData)) {
+    if (isOpen && databaseName) {
       loadDatabaseConfig();
-      fetchRowData();
+      
+      // Load row data either from the provided data or fetch by ID/index
+      if (rowData) {
+        setFormData(rowData);
+        setOriginalData(rowData);
+        setError('');
+        setSuccess('');
+        setShowDeleteConfirm(false);
+      } else {
+        fetchRowData();
+      }
     }
-  }, [isOpen, rowIndex, rowData, databaseName]);
+  }, [isOpen, rowId, rowIndex, rowData, databaseName]);
 
   // Track changes
   useEffect(() => {
@@ -140,15 +151,20 @@ const EditRow = ({
     try {
       let data;
       
-      if (rowData) {
-        data = rowData;
+      if (rowId) {
+        // Fetch row by ID - new preferred method
+        const response = await fetch(`${API_URL}/api/csv/${databaseName}/row/${rowId}`);
+        if (!response.ok) throw new Error('Failed to fetch row data by ID');
+        const result = await response.json();
+        data = result.row;
       } else if (rowIndex !== null) {
+        // Backward compatibility - fetch by index
         const response = await fetch(`${API_URL}/api/csv/${databaseName}/rows/${rowIndex}`);
-        if (!response.ok) throw new Error('Failed to fetch row data');
+        if (!response.ok) throw new Error('Failed to fetch row data by index');
         const result = await response.json();
         data = result.row;
       } else {
-        throw new Error('No row data available');
+        throw new Error('No row data, ID or index available');
       }
 
       setFormData(data);
@@ -205,7 +221,19 @@ const EditRow = ({
     setSuccess('');
 
     try {
-      const response = await fetch(`${API_URL}/api/csv/${databaseName}/rows/${rowIndex}`, {
+      // Determine which endpoint to use based on available identifiers
+      let endpoint;
+      if (rowId) {
+        // Update by ID (preferred)
+        endpoint = `${API_URL}/api/csv/${databaseName}/row/${rowId}`;
+      } else if (rowIndex !== null) {
+        // Update by index (backward compatibility)
+        endpoint = `${API_URL}/api/csv/${databaseName}/rows/${rowIndex}`;
+      } else {
+        throw new Error('Missing row identifier for update');
+      }
+
+      const response = await fetch(endpoint, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -242,7 +270,19 @@ const EditRow = ({
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/csv/${databaseName}/rows/${rowIndex}`, {
+      // Determine which endpoint to use based on available identifiers
+      let endpoint;
+      if (rowId) {
+        // Delete by ID (preferred)
+        endpoint = `${API_URL}/api/csv/${databaseName}/row/${rowId}`;
+      } else if (rowIndex !== null) {
+        // Delete by index (backward compatibility)
+        endpoint = `${API_URL}/api/csv/${databaseName}/rows/${rowIndex}`;
+      } else {
+        throw new Error('Missing row identifier for delete');
+      }
+
+      const response = await fetch(endpoint, {
         method: 'DELETE'
       });
 
@@ -509,9 +549,9 @@ const EditRow = ({
                 </h2>
                 <div className="flex items-center gap-3 mt-1">
                   {renderIdBadge()}
-                  {rowIndex !== null && (
+                  {(rowIndex !== null || rowId) && (
                     <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
-                      Row #{rowIndex + 1}
+                      {rowIndex !== null ? `Row #${rowIndex + 1}` : `Row ID: ${rowId}`}
                     </span>
                   )}
                 </div>

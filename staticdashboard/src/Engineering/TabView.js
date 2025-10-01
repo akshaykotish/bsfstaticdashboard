@@ -4,7 +4,7 @@ import {
   AlertTriangle, PauseCircle, CreditCard, Info, 
   RotateCcw, Layers, DollarSign, Activity, Heart,
   FileText, MapPin, Building2, Users, Calendar, Hash,
-  Navigation, Clock, Target, Package
+  Navigation, Clock, Target, Package, BookOpen
 } from 'lucide-react';
 
 // Import database configurations
@@ -57,6 +57,12 @@ const TabView = ({ filters, darkMode, rawData = [], databaseName = 'engineering'
       field: 'name_of_scheme',
       title: 'Name of Scheme', 
       icon: Briefcase,
+      type: 'column'
+    },
+    {
+      field: 'sub_scheme_name',
+      title: 'Sub Scheme Name',
+      icon: BookOpen,
       type: 'column'
     },
     {
@@ -151,6 +157,7 @@ const TabView = ({ filters, darkMode, rawData = [], databaseName = 'engineering'
       'ftr_hq_name': filters.selectedFrontierHQs,
       'shq_name': filters.selectedSectorHQs,
       'name_of_scheme': filters.selectedSchemes,
+      'sub_scheme_name': filters.selectedSubSchemes,
       'location': filters.selectedLocations,
       'health_status': filters.selectedHealthStatuses,
       'progress_category': filters.selectedProgressCategories
@@ -174,6 +181,7 @@ const TabView = ({ filters, darkMode, rawData = [], databaseName = 'engineering'
       'ftr_hq_name': filters.setSelectedFrontierHQs,
       'shq_name': filters.setSelectedSectorHQs,
       'name_of_scheme': filters.setSelectedSchemes,
+      'sub_scheme_name': filters.setSelectedSubSchemes,
       'location': filters.setSelectedLocations,
       'health_status': filters.setSelectedHealthStatuses,
       'progress_category': filters.setSelectedProgressCategories

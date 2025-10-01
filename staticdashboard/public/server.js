@@ -998,6 +998,156 @@ app.get('/api/stats/:database', async (req, res) => {
   }
 });
 
+// Add these new endpoints to server.js
+// These would be inserted into the existing server.js file
+
+// Get single row by ID
+app.get('/api/csv/:database/row/:id', async (req, res) => {
+  try {
+    const { database, id } = req.params;
+    const filePath = path.join(DATA_DIR, `${database}.csv`);
+    const config = getConfig(database);
+    const idField = config.idField || 'id';
+    
+    // Read the CSV file
+    const data = await readCSV(filePath);
+    
+    // Find the row by ID
+    const row = data.find(r => String(r[idField]) === String(id));
+    
+    if (row) {
+      res.json({ row });
+    } else {
+      res.status(404).json({ error: `Row with ID '${id}' not found` });
+    }
+  } catch (error) {
+    console.error('Error fetching row by ID:', error);
+    res.status(500).json({ error: 'Failed to fetch row' });
+  }
+});
+
+// Update row by ID
+app.put('/api/csv/:database/row/:id', async (req, res) => {
+  try {
+    const { database, id } = req.params;
+    const updatedRow = cleanData(req.body);
+    const filePath = path.join(DATA_DIR, `${database}.csv`);
+    const config = getConfig(database);
+    const idField = config.idField || 'id';
+    
+    // Read the CSV file
+    let data = await readCSV(filePath);
+    
+    // Find the row index by ID
+    const rowIndex = data.findIndex(r => String(r[idField]) === String(id));
+    
+    if (rowIndex === -1) {
+      return res.status(404).json({ error: `Row with ID '${id}' not found` });
+    }
+    
+    // Preserve original ID
+    const originalId = data[rowIndex][idField];
+    
+    // Update the row
+    data[rowIndex] = {
+      ...data[rowIndex],
+      ...updatedRow,
+      [idField]: originalId, // Always preserve original ID
+      updated_at: new Date().toISOString()
+    };
+    
+    // Get all columns
+    const allColumns = [...new Set(
+      data.flatMap(row => Object.keys(row))
+    )];
+    
+    // Ensure ID field is first
+    if (allColumns.includes(idField)) {
+      const idx = allColumns.indexOf(idField);
+      allColumns.splice(idx, 1);
+      allColumns.unshift(idField);
+    }
+    
+    // Write back to file
+    await writeCSV(filePath, data, allColumns);
+    
+    res.json({ 
+      message: 'Row updated successfully', 
+      row: data[rowIndex] 
+    });
+  } catch (error) {
+    console.error('Error updating row by ID:', error);
+    res.status(500).json({ error: 'Failed to update row' });
+  }
+});
+
+// Delete row by ID
+app.delete('/api/csv/:database/row/:id', async (req, res) => {
+  try {
+    const { database, id } = req.params;
+    const filePath = path.join(DATA_DIR, `${database}.csv`);
+    const config = getConfig(database);
+    const idField = config.idField || 'id';
+    
+    // Read the CSV file
+    let data = await readCSV(filePath);
+    
+    // Find the row index by ID
+    const rowIndex = data.findIndex(r => String(r[idField]) === String(id));
+    
+    if (rowIndex === -1) {
+      return res.status(404).json({ error: `Row with ID '${id}' not found` });
+    }
+    
+    // Delete the row
+    const deletedRow = data.splice(rowIndex, 1)[0];
+    
+    // Get columns from remaining data
+    const columns = data.length > 0 ? Object.keys(data[0]) : Object.keys(deletedRow);
+    
+    // Write back to file
+    await writeCSV(filePath, data, columns);
+    
+    res.json({ 
+      message: 'Row deleted successfully',
+      deletedRow,
+      remainingCount: data.length
+    });
+  } catch (error) {
+    console.error('Error deleting row by ID:', error);
+    res.status(500).json({ error: 'Failed to delete row' });
+  }
+});
+
+// Find row index by ID (helper endpoint)
+app.get('/api/csv/:database/findRowIndex/:id', async (req, res) => {
+  try {
+    const { database, id } = req.params;
+    const filePath = path.join(DATA_DIR, `${database}.csv`);
+    const config = getConfig(database);
+    const idField = config.idField || 'id';
+    
+    // Read the CSV file
+    const data = await readCSV(filePath);
+    
+    // Find the row index by ID
+    const rowIndex = data.findIndex(r => String(r[idField]) === String(id));
+    
+    if (rowIndex === -1) {
+      res.status(404).json({ error: `Row with ID '${id}' not found`, found: false });
+    } else {
+      res.json({ 
+        rowIndex, 
+        found: true, 
+        message: `Row with ID '${id}' found at index ${rowIndex}` 
+      });
+    }
+  } catch (error) {
+    console.error('Error finding row index by ID:', error);
+    res.status(500).json({ error: 'Failed to find row index', found: false });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ 

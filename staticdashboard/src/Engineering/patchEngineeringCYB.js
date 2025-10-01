@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   DollarSign, TrendingUp, AlertCircle, CheckCircle, 
   AlertTriangle, Activity, PiggyBank, Wallet,
@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 // Import database configurations from config.js
-import { databaseConfigs, getConfig, getDatabaseNames, generateId, applyCalculations } from '../System/config';
+import { getConfig, generateId, applyCalculations } from '../System/config';
 
 const API_URL = 'http://172.21.188.201:3456';
 
@@ -93,8 +93,12 @@ export const usePatchEngineeringCYB = (filters = {}) => {
           ftr_hq: processedRow['Name of Ftr HQ'] || 'Unknown',
           budget_head: processedRow['Budget head'] || 'Unknown',
           sub_head: processedRow['Sub head'] || '',
-          // Improved scheme mapping to use multiple sources
+          
+          // Enhanced scheme mapping to use multiple sources
           scheme_name: processedRow['Name of scheme'] || processedRow['Sub head'] || '',
+          // Add additional mappings to ensure compatibility
+          name_of_scheme: processedRow['Name of scheme'] || processedRow['Sub head'] || '',
+          sub_scheme_name: processedRow['Sub head'] || processedRow['Name of scheme'] || '',
           
           // Financial values (assuming in lakhs) - all properly cleaned
           allotment_prev_fy: cleanNumber(processedRow['Allotment Previous Financila year']),
@@ -351,100 +355,104 @@ export const usePatchEngineeringCYB = (filters = {}) => {
       mappedFilters.utilizationRange = filters.rangeFilters['% Age of total Expdr'].current;
     }
 
-    // Map scheme names and sub-scheme names - NEW MAPPING
-    if (filters.selectedSchemes?.length > 0) {
-      mappedFilters.selectedSchemes = filters.selectedSchemes;
-    } else if (filters.columnFilters?.['Name of scheme']?.length > 0) {
-      mappedFilters.selectedSchemes = filters.columnFilters['Name of scheme'];
-    } else if (filters.columnFilters?.name_of_scheme?.length > 0) {
-      mappedFilters.selectedSchemes = filters.columnFilters.name_of_scheme;
-    }
-    
-    // Add mapping for sub_scheme_name to name_of_scheme - NEW MAPPING
-    if (filters.columnFilters?.sub_scheme_name?.length > 0) {
-      // If we already have schemes, merge with sub schemes
-      if (mappedFilters.selectedSchemes && mappedFilters.selectedSchemes.length > 0) {
-        mappedFilters.selectedSchemes = [
-          ...mappedFilters.selectedSchemes,
-          ...filters.columnFilters.sub_scheme_name
-        ];
-      } else {
-        mappedFilters.selectedSchemes = filters.columnFilters.sub_scheme_name;
-      }
-    } else if (filters.columnFilters?.['Sub scheme name']?.length > 0) {
-      // If we already have schemes, merge with sub schemes
-      if (mappedFilters.selectedSchemes && mappedFilters.selectedSchemes.length > 0) {
-        mappedFilters.selectedSchemes = [
-          ...mappedFilters.selectedSchemes,
-          ...filters.columnFilters['Sub scheme name']
-        ];
-      } else {
-        mappedFilters.selectedSchemes = filters.columnFilters['Sub scheme name'];
-      }
+    // Improved scheme name mapping - gather from all possible sources
+    const schemeNameSources = [
+      ...(filters.selectedSchemes || []),
+      ...(filters.columnFilters?.name_of_scheme || []),
+      ...(filters.columnFilters?.sub_scheme_name || []),
+      ...(filters.columnFilters?.['Name of scheme'] || []),
+      ...(filters.columnFilters?.['Sub head'] || [])
+    ];
+
+    if (schemeNameSources.length > 0) {
+      // Deduplicate scheme names
+      mappedFilters.selectedSchemes = Array.from(new Set(
+        schemeNameSources.filter(Boolean)
+      ));
     }
 
-    console.log('[MetricsCards] Mapped patch filters:', mappedFilters);
+    console.log('[PatchCYB] Mapped filters:', mappedFilters);
     return mappedFilters;
   }, [filters]);
 
-  // Apply filters to patch data
+  // Apply filters to patch data with enhanced empty cell handling
   const patchData = useMemo(() => {
     if (!rawPatchData || rawPatchData.length === 0) return [];
     
     let filtered = [...rawPatchData];
     
     // Apply search filter
-    if (filters?.searchTerm) {
-      const searchLower = filters.searchTerm.toLowerCase();
+    if (patchFilters?.searchTerm) {
+      const searchLower = patchFilters.searchTerm.toLowerCase();
       filtered = filtered.filter(item =>
-        item.ftr_hq?.toLowerCase().includes(searchLower) ||
-        item.budget_head?.toLowerCase().includes(searchLower) ||
-        item.sub_head?.toLowerCase().includes(searchLower) ||
-        item.scheme_name?.toLowerCase().includes(searchLower)
+        (item.ftr_hq && item.ftr_hq.toLowerCase().includes(searchLower)) ||
+        (item.budget_head && item.budget_head.toLowerCase().includes(searchLower)) ||
+        (item.sub_head && item.sub_head.toLowerCase().includes(searchLower)) ||
+        (item.scheme_name && item.scheme_name.toLowerCase().includes(searchLower)) ||
+        (item.name_of_scheme && item.name_of_scheme.toLowerCase().includes(searchLower)) ||
+        (item.sub_scheme_name && item.sub_scheme_name.toLowerCase().includes(searchLower))
       );
     }
     
-    // Apply budget head filter
+    // Apply budget head filter - only include non-empty values
     if (patchFilters?.selectedBudgetHeads?.length > 0) {
       filtered = filtered.filter(item => 
-        patchFilters.selectedBudgetHeads.includes(item.budget_head)
+        item.budget_head && patchFilters.selectedBudgetHeads.includes(item.budget_head)
       );
     }
     
-    // Apply frontier HQ filter
+    // Apply frontier HQ filter - only include non-empty values
     if (patchFilters?.selectedFrontierHQs?.length > 0) {
       filtered = filtered.filter(item => 
-        patchFilters.selectedFrontierHQs.includes(item.ftr_hq)
+        item.ftr_hq && patchFilters.selectedFrontierHQs.includes(item.ftr_hq)
       );
     }
     
-    // Apply scheme filter if present - IMPROVED MATCHING
+    // Apply scheme filter with enhanced matching - exclude empty values
     if (patchFilters?.selectedSchemes?.length > 0) {
       filtered = filtered.filter(item => {
-        // Direct match
-        if (patchFilters.selectedSchemes.includes(item.scheme_name)) {
-          return true;
+        // Check if any scheme field exists
+        if (!item.scheme_name && !item.name_of_scheme && !item.sub_scheme_name) {
+          return false;
         }
         
-        // Partial match - check if any scheme contains the item's scheme name or vice versa
-        return patchFilters.selectedSchemes.some(scheme => 
-          (scheme && item.scheme_name && 
-           (scheme.includes(item.scheme_name) || item.scheme_name.includes(scheme)))
-        );
+        // Check direct matches against any scheme field
+        for (const scheme of patchFilters.selectedSchemes) {
+          if (!scheme) continue;
+          
+          // Direct match check against all scheme field variants
+          if ((item.scheme_name && item.scheme_name === scheme) || 
+              (item.name_of_scheme && item.name_of_scheme === scheme) || 
+              (item.sub_scheme_name && item.sub_scheme_name === scheme)) {
+            return true;
+          }
+          
+          // Partial match check - either contains the other
+          const schemeLower = scheme.toLowerCase();
+          if ((item.scheme_name && item.scheme_name.toLowerCase().includes(schemeLower)) ||
+              (item.scheme_name && schemeLower.includes(item.scheme_name.toLowerCase())) ||
+              (item.name_of_scheme && item.name_of_scheme.toLowerCase().includes(schemeLower)) ||
+              (item.name_of_scheme && schemeLower.includes(item.name_of_scheme.toLowerCase())) ||
+              (item.sub_scheme_name && item.sub_scheme_name.toLowerCase().includes(schemeLower)) ||
+              (item.sub_scheme_name && schemeLower.includes(item.sub_scheme_name.toLowerCase()))) {
+            return true;
+          }
+        }
+        return false;
       });
     }
     
-    // Apply risk level filter
+    // Apply risk level filter - exclude empty values
     if (patchFilters?.selectedRiskLevels?.length > 0) {
       filtered = filtered.filter(item => 
-        patchFilters.selectedRiskLevels.includes(item.risk_level)
+        item.risk_level && patchFilters.selectedRiskLevels.includes(item.risk_level)
       );
     }
     
-    // Apply health status filter
+    // Apply health status filter - exclude empty values
     if (patchFilters?.selectedHealthStatuses?.length > 0) {
       filtered = filtered.filter(item => 
-        patchFilters.selectedHealthStatuses.includes(item.health_status)
+        item.health_status && patchFilters.selectedHealthStatuses.includes(item.health_status)
       );
     }
     
@@ -462,7 +470,6 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     return filtered;
   }, [
     rawPatchData, 
-    filters?.searchTerm, 
     patchFilters
   ]);
 
@@ -874,31 +881,207 @@ export const generatePatchBudgetMetrics = (patchMetrics, darkMode = false) => {
   ];
 };
 
-// Enhanced Patch Data Table Component with config integration
+// Enhanced Patch Data Table Component with all columns from config
 const PatchDataTableComponent = ({ 
   data = [], 
   darkMode = false, 
   title = "Current Year Budget Details",
   onClose,
   isModal = false,
-  onRowEdit,
-  onRowDelete,
   onRefresh
 }) => {
   const [sortField, setSortField] = useState('serial_no');
   const [sortDirection, setSortDirection] = useState('asc');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [showAdvancedView, setShowAdvancedView] = useState(false);
-  const itemsPerPage = 20;
+  const [viewMode, setViewMode] = useState('standard'); // 'standard', 'compact', 'detailed'
+  const [selectedColumns, setSelectedColumns] = useState([]);
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
+  const itemsPerPage = 15;
   
   // Get database configuration
   const dbConfig = useMemo(() => getConfig('enggcurrentyear'), []);
+
+  // Define all available columns with metadata
+  const availableColumns = useMemo(() => [
+    // Basic Information group
+    { id: 'serial_no', field: 'serial_no', header: 'ID', group: 'basic', width: 70, sortable: true, alwaysVisible: true,
+      icon: <Fingerprint size={12} className="text-yellow-500" />, format: val => val },
+    { id: 'ftr_hq', field: 'ftr_hq', header: 'Frontier HQ', group: 'basic', width: 120, sortable: true, alwaysVisible: true,
+      icon: <Building2 size={12} className="text-purple-500" />, format: val => val },
+    { id: 'budget_head', field: 'budget_head', header: 'Budget Head', group: 'basic', width: 120, sortable: true,
+      icon: <FileText size={12} className="text-blue-500" />, format: val => val },
+    { id: 'sub_head', field: 'sub_head', header: 'Sub Head', group: 'basic', width: 130, sortable: true,
+      icon: <FileText size={12} className="text-blue-500" />, format: val => val },
+    { id: 'scheme_name', field: 'scheme_name', header: 'Scheme Name', group: 'basic', width: 150, sortable: true,
+      icon: <FileText size={12} className="text-blue-500" />, format: val => val },
+      
+    // Financial Allocations group
+    { id: 'allotment_prev_fy', field: 'allotment_prev_fy', header: 'Previous FY Allotment', group: 'allocation', width: 130, sortable: true,
+      icon: <DollarSign size={12} className="text-green-500" />, format: val => formatCurrency(val) },
+    { id: 'liabilities', field: 'liabilities', header: 'Liabilities', group: 'allocation', width: 120, sortable: true,
+      icon: <AlertCircle size={12} className="text-red-500" />, format: val => formatCurrency(val) },
+    { id: 'fresh_sanction_cfy', field: 'fresh_sanction_cfy', header: 'Fresh Sanction', group: 'allocation', width: 120, sortable: true,
+      icon: <DollarSign size={12} className="text-green-500" />, format: val => formatCurrency(val) },
+    { id: 'effective_sanction', field: 'effective_sanction', header: 'Effective Sanction', group: 'allocation', width: 130, sortable: true,
+      icon: <DollarSign size={12} className="text-green-500" />, format: val => formatCurrency(val) },
+    { id: 'allotment_cfy', field: 'allotment_cfy', header: 'Current FY Allotment', group: 'allocation', width: 130, sortable: true, alwaysVisible: true,
+      icon: <Wallet size={12} className="text-green-500" />, format: val => formatCurrency(val) },
+    { id: 'allotment_fy_24_25', field: 'allotment_fy_24_25', header: 'FY 24-25 Allotment', group: 'allocation', width: 130, sortable: true,
+      icon: <DollarSign size={12} className="text-green-500" />, format: val => formatCurrency(val) },
+      
+    // Expenditure group
+    { id: 'expdr_prev_year', field: 'expdr_prev_year', header: 'Previous Year Expdr', group: 'expenditure', width: 130, sortable: true,
+      icon: <Calculator size={12} className="text-orange-500" />, format: val => formatCurrency(val) },
+    { id: 'expdr_elekha_22_07', field: 'expdr_elekha_22_07', header: 'E-lekha Expdr (22/07)', group: 'expenditure', width: 140, sortable: true,
+      icon: <Calculator size={12} className="text-orange-500" />, format: val => formatCurrency(val) },
+    { id: 'expdr_elekha_31_03', field: 'expdr_elekha_31_03', header: 'E-lekha Expdr (31/03)', group: 'expenditure', width: 140, sortable: true,
+      icon: <Calculator size={12} className="text-orange-500" />, format: val => formatCurrency(val) },
+    { id: 'total_expdr_register', field: 'total_expdr_register', header: 'Total Expenditure', group: 'expenditure', width: 130, sortable: true, alwaysVisible: true,
+      icon: <Calculator size={12} className="text-orange-500" />, format: val => formatCurrency(val) },
+    { id: 'percent_expdr_elekha', field: 'percent_expdr_elekha', header: 'E-lekha %', group: 'expenditure', width: 100, sortable: true,
+      icon: <Gauge size={12} className="text-purple-500" />, format: val => `${ensureNumber(val).toFixed(1)}%` },
+    { id: 'percent_total_expdr', field: 'percent_total_expdr', header: 'Total Expdr %', group: 'expenditure', width: 100, sortable: true,
+      icon: <Gauge size={12} className="text-purple-500" />, format: val => `${ensureNumber(val).toFixed(1)}%` },
+    { id: 'utilization_rate', field: 'utilization_rate', header: 'Utilization %', group: 'expenditure', width: 110, sortable: true, alwaysVisible: true,
+      icon: <Gauge size={12} className="text-purple-500" />, format: val => `${ensureNumber(val).toFixed(1)}%`,
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{ensureNumber(row.utilization_rate).toFixed(1)}%</span>
+          <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div 
+              className={`h-full ${
+                ensureNumber(row.utilization_rate) >= 90 ? 'bg-green-500' :
+                ensureNumber(row.utilization_rate) >= 70 ? 'bg-blue-500' :
+                ensureNumber(row.utilization_rate) >= 50 ? 'bg-yellow-500' :
+                'bg-red-500'
+              }`}
+              style={{ width: `${Math.min(100, ensureNumber(row.utilization_rate))}%` }}
+            />
+          </div>
+        </div>
+      )
+    },
+      
+    // Pending Bills group
+    { id: 'bill_pending_pad', field: 'bill_pending_pad', header: 'Bills Pending PAD', group: 'pending', width: 130, sortable: true,
+      icon: <Receipt size={12} className="text-red-500" />, format: val => formatCurrency(val) },
+    { id: 'bill_pending_hqrs', field: 'bill_pending_hqrs', header: 'Bills Pending HQ', group: 'pending', width: 130, sortable: true,
+      icon: <Receipt size={12} className="text-red-500" />, format: val => formatCurrency(val) },
+    { id: 'pending_bills_total', field: 'pending_bills_total', header: 'Total Pending Bills', group: 'pending', width: 140, sortable: true,
+      icon: <Clock size={12} className="text-red-500" />, format: val => formatCurrency(val) },
+      
+    // Balance & Planning group
+    { id: 'balance_fund', field: 'balance_fund', header: 'Balance Fund', group: 'balance', width: 120, sortable: true, alwaysVisible: true,
+      icon: <PiggyBank size={12} className="text-green-500" />, format: val => formatCurrency(val),
+      render: (row) => (
+        <div>
+          <div className="font-medium text-green-600 dark:text-green-400">
+            {formatCurrency(row.balance_fund)}
+          </div>
+          <div className="text-xs text-gray-500">
+            {ensureNumber(row.allotment_cfy) > 0 
+              ? `${((ensureNumber(row.balance_fund) / ensureNumber(row.allotment_cfy)) * 100).toFixed(1)}% avail`
+              : '0% avail'}
+          </div>
+        </div>
+      )
+    },
+    { id: 'expdr_plan_balance', field: 'expdr_plan_balance', header: 'Balance Expdr Plan', group: 'balance', width: 140, sortable: true,
+      icon: <TrendingUp size={12} className="text-blue-500" />, format: val => formatCurrency(val) },
+      
+    // Status & Analysis group
+    { id: 'risk_level', field: 'risk_level', header: 'Risk Level', group: 'status', width: 110, sortable: true,
+      icon: <AlertTriangle size={12} className="text-yellow-500" />, 
+      format: val => val,
+      render: (row) => (
+        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getRiskBadgeColor(row.risk_level)}`}>
+          {row.risk_level}
+        </span>
+      )
+    },
+    { id: 'health_status', field: 'health_status', header: 'Health Status', group: 'status', width: 120, sortable: true,
+      icon: <Activity size={12} className="text-blue-500" />, 
+      format: val => val,
+      render: (row) => (
+        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getHealthBadgeColor(row.health_status)}`}>
+          {row.health_status}
+        </span>
+      )
+    },
+    { id: 'efficiency_score', field: 'efficiency_score', header: 'Efficiency Score', group: 'status', width: 130, sortable: true,
+      icon: <Target size={12} className="text-purple-500" />, format: val => `${ensureNumber(val).toFixed(1)}%` },
+    { id: 'priority', field: 'priority', header: 'Priority', group: 'status', width: 100, sortable: true,
+      icon: <AlertCircle size={12} className="text-orange-500" />, 
+      format: val => val,
+      render: (row) => (
+        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+          row.priority === 'HIGH' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+          row.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+          'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+        }`}>
+          {row.priority}
+        </span>
+      )
+    },
+  ], []);
+
+  // Define column groups
+  const columnGroups = useMemo(() => [
+    { id: 'basic', name: 'Basic Information', icon: <FileText size={14} /> },
+    { id: 'allocation', name: 'Financial Allocations', icon: <DollarSign size={14} /> },
+    { id: 'expenditure', name: 'Expenditure Details', icon: <Calculator size={14} /> },
+    { id: 'pending', name: 'Pending Bills', icon: <Clock size={14} /> },
+    { id: 'balance', name: 'Balance & Planning', icon: <PiggyBank size={14} /> },
+    { id: 'status', name: 'Status & Analysis', icon: <Activity size={14} /> },
+  ], []);
+
+  // Default visible columns by view mode
+  const defaultVisibleColumns = useMemo(() => ({
+    compact: ['serial_no', 'ftr_hq', 'budget_head', 'allotment_cfy', 'total_expdr_register', 'utilization_rate', 'balance_fund'],
+    standard: ['serial_no', 'ftr_hq', 'budget_head', 'sub_head', 'scheme_name', 'allotment_cfy', 'total_expdr_register', 
+               'utilization_rate', 'pending_bills_total', 'balance_fund', 'risk_level', 'health_status'],
+    detailed: availableColumns.map(col => col.id)
+  }), [availableColumns]);
+
+  // Initialize selected columns based on view mode
+  useEffect(() => {
+    setSelectedColumns(defaultVisibleColumns[viewMode]);
+  }, [viewMode, defaultVisibleColumns]);
 
   // Helper to ensure valid number display
   const ensureNumber = (val) => {
     const num = parseFloat(val) || 0;
     return isNaN(num) || !isFinite(num) ? 0 : num;
+  };
+
+  // Format currency values (lakhs to crores)
+  const formatCurrency = (value) => {
+    const num = ensureNumber(value);
+    return `₹${num.toFixed(2)}L`; // Displaying in Lakhs
+  };
+
+  // Get risk level badge color
+  const getRiskBadgeColor = (risk) => {
+    const colors = {
+      CRITICAL: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+      HIGH: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+      MEDIUM: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+      LOW: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+    };
+    return colors[risk] || colors.LOW;
+  };
+
+  // Get health status badge color
+  const getHealthBadgeColor = (health) => {
+    const colors = {
+      EXCELLENT: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      GOOD: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      NORMAL: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400',
+      POOR: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+      CRITICAL: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+    };
+    return colors[health] || colors.NORMAL;
   };
 
   // Filter and sort data
@@ -908,12 +1091,19 @@ const PatchDataTableComponent = ({
     // Apply search
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(item =>
-        item.ftr_hq?.toLowerCase().includes(search) ||
-        item.budget_head?.toLowerCase().includes(search) ||
-        item.sub_head?.toLowerCase().includes(search) ||
-        item.scheme_name?.toLowerCase().includes(search)
-      );
+      filtered = filtered.filter(item => {
+        return (
+          (item.ftr_hq && item.ftr_hq.toLowerCase().includes(search)) ||
+          (item.budget_head && item.budget_head.toLowerCase().includes(search)) ||
+          (item.sub_head && item.sub_head.toLowerCase().includes(search)) ||
+          (item.scheme_name && item.scheme_name.toLowerCase().includes(search)) ||
+          (item.name_of_scheme && item.name_of_scheme.toLowerCase().includes(search)) ||
+          (item.sub_scheme_name && item.sub_scheme_name.toLowerCase().includes(search)) ||
+          (item.serial_no && item.serial_no.toString().includes(search)) ||
+          (item.risk_level && item.risk_level.toLowerCase().includes(search)) ||
+          (item.health_status && item.health_status.toLowerCase().includes(search))
+        );
+      });
     }
     
     // Sort
@@ -925,8 +1115,8 @@ const PatchDataTableComponent = ({
         return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
       }
       
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
+      const aStr = String(aVal || '').toLowerCase();
+      const bStr = String(bVal || '').toLowerCase();
       return sortDirection === 'asc' 
         ? aStr.localeCompare(bStr)
         : bStr.localeCompare(aStr);
@@ -942,6 +1132,7 @@ const PatchDataTableComponent = ({
     currentPage * itemsPerPage
   );
 
+  // Handle sorting
   const handleSort = (field) => {
     if (sortField === field) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -951,37 +1142,21 @@ const PatchDataTableComponent = ({
     }
   };
 
+  // Export data to CSV
   const exportToCSV = () => {
-    const headers = [
-      'S.No',
-      'Frontier HQ',
-      'Budget Head',
-      'Sub Head',
-      'Scheme Name',
-      'Allocation CFY',
-      'Total Expenditure',
-      'Utilization %',
-      'Pending Bills (Total)',
-      'Balance Fund',
-      'Risk Level',
-      'Health Status'
-    ];
+    // Get selected column headers
+    const visibleColumns = availableColumns.filter(col => selectedColumns.includes(col.id));
+    const headers = visibleColumns.map(col => col.header);
     
-    const rows = processedData.map(row => [
-      row.serial_no,
-      row.ftr_hq,
-      row.budget_head,
-      row.sub_head || '',
-      row.scheme_name || '',
-      ensureNumber(row.allotment_cfy).toFixed(2),
-      ensureNumber(row.total_expdr_register).toFixed(2),
-      ensureNumber(row.utilization_rate).toFixed(2),
-      ensureNumber(row.pending_bills_total).toFixed(2),
-      ensureNumber(row.balance_fund).toFixed(2),
-      row.risk_level,
-      row.health_status
-    ]);
+    // Format rows for export
+    const rows = processedData.map(row => 
+      visibleColumns.map(col => {
+        const rawValue = row[col.field];
+        return col.format ? col.format(rawValue).replace(/[,₹L%]/g, '') : rawValue;
+      })
+    );
     
+    // Create CSV content
     const csvContent = [
       ['Current Year Budget Analysis Report'],
       [`Generated: ${new Date().toLocaleString()}`],
@@ -990,6 +1165,7 @@ const PatchDataTableComponent = ({
       ...rows.map(row => row.join(','))
     ].join('\n');
     
+    // Download CSV
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -999,32 +1175,105 @@ const PatchDataTableComponent = ({
     URL.revokeObjectURL(url);
   };
 
-  const formatCurrency = (value) => {
-    const num = ensureNumber(value);
-    return `₹${(num / 100).toFixed(2)}Cr`;
+  // Toggle column selection
+  const toggleColumnSelection = (colId) => {
+    setSelectedColumns(prev => {
+      if (prev.includes(colId)) {
+        // Don't allow removing always visible columns
+        const col = availableColumns.find(c => c.id === colId);
+        if (col?.alwaysVisible) return prev;
+        return prev.filter(id => id !== colId);
+      } else {
+        return [...prev, colId];
+      }
+    });
   };
 
-  const getRiskBadgeColor = (risk) => {
-    const colors = {
-      CRITICAL: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-      HIGH: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-      MEDIUM: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-      LOW: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-    };
-    return colors[risk] || colors.LOW;
-  };
+  // Column selector component
+  const ColumnSelector = () => (
+    <div className={`absolute top-full right-0 mt-1 p-4 rounded-lg shadow-lg z-20 w-72 ${
+      darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
+    }`}>
+      <h3 className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+        Select Columns to Display
+      </h3>
+      
+      <div className="max-h-96 overflow-y-auto pr-2">
+        {columnGroups.map(group => (
+          <div key={group.id} className="mb-4">
+            <div className={`flex items-center gap-2 mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+              {group.icon}
+              <span className="text-xs font-medium uppercase">{group.name}</span>
+            </div>
+            
+            <div className="space-y-1.5 ml-6">
+              {availableColumns.filter(col => col.group === group.id).map(col => {
+                const isSelected = selectedColumns.includes(col.id);
+                return (
+                  <div 
+                    key={col.id}
+                    className={`flex items-center gap-2 text-sm py-1 px-2 rounded ${
+                      isSelected 
+                        ? darkMode 
+                          ? 'bg-indigo-900/30 text-indigo-300' 
+                          : 'bg-indigo-50 text-indigo-700'
+                        : ''
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      id={`col-${col.id}`}
+                      checked={isSelected}
+                      onChange={() => toggleColumnSelection(col.id)}
+                      disabled={col.alwaysVisible}
+                      className="rounded text-indigo-500 focus:ring-indigo-500"
+                    />
+                    <label 
+                      htmlFor={`col-${col.id}`}
+                      className={`flex-1 cursor-pointer flex items-center gap-2 ${
+                        col.alwaysVisible ? 'italic' : ''
+                      }`}
+                    >
+                      {col.icon}
+                      <span>{col.header}</span>
+                      {col.alwaysVisible && (
+                        <span className="text-xs text-gray-500">(Required)</span>
+                      )}
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="mt-4 flex justify-between">
+        <button
+          onClick={() => setSelectedColumns(defaultVisibleColumns[viewMode])}
+          className={`px-2 py-1 text-xs rounded ${
+            darkMode 
+              ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' 
+              : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+          }`}
+        >
+          Reset
+        </button>
+        <button
+          onClick={() => setShowColumnSelector(false)}
+          className={`px-2 py-1 text-xs rounded ${
+            darkMode 
+              ? 'bg-indigo-600 hover:bg-indigo-700 text-white' 
+              : 'bg-indigo-500 hover:bg-indigo-600 text-white'
+          }`}
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  );
 
-  const getHealthBadgeColor = (health) => {
-    const colors = {
-      EXCELLENT: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-      GOOD: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-      NORMAL: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400',
-      POOR: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-      CRITICAL: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-    };
-    return colors[health] || colors.NORMAL;
-  };
-
+  // Render modal view
   if (isModal) {
     return (
       <div className="fixed inset-0 z-[9999] overflow-hidden flex items-center justify-center">
@@ -1056,16 +1305,56 @@ const PatchDataTableComponent = ({
               </div>
               
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowAdvancedView(!showAdvancedView)}
-                  className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 ${
-                    darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-indigo-700 hover:bg-indigo-800 text-white'
-                  } transition-colors`}
-                >
-                  <Layers size={14} />
-                  {showAdvancedView ? 'Simple' : 'Advanced'}
-                </button>
+                {/* View Mode Selector */}
+                <div className="relative flex items-center border rounded-lg overflow-hidden shadow-sm">
+                  <button
+                    onClick={() => setViewMode('compact')}
+                    className={`px-3 py-1.5 text-xs font-medium ${
+                      viewMode === 'compact'
+                        ? darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white'
+                        : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    Compact
+                  </button>
+                  <button
+                    onClick={() => setViewMode('standard')}
+                    className={`px-3 py-1.5 text-xs font-medium ${
+                      viewMode === 'standard'
+                        ? darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white'
+                        : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    Standard
+                  </button>
+                  <button
+                    onClick={() => setViewMode('detailed')}
+                    className={`px-3 py-1.5 text-xs font-medium ${
+                      viewMode === 'detailed'
+                        ? darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white'
+                        : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    Detailed
+                  </button>
+                </div>
                 
+                {/* Column Selector */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowColumnSelector(!showColumnSelector)}
+                    className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 ${
+                      darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-indigo-700 hover:bg-indigo-800 text-white'
+                    } transition-colors`}
+                  >
+                    <Layers size={14} />
+                    Columns
+                  </button>
+                  
+                  {showColumnSelector && <ColumnSelector />}
+                </div>
+                
+                {/* Refresh Button */}
                 {onRefresh && (
                   <button
                     onClick={onRefresh}
@@ -1078,6 +1367,7 @@ const PatchDataTableComponent = ({
                   </button>
                 )}
                 
+                {/* Export Button */}
                 <button
                   onClick={exportToCSV}
                   className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 ${
@@ -1088,6 +1378,7 @@ const PatchDataTableComponent = ({
                   Export
                 </button>
                 
+                {/* Close Button */}
                 <button
                   onClick={onClose}
                   className={`p-2 rounded-lg ${
@@ -1104,19 +1395,25 @@ const PatchDataTableComponent = ({
           <div className={`px-6 py-3 border-b ${
             darkMode ? 'border-gray-700 bg-gray-850' : 'border-gray-200 bg-gray-50'
           }`}>
-            <div className="relative max-w-md">
-              <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by Frontier HQ, Budget Head, Sub Head, or Scheme..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-9 pr-4 py-2 text-sm rounded-lg ${
-                  darkMode 
-                    ? 'bg-gray-700 text-gray-100 placeholder-gray-400 border-gray-600' 
-                    : 'bg-white placeholder-gray-500 border-gray-200'
-                } border focus:ring-2 focus:ring-indigo-400 focus:outline-none`}
-              />
+            <div className="flex justify-between items-center">
+              <div className="relative max-w-md">
+                <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by Frontier HQ, Budget Head, Sub Head, or Scheme..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className={`w-full pl-9 pr-4 py-2 text-sm rounded-lg ${
+                    darkMode 
+                      ? 'bg-gray-700 text-gray-100 placeholder-gray-400 border-gray-600' 
+                      : 'bg-white placeholder-gray-500 border-gray-200'
+                  } border focus:ring-2 focus:ring-indigo-400 focus:outline-none`}
+                />
+              </div>
+              
+              <div className="text-sm text-gray-500">
+                {processedData.length} records found
+              </div>
             </div>
           </div>
 
@@ -1127,228 +1424,52 @@ const PatchDataTableComponent = ({
                 darkMode ? 'bg-gray-800' : 'bg-gray-100'
               } z-10`}>
                 <tr>
-                  {/* Table headers based on config */}
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
-                      onClick={() => handleSort('serial_no')}>
-                    <div className="flex items-center gap-1">
-                      <Fingerprint size={12} className="text-yellow-500" />
-                      ID
-                      {sortField === 'serial_no' && (
-                        <span className="text-indigo-500">
-                          {sortDirection === 'asc' ? '↑' : '↓'}
-                        </span>
-                      )}
-                    </div>
-                  </th>
-                  
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
-                      <Building2 size={12} className="text-purple-500" />
-                      Location
-                    </div>
-                  </th>
-                  
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
-                      <FileText size={12} className="text-blue-500" />
-                      Budget Details
-                    </div>
-                  </th>
-                  
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
-                      onClick={() => handleSort('allotment_cfy')}>
-                    <div className="flex items-center gap-1">
-                      <DollarSign size={12} className="text-green-500" />
-                      Allocation
-                      {sortField === 'allotment_cfy' && (
-                        <span className="text-indigo-500">
-                          {sortDirection === 'asc' ? '↑' : '↓'}
-                        </span>
-                      )}
-                    </div>
-                  </th>
-                  
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
-                      <Calculator size={12} className="text-orange-500" />
-                      Expenditure
-                    </div>
-                  </th>
-                  
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
-                      onClick={() => handleSort('utilization_rate')}>
-                    <div className="flex items-center gap-1">
-                      <Gauge size={12} className="text-purple-500" />
-                      Utilization
-                      {sortField === 'utilization_rate' && (
-                        <span className="text-indigo-500">
-                          {sortDirection === 'asc' ? '↑' : '↓'}
-                        </span>
-                      )}
-                    </div>
-                  </th>
-                  
-                  {showAdvancedView && (
-                    <>
-                      <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                  {availableColumns
+                    .filter(col => selectedColumns.includes(col.id))
+                    .map(col => (
+                      <th 
+                        key={col.id}
+                        className={`px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
+                          col.sortable ? 'cursor-pointer' : ''
+                        }`}
+                        style={{ minWidth: col.width }}
+                        onClick={() => col.sortable ? handleSort(col.field) : null}
+                      >
                         <div className="flex items-center gap-1">
-                          <Clock size={12} className="text-red-500" />
-                          Pending Bills
-                        </div>
-                      </th>
-                      
-                      <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer"
-                          onClick={() => handleSort('balance_fund')}>
-                        <div className="flex items-center gap-1">
-                          <PiggyBank size={12} className="text-green-500" />
-                          Balance
-                          {sortField === 'balance_fund' && (
+                          {col.icon}
+                          <span>{col.header}</span>
+                          {col.sortable && sortField === col.field && (
                             <span className="text-indigo-500">
-                              {sortDirection === 'asc' ? '↑' : '↓'}
+                              {sortDirection === 'asc' ? '↓' : '↑'}
                             </span>
                           )}
                         </div>
                       </th>
-                      
-                      <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider">
-                        <div className="flex items-center gap-1">
-                          <Shield size={12} className="text-yellow-500" />
-                          Status
-                        </div>
-                      </th>
-                    </>
-                  )}
-                  
-                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider">
-                    Actions
-                  </th>
+                    ))}
                 </tr>
               </thead>
               
               <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
                 {paginatedData.map((row, index) => (
                   <tr 
-                    key={row.id}
+                    key={row.id || index}
                     className={`hover:bg-opacity-50 transition-colors ${
+                      row.risk_level === 'CRITICAL' ? (darkMode ? 'bg-red-900/10' : 'bg-red-50') :
+                      row.risk_level === 'HIGH' ? (darkMode ? 'bg-orange-900/10' : 'bg-orange-50') :
                       darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-50'
                     }`}
                   >
-                    <td className="px-3 py-2 text-sm">
-                      <div className="flex items-center gap-1">
-                        <span className="font-mono text-xs">{row.serial_no}</span>
-                      </div>
-                    </td>
-                    
-                    <td className="px-3 py-2 text-sm">
-                      <div className="space-y-1">
-                        <div className="font-medium">{row.ftr_hq}</div>
-                        {row.scheme_name && (
-                          <div className="text-xs text-gray-500">{row.scheme_name}</div>
-                        )}
-                      </div>
-                    </td>
-                    
-                    <td className="px-3 py-2 text-sm">
-                      <div className="space-y-1">
-                        <div className="font-medium">{row.budget_head}</div>
-                        {row.sub_head && (
-                          <div className="text-xs text-gray-500">{row.sub_head}</div>
-                        )}
-                      </div>
-                    </td>
-                    
-                    <td className="px-3 py-2 text-sm font-medium">
-                      {formatCurrency(row.allotment_cfy)}
-                    </td>
-                    
-                    <td className="px-3 py-2 text-sm">
-                      <div className="space-y-1">
-                        <div>{formatCurrency(row.total_expdr_register)}</div>
-                        <div className="text-xs text-gray-500">
-                          Prev: {formatCurrency(row.expdr_prev_year)}
-                        </div>
-                      </div>
-                    </td>
-                    
-                    <td className="px-3 py-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{ensureNumber(row.utilization_rate).toFixed(1)}%</span>
-                        <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full ${
-                              ensureNumber(row.utilization_rate) >= 90 ? 'bg-green-500' :
-                              ensureNumber(row.utilization_rate) >= 70 ? 'bg-blue-500' :
-                              ensureNumber(row.utilization_rate) >= 50 ? 'bg-yellow-500' :
-                              'bg-red-500'
-                            }`}
-                            style={{ width: `${Math.min(100, ensureNumber(row.utilization_rate))}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    
-                    {showAdvancedView && (
-                      <>
-                        <td className="px-3 py-2 text-sm">
-                          <div className="space-y-1">
-                            <div className="text-xs font-medium">
-                              Total: {formatCurrency(row.pending_bills_total)}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              PAD: {formatCurrency(row.bill_pending_pad)}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              HQ: {formatCurrency(row.bill_pending_hqrs)}
-                            </div>
-                          </div>
+                    {availableColumns
+                      .filter(col => selectedColumns.includes(col.id))
+                      .map(col => (
+                        <td 
+                          key={col.id}
+                          className="px-3 py-2 text-sm"
+                          style={{ maxWidth: col.width * 2 }}
+                        >
+                          {col.render ? col.render(row) : col.format(row[col.field])}
                         </td>
-                        
-                        <td className="px-3 py-2 text-sm">
-                          <div className="font-medium text-green-600 dark:text-green-400">
-                            {formatCurrency(row.balance_fund)}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {ensureNumber(row.allotment_cfy) > 0 
-                              ? `${((ensureNumber(row.balance_fund) / ensureNumber(row.allotment_cfy)) * 100).toFixed(1)}% avail`
-                              : '0% avail'}
-                          </div>
-                        </td>
-                        
-                        <td className="px-3 py-2 text-sm">
-                          <div className="space-y-1">
-                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getRiskBadgeColor(row.risk_level)}`}>
-                              {row.risk_level}
-                            </span>
-                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getHealthBadgeColor(row.health_status)}`}>
-                              {row.health_status}
-                            </span>
-                          </div>
-                        </td>
-                      </>
-                    )}
-                    
-                    <td className="px-3 py-2 text-sm text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {onRowEdit && (
-                          <button
-                            onClick={() => onRowEdit(row, index)}
-                            className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded"
-                            title="Edit"
-                          >
-                            <Settings size={14} className="text-blue-500" />
-                          </button>
-                        )}
-                        {onRowDelete && (
-                          <button
-                            onClick={() => onRowDelete(row, index)}
-                            className="p-1 hover:bg-red-100 dark:hover:bg-red-900/20 rounded"
-                            title="Delete"
-                          >
-                            <X size={14} className="text-red-500" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                      ))}
                   </tr>
                 ))}
               </tbody>
@@ -1418,7 +1539,7 @@ const PatchDataTableComponent = ({
     );
   }
 
-  // Non-modal embedded view
+  // Non-modal embedded view - would implement if needed
   return null;
 };
 

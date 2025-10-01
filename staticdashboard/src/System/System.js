@@ -47,6 +47,9 @@ const System = () => {
     const saved = getCookie('system_currentDatabase');
     return saved || '';
   });
+
+  const [selectedRowId, setSelectedRowId] = useState(null);
+
   
   const [databases, setDatabases] = useState([]);
   const [data, setData] = useState([]);
@@ -355,6 +358,7 @@ const System = () => {
   const handleRowEdit = (row, index) => {
     // Get the actual index in the full dataset
     const actualIndex = data.findIndex(r => r[idField] === row[idField]);
+    setSelectedRowId(row[idField]); // Add this line
     setSelectedRow(row);
     setSelectedRowIndex(actualIndex !== -1 ? actualIndex : index);
     setShowEditRow(true);
@@ -1296,12 +1300,14 @@ const System = () => {
           onClose={() => {
             setShowEditRow(false);
             setSelectedRow(null);
+            setSelectedRowId(null);
             setSelectedRowIndex(null);
           }}
           darkMode={darkMode}
           databaseName={currentDatabase}
           idField={idField}
-          rowIndex={selectedRowIndex}
+          rowId={selectedRowId} // Add this line
+          rowIndex={selectedRowIndex} // Keep for backward compatibility
           rowData={selectedRow}
           onSuccess={handleEditRowSuccess}
           onDelete={handleDeleteSuccess}

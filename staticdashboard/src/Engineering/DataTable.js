@@ -491,7 +491,7 @@ const DataTable = ({
   const [selectedProjectForReport, setSelectedProjectForReport] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedProjectForEdit, setSelectedProjectForEdit] = useState(null);
-  const [editRowIndex, setEditRowIndex] = useState(null);
+  const [selectedRowId, setSelectedRowId] = useState(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [fitViewModalOpen, setFitViewModalOpen] = useState(false);
   const [selectedRowForFitView, setSelectedRowForFitView] = useState(null);
@@ -506,6 +506,7 @@ const DataTable = ({
 
   // Get database configuration
   const dbConfig = useMemo(() => getConfig(databaseName), [databaseName]);
+  const idField = useMemo(() => dbConfig?.idField || 'id', [dbConfig]);
 
   // Process and filter data
   const processedData = useMemo(() => {
@@ -649,15 +650,15 @@ const DataTable = ({
     setReportModalOpen(true);
   }, []);
 
-  const openEditModal = useCallback((row, index, event) => {
+  const openEditModal = useCallback((row, event) => {
     if (event) {
       event.preventDefault();
       event.stopPropagation();
     }
     setSelectedProjectForEdit(row);
-    setEditRowIndex(index);
+    setSelectedRowId(row[idField]); // Use the row's unique ID instead of index
     setEditModalOpen(true);
-  }, []);
+  }, [idField]);
 
   const openAddModal = useCallback(() => {
     setAddModalOpen(true);
@@ -986,6 +987,9 @@ const DataTable = ({
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
                   #
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  {idField}
+                </th>
                 <th 
                   className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                   onClick={() => handleSort('sub_scheme_name')}
@@ -1060,7 +1064,7 @@ const DataTable = ({
                 
                 return (
                   <tr
-                    key={row[dbConfig?.idField] || index}
+                    key={row[idField] || index}
                     className={`${
                       darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-50'
                     } cursor-pointer transition-colors ${
@@ -1075,6 +1079,13 @@ const DataTable = ({
                     {/* Serial Number */}
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                       {((currentPage - 1) * itemsPerPage) + index + 1}
+                    </td>
+                    
+                    {/* ID Field */}
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <div className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded">
+                        {row[idField] || 'N/A'}
+                      </div>
                     </td>
                     
                     {/* Scheme Name */}
@@ -1223,8 +1234,7 @@ const DataTable = ({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            const actualIndex = processedData.findIndex(r => r[dbConfig?.idField] === row[dbConfig?.idField]);
-                            openEditModal(row, actualIndex, e);
+                            openEditModal(row, e);
                           }}
                           className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all group"
                           title="Edit"
@@ -1354,12 +1364,12 @@ const DataTable = ({
         onClose={() => {
           setEditModalOpen(false);
           setSelectedProjectForEdit(null);
-          setEditRowIndex(null);
+          setSelectedRowId(null);
         }}
         darkMode={darkMode}
         databaseName={databaseName}
-        idField={dbConfig?.idField}
-        rowIndex={editRowIndex}
+        idField={idField}
+        rowId={selectedRowId} // Pass the row ID instead of index
         rowData={selectedProjectForEdit}
         onSuccess={handleEditSaveSuccess}
         onDelete={handleEditSaveSuccess}
@@ -1372,7 +1382,7 @@ const DataTable = ({
         }}
         darkMode={darkMode}
         databaseName={databaseName}
-        idField={dbConfig?.idField}
+        idField={idField}
         onSuccess={handleAddSuccess}
         defaultValues={{}}
       />
