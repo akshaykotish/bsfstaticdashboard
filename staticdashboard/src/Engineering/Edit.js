@@ -7,7 +7,7 @@ import {
   Plus, Copy, AlertTriangle
 } from 'lucide-react';
 
-const API_URL = 'http://172.21.188.201:3456';
+const API_URL = 'http://localhost:3456';
 
 const Edit = ({ 
   isOpen, 

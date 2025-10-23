@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import HomePage from './Home';
 import Engineering from './Engineering';
 import Operations from './Operations';
-import System from './System'; // Import the new System component
+import System from './System';
 import { 
   LayoutGrid, Home, Lock, Shield, AlertTriangle, CreditCard, Mail, Globe, CheckCircle, Database
 } from 'lucide-react';
@@ -180,14 +180,71 @@ const PaywallScreen = () => {
 };
 
 const App = () => {
+  // Initialize state from localStorage if available, otherwise use defaults
   const [isLoading, setIsLoading] = useState(true);
-  const [currentView, setCurrentView] = useState('home');
-  const [licenseValid, setLicenseValid] = useState(null);
-  const [showPaywall, setShowPaywall] = useState(false);
+  const [currentView, setCurrentView] = useState(() => {
+    return localStorage.getItem('bsfDashboard_currentView') || 'home';
+  });
+  const [licenseValid, setLicenseValid] = useState(() => {
+    const storedValue = localStorage.getItem('bsfDashboard_licenseValid');
+    return storedValue !== null ? JSON.parse(storedValue) : null;
+  });
+  const [showPaywall, setShowPaywall] = useState(() => {
+    const storedValue = localStorage.getItem('bsfDashboard_showPaywall');
+    return storedValue !== null ? JSON.parse(storedValue) : false;
+  });
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('bsfDashboard_currentView', currentView);
+  }, [currentView]);
 
   useEffect(() => {
+    localStorage.setItem('bsfDashboard_licenseValid', JSON.stringify(licenseValid));
+  }, [licenseValid]);
+
+  useEffect(() => {
+    localStorage.setItem('bsfDashboard_showPaywall', JSON.stringify(showPaywall));
+  }, [showPaywall]);
+
+  // Function to clear all stored state (for manual resets)
+  const clearAppState = () => {
+    localStorage.removeItem('bsfDashboard_currentView');
+    localStorage.removeItem('bsfDashboard_licenseValid');
+    localStorage.removeItem('bsfDashboard_showPaywall');
+    // Add any other state variables you want to clear
+    window.location.reload(); // Force page reload after clearing
+  };
+
+  // Add this to window object for debugging (can be removed in production)
+  useEffect(() => {
+    window.clearBSFDashboardState = clearAppState;
+  }, []);
+
+  useEffect(() => {
+    // Check if this is first load after page refresh
+    const isPageRefresh = sessionStorage.getItem('bsfDashboard_hasLoaded') === null;
+    sessionStorage.setItem('bsfDashboard_hasLoaded', 'true');
+
+    // Function to handle beforeunload event
+    const handleBeforeUnload = () => {
+      // Save any immediate state changes before page unload
+      localStorage.setItem('bsfDashboard_currentView', currentView);
+      localStorage.setItem('bsfDashboard_licenseValid', JSON.stringify(licenseValid));
+      localStorage.setItem('bsfDashboard_showPaywall', JSON.stringify(showPaywall));
+    };
+
+    // Register beforeunload handler
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     // Check activation status
     const checkActivation = () => {
+      // If we already have a stored license state and this isn't first load, use that
+      if (!isPageRefresh && licenseValid !== null) {
+        setIsLoading(false);
+        return;
+      }
+
       const currentDate = new Date();
       const cutoffDate = new Date('2025-10-30');
       
@@ -215,14 +272,59 @@ const App = () => {
     };
 
     // Simulate initial loading and check activation
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       checkActivation();
       setIsLoading(false);
-    }, 1000);
-  }, []);
+    }, isPageRefresh ? 1000 : 0); // Only show loading on first page load
+
+    // Cleanup function
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [licenseValid, currentView, showPaywall]);
 
   const handleNavigate = (view) => {
     setCurrentView(view);
+  };
+
+  // Event listener for custom state changes from child components
+  useEffect(() => {
+    // Function to handle custom state update events from child components
+    const handleStateUpdate = (event) => {
+      const { type, payload } = event.detail;
+      
+      switch (type) {
+        case 'UPDATE_VIEW':
+          setCurrentView(payload);
+          break;
+        case 'UPDATE_LICENSE':
+          setLicenseValid(payload);
+          break;
+        case 'UPDATE_PAYWALL':
+          setShowPaywall(payload);
+          break;
+        case 'RESET_STATE':
+          clearAppState();
+          break;
+        default:
+          break;
+      }
+    };
+
+    // Register and unregister the event listener
+    window.addEventListener('bsfDashboardStateUpdate', handleStateUpdate);
+    return () => {
+      window.removeEventListener('bsfDashboardStateUpdate', handleStateUpdate);
+    };
+  }, []);
+
+  // Function for child components to update parent state
+  const updateStateFromChild = (type, payload) => {
+    const event = new CustomEvent('bsfDashboardStateUpdate', {
+      detail: { type, payload }
+    });
+    window.dispatchEvent(event);
   };
 
   // Show paywall if needed
@@ -396,7 +498,7 @@ const App = () => {
               </span>
             </button>
 
-            {/* System Tab - NEW */}
+            {/* System Tab */}
             <button 
               onClick={() => handleNavigate('system')}
               className={`px-3 py-1.5 rounded-md transition-all duration-200 flex items-center gap-1.5 ${
@@ -454,10 +556,10 @@ const App = () => {
       {/* Main Content Area with top padding for fixed header */}
       <main className="max-w-[1920px] mx-auto px-6 py-6" style={{ paddingTop: '72px' }}>
         <div className="neu-content-wrapper">
-          {currentView === 'home' && <HomePage onNavigate={handleNavigate} />}
-          {currentView === 'engineering' && <Engineering />}
-          {currentView === 'operations' && <Operations />}
-          {currentView === 'system' && <System />}
+          {currentView === 'home' && <HomePage onNavigate={handleNavigate} updateState={updateStateFromChild} />}
+          {currentView === 'engineering' && <Engineering updateState={updateStateFromChild} />}
+          {currentView === 'operations' && <Operations updateState={updateStateFromChild} />}
+          {currentView === 'system' && <System updateState={updateStateFromChild} />}
         </div>
       </main>
 

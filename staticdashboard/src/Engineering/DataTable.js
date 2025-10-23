@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef, useContext } from 'react';
 import ReactDOM from 'react-dom';
 import { 
   Search, X, ChevronDown, ChevronUp, RotateCcw,
@@ -17,8 +17,9 @@ import EditRow from '../System/EditRow';
 import AddRow from '../System/AddRow';
 import FitViewModal from './FitView';
 
-// Import database configurations
+// Import database configurations and data context
 import { databaseConfigs, getConfig, getDatabaseNames, generateId, applyCalculations } from '../System/config';
+import { useData } from './useData'; // Import the useData hook
 
 // Inject enhanced progress animation styles
 const animatedStripesStyle = `
@@ -466,9 +467,28 @@ const ReportModal = React.memo(({ isOpen, onClose, projectData, darkMode }) => {
   );
 });
 
+// Function to safely store and retrieve state from localStorage
+const getStoredState = (key, databaseName, defaultValue) => {
+  try {
+    const storedValue = localStorage.getItem(`bsfDashboard_${databaseName}_${key}`);
+    return storedValue !== null ? JSON.parse(storedValue) : defaultValue;
+  } catch (error) {
+    console.error(`Error retrieving ${key} from localStorage:`, error);
+    return defaultValue;
+  }
+};
+
+const storeState = (key, databaseName, value) => {
+  try {
+    localStorage.setItem(`bsfDashboard_${databaseName}_${key}`, JSON.stringify(value));
+  } catch (error) {
+    console.error(`Error storing ${key} in localStorage:`, error);
+  }
+};
+
 // Main DataTable Component
 const DataTable = ({ 
-  data, 
+  data: initialData, 
   darkMode, 
   onRowClick, 
   compareMode, 
@@ -479,14 +499,51 @@ const DataTable = ({
   onRefreshData,
   databaseName = 'engineering'
 }) => {
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(25);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [showAdvancedMetrics, setShowAdvancedMetrics] = useState(false);
+  // Get database data with useData hook instead of relying solely on props
+  const {
+    rawData: hookData,
+    loading: hookLoading,
+    error: hookError,
+    refetch: hookRefetch,
+    updateRecord: hookUpdateRecord,
+    addRecord: hookAddRecord,
+    deleteRecords: hookDeleteRecords
+  } = useData(databaseName);
+
+  // Use combined data approach - props have priority, fallback to hook data
+  const [localData, setLocalData] = useState(initialData || []);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Update local data when either props or hook data changes
+  useEffect(() => {
+    if (initialData && initialData.length > 0) {
+      setLocalData(initialData);
+    } else if (hookData && hookData.length > 0) {
+      setLocalData(hookData);
+    }
+  }, [initialData, hookData]);
+
+  // Initialize state from localStorage, with fallbacks
+  const [sortConfig, setSortConfig] = useState(() => 
+    getStoredState('sortConfig', databaseName, { key: null, direction: 'asc' })
+  );
+  const [currentPage, setCurrentPage] = useState(() => 
+    getStoredState('currentPage', databaseName, 1)
+  );
+  const [itemsPerPage, setItemsPerPage] = useState(() => 
+    getStoredState('itemsPerPage', databaseName, 25)
+  );
+  const [searchTerm, setSearchTerm] = useState(() => 
+    getStoredState('searchTerm', databaseName, '')
+  );
+  const [showFilters, setShowFilters] = useState(() => 
+    getStoredState('showFilters', databaseName, false)
+  );
+  const [showAdvancedMetrics, setShowAdvancedMetrics] = useState(() => 
+    getStoredState('showAdvancedMetrics', databaseName, false)
+  );
   
-  // Modal states
+  // Modal states (not persisted as they should reset on page load)
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedProjectForReport, setSelectedProjectForReport] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -496,13 +553,98 @@ const DataTable = ({
   const [fitViewModalOpen, setFitViewModalOpen] = useState(false);
   const [selectedRowForFitView, setSelectedRowForFitView] = useState(null);
 
-  // Filter states
-  const [filters, setFilters] = useState({
-    frontier: '',
-    sector: '',
-    paceStatus: '',
-    progressStatus: ''
-  });
+  // Filter states (persisted)
+  const [filters, setFilters] = useState(() => 
+    getStoredState('filters', databaseName, {
+      frontier: '',
+      sector: '',
+      paceStatus: '',
+      progressStatus: ''
+    })
+  );
+
+  // Store state in localStorage whenever it changes
+  useEffect(() => {
+    storeState('sortConfig', databaseName, sortConfig);
+  }, [sortConfig, databaseName]);
+
+  useEffect(() => {
+    storeState('currentPage', databaseName, currentPage);
+  }, [currentPage, databaseName]);
+
+  useEffect(() => {
+    storeState('itemsPerPage', databaseName, itemsPerPage);
+  }, [itemsPerPage, databaseName]);
+
+  useEffect(() => {
+    storeState('searchTerm', databaseName, searchTerm);
+  }, [searchTerm, databaseName]);
+
+  useEffect(() => {
+    storeState('showFilters', databaseName, showFilters);
+  }, [showFilters, databaseName]);
+
+  useEffect(() => {
+    storeState('showAdvancedMetrics', databaseName, showAdvancedMetrics);
+  }, [showAdvancedMetrics, databaseName]);
+
+  useEffect(() => {
+    storeState('filters', databaseName, filters);
+  }, [filters, databaseName]);
+
+  // Function to clear all stored state (for manual resets)
+  const clearTableState = useCallback(() => {
+    localStorage.removeItem(`bsfDashboard_${databaseName}_sortConfig`);
+    localStorage.removeItem(`bsfDashboard_${databaseName}_currentPage`);
+    localStorage.removeItem(`bsfDashboard_${databaseName}_itemsPerPage`);
+    localStorage.removeItem(`bsfDashboard_${databaseName}_searchTerm`);
+    localStorage.removeItem(`bsfDashboard_${databaseName}_showFilters`);
+    localStorage.removeItem(`bsfDashboard_${databaseName}_showAdvancedMetrics`);
+    localStorage.removeItem(`bsfDashboard_${databaseName}_filters`);
+    
+    // Reset state to defaults
+    setSortConfig({ key: null, direction: 'asc' });
+    setCurrentPage(1);
+    setItemsPerPage(25);
+    setSearchTerm('');
+    setShowFilters(false);
+    setShowAdvancedMetrics(false);
+    setFilters({
+      frontier: '',
+      sector: '',
+      paceStatus: '',
+      progressStatus: ''
+    });
+  }, [databaseName]);
+
+  // Add this to window object for debugging (can be removed in production)
+  useEffect(() => {
+    if (!window.bsfDashboardHelpers) {
+      window.bsfDashboardHelpers = {};
+    }
+    window.bsfDashboardHelpers[`clearTable_${databaseName}`] = clearTableState;
+  }, [databaseName, clearTableState]);
+
+  // Handle beforeunload to ensure state is saved before the page unloads
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      storeState('sortConfig', databaseName, sortConfig);
+      storeState('currentPage', databaseName, currentPage);
+      storeState('itemsPerPage', databaseName, itemsPerPage);
+      storeState('searchTerm', databaseName, searchTerm);
+      storeState('showFilters', databaseName, showFilters);
+      storeState('showAdvancedMetrics', databaseName, showAdvancedMetrics);
+      storeState('filters', databaseName, filters);
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [
+    sortConfig, currentPage, itemsPerPage, searchTerm, 
+    showFilters, showAdvancedMetrics, filters, databaseName
+  ]);
 
   // Get database configuration
   const dbConfig = useMemo(() => getConfig(databaseName), [databaseName]);
@@ -510,9 +652,9 @@ const DataTable = ({
 
   // Process and filter data
   const processedData = useMemo(() => {
-    if (!data || !Array.isArray(data)) return [];
+    if (!localData || !Array.isArray(localData)) return [];
     
-    let processed = data.map(item => {
+    let processed = localData.map(item => {
       if (dbConfig && dbConfig.calculations) {
         return applyCalculations(databaseName, item);
       }
@@ -583,18 +725,34 @@ const DataTable = ({
     }
 
     return processed;
-  }, [data, searchTerm, sortConfig, dbConfig, databaseName, filters]);
+  }, [localData, searchTerm, sortConfig, dbConfig, databaseName, filters]);
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return processedData.slice(startIndex, startIndex + itemsPerPage);
   }, [processedData, currentPage, itemsPerPage]);
 
+  // Calculate total pages and adjust current page if needed
   const totalPages = Math.ceil(processedData.length / itemsPerPage);
+  
+  // Ensure current page is valid when data changes
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(Math.max(1, totalPages));
+    }
+  }, [totalPages, currentPage]);
 
   // Get unique values for filters
-  const uniqueFrontiers = [...new Set(processedData.map(row => row.ftr_hq_name).filter(Boolean))];
-  const uniqueSectors = [...new Set(processedData.map(row => row.shq_name).filter(Boolean))];
+  const uniqueFrontiers = useMemo(() => 
+    [...new Set(processedData.map(row => row.ftr_hq_name).filter(Boolean))],
+    [processedData]
+  );
+  
+  const uniqueSectors = useMemo(() => 
+    [...new Set(processedData.map(row => row.shq_name).filter(Boolean))],
+    [processedData]
+  );
+  
   const uniquePaceStatuses = ['PERFECT_PACE', 'SLOW_PACE', 'BAD_PACE', 'SLEEP_PACE', 'PAYMENT_PENDING', 'COMPLETED', 'NOT_STARTED'];
 
   // Calculate aggregate statistics
@@ -638,12 +796,108 @@ const DataTable = ({
     }));
   }, []);
 
-  const handleRefreshData = useCallback(() => {
-    setCurrentPage(1);
-    if (onRefreshData && typeof onRefreshData === 'function') {
-      onRefreshData();
+  // Enhanced refresh handler using useData hook's refetch
+  const handleRefreshData = useCallback(async () => {
+    try {
+      setIsRefreshing(true);
+      
+      // First try the parent's refresh handler if available
+      if (onRefreshData && typeof onRefreshData === 'function') {
+        await onRefreshData();
+      }
+      
+      // Then use the hook's refetch as a backup or additional refresh
+      if (hookRefetch && typeof hookRefetch === 'function') {
+        await hookRefetch();
+      }
+      
+      // Success visual feedback
+      setTimeout(() => setIsRefreshing(false), 500);
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      setIsRefreshing(false);
     }
-  }, [onRefreshData]);
+  }, [onRefreshData, hookRefetch]);
+
+  // Function to handle successful data update locally without refreshing
+  const handleDataUpdate = useCallback((updatedData) => {
+    // Find and update the record in our local data
+    setLocalData(prevData => {
+      return prevData.map(item => 
+        item[idField] === updatedData[idField] ? { ...item, ...updatedData } : item
+      );
+    });
+    
+    // Close the edit modal
+    setEditModalOpen(false);
+    setSelectedProjectForEdit(null);
+    setSelectedRowId(null);
+    
+    // Also update the report modal if it's the same record
+    if (selectedProjectForReport && selectedProjectForReport[idField] === updatedData[idField]) {
+      setSelectedProjectForReport({ ...selectedProjectForReport, ...updatedData });
+    }
+    
+    // Try to update using the hook's API
+    if (hookUpdateRecord && typeof hookUpdateRecord === 'function') {
+      // Find the index if needed by the hook
+      const recordIndex = localData.findIndex(item => item[idField] === updatedData[idField]);
+      if (recordIndex !== -1) {
+        hookUpdateRecord(recordIndex, updatedData).catch(err => 
+          console.error("Error syncing update with API:", err)
+        );
+      }
+    }
+  }, [idField, localData, selectedProjectForReport, hookUpdateRecord]);
+
+  // Function to handle successful record deletion
+  const handleDeleteSuccess = useCallback((deletedId) => {
+    // Remove the record from our local data
+    setLocalData(prevData => {
+      return prevData.filter(item => item[idField] !== deletedId);
+    });
+    
+    // Close the edit modal
+    setEditModalOpen(false);
+    
+    // Close the report modal if it's showing the deleted record
+    if (selectedProjectForReport && selectedProjectForReport[idField] === deletedId) {
+      setReportModalOpen(false);
+      setSelectedProjectForReport(null);
+    }
+    
+    // Try to delete using the hook's API
+    if (hookDeleteRecords && typeof hookDeleteRecords === 'function') {
+      // Find the index if needed by the hook
+      const recordIndex = localData.findIndex(item => item[idField] === deletedId);
+      if (recordIndex !== -1) {
+        hookDeleteRecords([recordIndex]).catch(err => 
+          console.error("Error syncing deletion with API:", err)
+        );
+      }
+    }
+  }, [idField, localData, selectedProjectForReport, hookDeleteRecords]);
+
+  // Function to handle successful record addition
+  const handleAddSuccess = useCallback((newRecord) => {
+    // Add the new record to our local data
+    setLocalData(prevData => {
+      return [...prevData, newRecord];
+    });
+    
+    // Close the add modal
+    setAddModalOpen(false);
+    
+    // Navigate to the first page to show the new record
+    setCurrentPage(1);
+    
+    // Try to add using the hook's API
+    if (hookAddRecord && typeof hookAddRecord === 'function') {
+      hookAddRecord(newRecord).catch(err => 
+        console.error("Error syncing new record with API:", err)
+      );
+    }
+  }, [hookAddRecord]);
 
   const openReportModal = useCallback((row) => {
     setSelectedProjectForReport(row);
@@ -656,7 +910,7 @@ const DataTable = ({
       event.stopPropagation();
     }
     setSelectedProjectForEdit(row);
-    setSelectedRowId(row[idField]); // Use the row's unique ID instead of index
+    setSelectedRowId(row[idField]);
     setEditModalOpen(true);
   }, [idField]);
 
@@ -668,16 +922,6 @@ const DataTable = ({
     setSelectedRowForFitView(row);
     setFitViewModalOpen(true);
   }, []);
-
-  const handleEditSaveSuccess = useCallback(() => {
-    setEditModalOpen(false);
-    handleRefreshData();
-  }, [handleRefreshData]);
-
-  const handleAddSuccess = useCallback(() => {
-    setAddModalOpen(false);
-    handleRefreshData();
-  }, [handleRefreshData]);
 
   const exportTableData = useCallback(() => {
     const csvContent = [
@@ -710,7 +954,59 @@ const DataTable = ({
     URL.revokeObjectURL(url);
   }, [processedData, databaseName]);
 
-  if (!data || data.length === 0) {
+  // Utility function to reset filters
+  const resetFilters = useCallback(() => {
+    setFilters({
+      frontier: '',
+      sector: '',
+      paceStatus: '',
+      progressStatus: ''
+    });
+    setSearchTerm('');
+    setCurrentPage(1);
+  }, []);
+
+  // Show loading state either from props or from hook
+  if ((hookLoading && !localData.length) || (isRefreshing && !localData.length)) {
+    return (
+      <div className={`${darkMode ? 'bg-gray-900' : 'bg-white'} rounded-xl shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} overflow-hidden flex flex-col h-full`}>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+              <RefreshCw size={32} className="text-blue-500 animate-spin" />
+            </div>
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">Loading Data</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Fetching the latest records...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (hookError) {
+    return (
+      <div className={`${darkMode ? 'bg-gray-900' : 'bg-white'} rounded-xl shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} overflow-hidden flex flex-col h-full`}>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertTriangle size={48} className="mx-auto text-red-500 mb-4" />
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">Error Loading Data</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{hookError.toString()}</p>
+            <button
+              onClick={handleRefreshData}
+              className="mt-4 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg flex items-center gap-2 mx-auto"
+            >
+              <RefreshCw size={18} />
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state
+  if (!localData || localData.length === 0) {
     return (
       <div className={`${darkMode ? 'bg-gray-900' : 'bg-white'} rounded-xl shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} overflow-hidden flex flex-col h-full`}>
         <div className="flex items-center justify-center h-64">
@@ -751,6 +1047,15 @@ const DataTable = ({
                     : 'bg-white border-gray-300 placeholder-gray-500'
                 } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
               />
+              {searchTerm && (
+                <button 
+                  className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  onClick={() => setSearchTerm('')}
+                  title="Clear search"
+                >
+                  <X size={16} />
+                </button>
+              )}
             </div>
 
             {/* Right Controls */}
@@ -780,7 +1085,7 @@ const DataTable = ({
               >
                 <Filter size={16} />
                 Filters
-                {(filters.frontier || filters.sector || filters.paceStatus || filters.progressStatus) && (
+                {(filters.frontier || filters.sector || filters.paceStatus || filters.progressStatus || searchTerm) && (
                   <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                 )}
               </button>
@@ -823,11 +1128,12 @@ const DataTable = ({
 
               <button
                 onClick={handleRefreshData}
+                disabled={isRefreshing}
                 className={`p-2 rounded-lg border ${
                   darkMode ? 'bg-gray-800 border-gray-600 text-gray-100 hover:bg-gray-700' : 'bg-white border-gray-300 hover:bg-gray-50'
-                }`}
+                } ${isRefreshing ? 'opacity-50' : ''}`}
               >
-                <RefreshCw size={16} />
+                <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
               </button>
             </div>
           </div>
@@ -904,7 +1210,10 @@ const DataTable = ({
               <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                 <select
                   value={filters.frontier}
-                  onChange={(e) => setFilters(prev => ({ ...prev, frontier: e.target.value }))}
+                  onChange={(e) => {
+                    setFilters(prev => ({ ...prev, frontier: e.target.value }));
+                    setCurrentPage(1); // Reset to first page when filter changes
+                  }}
                   className={`w-full px-3 py-2 rounded-lg border text-sm ${
                     darkMode 
                       ? 'bg-gray-800 border-gray-600 text-gray-100' 
@@ -919,7 +1228,10 @@ const DataTable = ({
                 
                 <select
                   value={filters.sector}
-                  onChange={(e) => setFilters(prev => ({ ...prev, sector: e.target.value }))}
+                  onChange={(e) => {
+                    setFilters(prev => ({ ...prev, sector: e.target.value }));
+                    setCurrentPage(1); // Reset to first page when filter changes
+                  }}
                   className={`w-full px-3 py-2 rounded-lg border text-sm ${
                     darkMode 
                       ? 'bg-gray-800 border-gray-600 text-gray-100' 
@@ -934,7 +1246,10 @@ const DataTable = ({
                 
                 <select
                   value={filters.progressStatus}
-                  onChange={(e) => setFilters(prev => ({ ...prev, progressStatus: e.target.value }))}
+                  onChange={(e) => {
+                    setFilters(prev => ({ ...prev, progressStatus: e.target.value }));
+                    setCurrentPage(1); // Reset to first page when filter changes
+                  }}
                   className={`w-full px-3 py-2 rounded-lg border text-sm ${
                     darkMode 
                       ? 'bg-gray-800 border-gray-600 text-gray-100' 
@@ -952,7 +1267,10 @@ const DataTable = ({
                 
                 <select
                   value={filters.paceStatus}
-                  onChange={(e) => setFilters(prev => ({ ...prev, paceStatus: e.target.value }))}
+                  onChange={(e) => {
+                    setFilters(prev => ({ ...prev, paceStatus: e.target.value }));
+                    setCurrentPage(1); // Reset to first page when filter changes
+                  }}
                   className={`w-full px-3 py-2 rounded-lg border text-sm ${
                     darkMode 
                       ? 'bg-gray-800 border-gray-600 text-gray-100' 
@@ -969,7 +1287,7 @@ const DataTable = ({
                 </select>
                 
                 <button
-                  onClick={() => setFilters({ frontier: '', sector: '', paceStatus: '', progressStatus: '' })}
+                  onClick={resetFilters}
                   className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-medium"
                 >
                   Clear Filters
@@ -1359,6 +1677,7 @@ const DataTable = ({
         />
       )}
 
+      {/* Modified EditRow to pass the handleDataUpdate callback */}
       <EditRow
         isOpen={editModalOpen}
         onClose={() => {
@@ -1369,12 +1688,13 @@ const DataTable = ({
         darkMode={darkMode}
         databaseName={databaseName}
         idField={idField}
-        rowId={selectedRowId} // Pass the row ID instead of index
+        rowId={selectedRowId}
         rowData={selectedProjectForEdit}
-        onSuccess={handleEditSaveSuccess}
-        onDelete={handleEditSaveSuccess}
+        onSuccess={handleDataUpdate} // Use our local data update handler
+        onDelete={handleDeleteSuccess} // Use our local delete handler
       />
 
+      {/* Modified AddRow to pass the handleAddSuccess callback */}
       <AddRow
         isOpen={addModalOpen}
         onClose={() => {
@@ -1383,7 +1703,7 @@ const DataTable = ({
         darkMode={darkMode}
         databaseName={databaseName}
         idField={idField}
-        onSuccess={handleAddSuccess}
+        onSuccess={handleAddSuccess} // Use our local add handler
         defaultValues={{}}
       />
 

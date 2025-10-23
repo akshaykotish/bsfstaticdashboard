@@ -1333,8 +1333,6 @@ const Engineering = () => {
                       {metrics.totalProjects} Projects
                     </span>
                     <span>•</span>
-                    <span>{formatAmount(metrics.totalSanctionedCr * 100)}</span>
-                    <span>•</span>
                     <span>{new Date().toLocaleString()}</span>
                     {isCascadingActive && (
                       <>

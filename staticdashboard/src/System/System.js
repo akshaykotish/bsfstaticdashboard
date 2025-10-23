@@ -16,7 +16,7 @@ import Configure from './Configure';
 import AddRow from './AddRow';
 import EditRow from './EditRow';
 
-const API_URL = 'http://172.21.188.201:3456';
+const API_URL = 'http://localhost:3456';
 
 // Cookie utility functions
 const setCookie = (name, value, days = 365) => {

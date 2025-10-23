@@ -28,7 +28,7 @@ const HomePage = ({ onNavigate }) => {
       
       // Fetch system stats from API
       try {
-        const response = await fetch('http://172.21.188.201:3456/api/databases');
+        const response = await fetch('http://localhost:3456/api/databases');
         if (response.ok) {
           const data = await response.json();
           const totalRecords = data.databases?.reduce((sum, db) => sum + (db.recordCount || 0), 0) || 0;

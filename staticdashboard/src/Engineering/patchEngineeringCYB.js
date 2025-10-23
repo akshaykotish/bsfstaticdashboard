@@ -13,7 +13,7 @@ import {
 // Import database configurations from config.js
 import { getConfig, generateId, applyCalculations } from '../System/config';
 
-const API_URL = 'http://172.21.188.201:3456';
+const API_URL = 'http://localhost:3456';
 
 // Hook to load and process patch data from enggcurrentyear database
 export const usePatchEngineeringCYB = (filters = {}) => {
@@ -480,6 +480,8 @@ export const usePatchEngineeringCYB = (filters = {}) => {
         totalRecords: 0,
         currentYearAllocation: 0,
         currentYearExpenditure: 0,
+        elekhaExpenditure: 0, // Added E-Lekha expenditure
+        elekhaExpenditureWithPending: 0, // Added E-Lekha + Pending bills
         pendingBillsPAD: 0,
         pendingBillsHQ: 0,
         totalPendingBills: 0,
@@ -520,12 +522,19 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     // Sum up financial metrics (convert from lakhs to crores)
     const currentYearAllocation = patchData.reduce((sum, d) => sum + ensureNumber(d.allotment_cfy), 0) / 100;
     const currentYearExpenditure = patchData.reduce((sum, d) => sum + ensureNumber(d.total_expdr_register), 0) / 100;
+    
+    // Add E-Lekha expenditure calculation
+    const elekhaExpenditure = patchData.reduce((sum, d) => sum + ensureNumber(d.expdr_elekha_22_07), 0) / 100;
+    
     const pendingBillsPAD = patchData.reduce((sum, d) => sum + ensureNumber(d.bill_pending_pad), 0) / 100;
     const pendingBillsHQ = patchData.reduce((sum, d) => sum + ensureNumber(d.bill_pending_hqrs), 0) / 100;
     const totalPendingBills = pendingBillsPAD + pendingBillsHQ;
     
+    // Calculate E-Lekha + Pending bills total
+    const elekhaExpenditureWithPending = elekhaExpenditure + totalPendingBills;
+    
     // Calculate balance funds properly
-    const balanceFunds = patchData.reduce((sum, d) => sum + ensureNumber(d.balance_fund), 0) / 100;
+    const balanceFunds = Math.max(0, currentYearAllocation - elekhaExpenditureWithPending);
     
     // Additional financial metrics
     const freshSanctions = patchData.reduce((sum, d) => sum + ensureNumber(d.fresh_sanction_cfy), 0) / 100;
@@ -581,6 +590,8 @@ export const usePatchEngineeringCYB = (filters = {}) => {
       totalRecords: total,
       currentYearAllocation: isNaN(currentYearAllocation) ? 0 : currentYearAllocation,
       currentYearExpenditure: isNaN(currentYearExpenditure) ? 0 : currentYearExpenditure,
+      elekhaExpenditure: isNaN(elekhaExpenditure) ? 0 : elekhaExpenditure, // Added E-Lekha expenditure
+      elekhaExpenditureWithPending: isNaN(elekhaExpenditureWithPending) ? 0 : elekhaExpenditureWithPending, // Added E-Lekha + Pending
       pendingBillsPAD: isNaN(pendingBillsPAD) ? 0 : pendingBillsPAD,
       pendingBillsHQ: isNaN(pendingBillsHQ) ? 0 : pendingBillsHQ,
       totalPendingBills: isNaN(totalPendingBills) ? 0 : totalPendingBills,
@@ -615,6 +626,8 @@ export const usePatchEngineeringCYB = (filters = {}) => {
       balanceFunds: result.balanceFunds.toFixed(2),
       currentYearAllocation: result.currentYearAllocation.toFixed(2),
       currentYearExpenditure: result.currentYearExpenditure.toFixed(2),
+      elekhaExpenditure: result.elekhaExpenditure.toFixed(2),
+      elekhaExpenditureWithPending: result.elekhaExpenditureWithPending.toFixed(2),
       totalPendingBills: result.totalPendingBills.toFixed(2),
       avgUtilizationRate: result.avgUtilizationRate,
       avgEfficiencyScore: result.avgEfficiencyScore
@@ -737,7 +750,7 @@ export const usePatchEngineeringCYB = (filters = {}) => {
   };
 };
 
-// Generate metric cards for patch data with enhanced details and fixed balance funds
+// Updated: Generate metric cards for patch data with the new metrics structure
 export const generatePatchBudgetMetrics = (patchMetrics, darkMode = false) => {
   if (!patchMetrics) return [];
   
@@ -747,11 +760,13 @@ export const generatePatchBudgetMetrics = (patchMetrics, darkMode = false) => {
     return isNaN(num) || !isFinite(num) ? 0 : num;
   };
   
-  // Use balanceFunds (note the 's') as it's the correct property name
   const balanceAmount = formatValue(patchMetrics.balanceFunds);
   const allocationAmount = formatValue(patchMetrics.currentYearAllocation);
   const utilizationRate = formatValue(patchMetrics.avgUtilizationRate);
   const efficiencyScore = formatValue(patchMetrics.avgEfficiencyScore);
+  const elekhaExpenditure = formatValue(patchMetrics.elekhaExpenditure);
+  const pendingBillsAmount = formatValue(patchMetrics.totalPendingBills);
+  const totalExpenditureAmount = formatValue(patchMetrics.elekhaExpenditureWithPending);
   
   return [
     {
@@ -777,49 +792,68 @@ export const generatePatchBudgetMetrics = (patchMetrics, darkMode = false) => {
       }
     },
     {
-      id: 'cy-expenditure',
+      id: 'cy-elekha-expenditure',
       group: 'budget',
-      title: 'CY Expenditure',
-      value: `₹${formatValue(patchMetrics.currentYearExpenditure).toFixed(2)}Cr`,
-      subtitle: `${utilizationRate}% utilized`,
-      icon: CreditCard,
+      title: 'CY Expenditure (E-Lekha)',
+      value: `₹${elekhaExpenditure.toFixed(2)}Cr`,
+      subtitle: `${(elekhaExpenditure / allocationAmount * 100).toFixed(1)}% of allocation`,
+      icon: Calculator,
       color: 'blue',
       gradient: 'from-blue-500 to-blue-600',
       isPatchData: true,
-      percentage: utilizationRate,
-      trend: utilizationRate >= 70 ? 'up' : 'down',
-      infoText: "Total expenditure in the current financial year including e-lekha bookings and pending bills.",
+      percentage: allocationAmount > 0 ? (elekhaExpenditure / allocationAmount * 100) : 0,
+      trend: (elekhaExpenditure / allocationAmount * 100) >= 70 ? 'up' : 'down',
+      infoText: "Total expenditure booked in e-lekha system for the current financial year.",
       details: {
         'Previous Year Expdr': `₹${formatValue(patchMetrics.previousYearExpenditure).toFixed(2)}Cr`,
-        'Efficiency Score': `${efficiencyScore}%`,
-        'Under Utilized': patchMetrics.underUtilized,
-        'Over Utilized': patchMetrics.overUtilized
+        'As of Date': 'July 22, 2025',
+        'Utilization Rate': `${(elekhaExpenditure / allocationAmount * 100).toFixed(1)}%`
       }
     },
     {
       id: 'cy-pending-bills',
       group: 'budget',
       title: 'CY Pending Bills',
-      value: `₹${formatValue(patchMetrics.totalPendingBills).toFixed(2)}Cr`,
+      value: `₹${pendingBillsAmount.toFixed(2)}Cr`,
       subtitle: `PAD: ₹${formatValue(patchMetrics.pendingBillsPAD).toFixed(2)}Cr | HQ: ₹${formatValue(patchMetrics.pendingBillsHQ).toFixed(2)}Cr`,
       icon: Receipt,
       color: 'orange',
       gradient: 'from-orange-500 to-orange-600',
       isPatchData: true,
-      alert: patchMetrics.totalPendingBills > allocationAmount * 0.1,
-      severity: patchMetrics.totalPendingBills > allocationAmount * 0.15 ? 'high' : 'medium',
+      alert: pendingBillsAmount > allocationAmount * 0.1,
+      severity: pendingBillsAmount > allocationAmount * 0.15 ? 'high' : 'medium',
       infoText: "Bills pending with PAD and Headquarters for processing and payment.",
       details: {
         'Percent of Allocation': allocationAmount > 0 
-          ? `${(formatValue(patchMetrics.totalPendingBills) / allocationAmount * 100).toFixed(1)}%`
+          ? `${(pendingBillsAmount / allocationAmount * 100).toFixed(1)}%`
           : '0%',
-        'Critical Count': patchMetrics.criticalCount
+        'Critical Count': patchMetrics.criticalCount,
+        'High Risk Count': patchMetrics.highRiskCount
+      }
+    },
+    {
+      id: 'cy-total-expenditure',
+      group: 'budget',
+      title: 'CY Expenditure (E-Lekha + Pending)',
+      value: `₹${totalExpenditureAmount.toFixed(2)}Cr`,
+      subtitle: `${(totalExpenditureAmount / allocationAmount * 100).toFixed(1)}% of allocation`,
+      icon: TrendingUp,
+      color: 'cyan',
+      gradient: 'from-cyan-500 to-cyan-600',
+      isPatchData: true,
+      percentage: allocationAmount > 0 ? (totalExpenditureAmount / allocationAmount * 100) : 0,
+      trend: (totalExpenditureAmount / allocationAmount * 100) >= 80 ? 'up' : 'down',
+      infoText: "Total combined expenditure including e-lekha bookings and pending bills.",
+      details: {
+        'E-Lekha': `₹${elekhaExpenditure.toFixed(2)}Cr`,
+        'Pending Bills': `₹${pendingBillsAmount.toFixed(2)}Cr`,
+        'Utilization Rate': `${(totalExpenditureAmount / allocationAmount * 100).toFixed(1)}%`
       }
     },
     {
       id: 'cy-balance',
       group: 'budget',
-      title: 'CY Balance Funds',
+      title: 'CY Balance Fund',
       value: `₹${balanceAmount.toFixed(2)}Cr`,
       subtitle: allocationAmount > 0 
         ? `${(balanceAmount / allocationAmount * 100).toFixed(1)}% available`
@@ -829,32 +863,12 @@ export const generatePatchBudgetMetrics = (patchMetrics, darkMode = false) => {
       gradient: 'from-green-500 to-green-600',
       isPatchData: true,
       percentage: allocationAmount > 0 ? (balanceAmount / allocationAmount * 100) : 0,
-      infoText: "Remaining budget available for utilization in the current financial year (Allocation - Expenditure - Pending Bills).",
+      infoText: "Remaining budget available for utilization in the current financial year (Allocation - E-Lekha - Pending Bills).",
       details: {
         'Optimal Utilized': patchMetrics.optimalUtilized,
         'Time Remaining': 'Q4 FY 2024-25',
         'Allocation': `₹${allocationAmount.toFixed(2)}Cr`,
-        'Spent + Pending': `₹${(formatValue(patchMetrics.currentYearExpenditure) + formatValue(patchMetrics.totalPendingBills)).toFixed(2)}Cr`
-      }
-    },
-    {
-      id: 'cy-liabilities',
-      group: 'budget',
-      title: 'CY Liabilities',
-      value: `₹${formatValue(patchMetrics.liabilities).toFixed(2)}Cr`,
-      subtitle: allocationAmount > 0 
-        ? `${(formatValue(patchMetrics.liabilities) / allocationAmount * 100).toFixed(1)}% of allocation`
-        : '0% of allocation',
-      icon: AlertTriangle,
-      color: 'red',
-      gradient: 'from-red-500 to-red-600',
-      isPatchData: true,
-      alert: patchMetrics.liabilities > allocationAmount * 0.2,
-      severity: patchMetrics.liabilities > allocationAmount * 0.3 ? 'critical' : 'high',
-      infoText: "Liabilities carried forward from previous years that need to be cleared.",
-      details: {
-        'High Risk Count': patchMetrics.highRiskCount,
-        'Critical Count': patchMetrics.criticalCount
+        'Spent + Pending': `₹${totalExpenditureAmount.toFixed(2)}Cr`
       }
     },
     {
