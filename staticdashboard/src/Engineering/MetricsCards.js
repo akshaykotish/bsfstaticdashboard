@@ -1871,7 +1871,7 @@ const MetricsCards = ({
     if (selectedMetric?.isPatchData && PatchTable) {
       return (
         <PatchTable
-          data={patchData}
+          data={drillDownData}
           darkMode={darkMode}
           title={drillDownTitle}
           onClose={handleClose}
@@ -1880,7 +1880,7 @@ const MetricsCards = ({
       );
     }
 
-    // Render regular project data table
+    // Render regular project data table with ONLY the filtered drillDownData
     return (
       <div className="fixed inset-0 z-[9999] overflow-hidden flex items-center justify-center">
         {/* Backdrop */}
@@ -1893,34 +1893,8 @@ const MetricsCards = ({
         <div className={`relative w-[98vw] max-w-[1600px] h-[88vh] ${
           darkMode ? 'bg-gray-900' : 'bg-white'
         } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
-          
-          {/* Header */}
-          <div className={`px-3 py-2 border-b ${
-            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
-          }`}>
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
-                  {drillDownTitle} &nbsp;
-                  <span className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
-                    (Showing {drillDownData.length} projects)
-                  </span>
-                </h2>
-                
-              </div>
-              
-              <button
-                onClick={handleClose}
-                className={`p-2 rounded-lg ${
-                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
-                } transition-colors`}
-              >
-                <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
-              </button>
-            </div>
-          </div>
 
-          {/* Data Table */}
+          {/* Data Table - ONLY showing drillDownData rows */}
           <div className="flex-1 overflow-hidden">
             <DataTable
               data={drillDownData}
@@ -1932,6 +1906,9 @@ const MetricsCards = ({
               maxHeight="calc(85vh - 80px)"
               maxWidth="100%"
               databaseName={databaseName}
+              heading={drillDownTitle}
+              subHeading={`Showing ${drillDownData.length} ${drillDownData.length === 1 ? 'project' : 'projects'}`}
+              onClose={handleClose}
             />
           </div>
         </div>

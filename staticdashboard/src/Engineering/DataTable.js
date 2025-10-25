@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { 
   Search, X, ChevronDown, ChevronUp, RotateCcw,
@@ -8,7 +8,9 @@ import {
   DollarSign, Calendar, CheckCircle, AlertCircle,
   Timer, Gauge, IndianRupee, Flag, Maximize2,
   PauseCircle, CreditCard, PlayCircle, TrendingDown,
-  Activity, Heart, Award, Hash, Layers
+  Activity, Heart, Award, Hash, Layers, Columns,
+  CheckSquare, Square, List, Grid, FileText,
+  Check, Sliders
 } from 'lucide-react';
 
 // Import components
@@ -19,7 +21,7 @@ import FitViewModal from './FitView';
 
 // Import database configurations and data context
 import { databaseConfigs, getConfig, getDatabaseNames, generateId, applyCalculations } from '../System/config';
-import { useData } from './useData'; // Import the useData hook
+import { useData } from './useData';
 
 // Inject enhanced progress animation styles
 const animatedStripesStyle = `
@@ -77,6 +79,369 @@ if (typeof document !== 'undefined' && !document.getElementById('datatable-progr
   document.head.appendChild(styleSheet);
 }
 
+// Portal component for dropdown
+const DropdownPortal = ({ children }) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+
+  if (!mounted) return null;
+  
+  return ReactDOM.createPortal(
+    children,
+    document.body
+  );
+};
+
+// Multi-select dropdown component
+const MultiSelect = ({ 
+  options = [], 
+  value = [], 
+  onChange, 
+  placeholder = 'Select...', 
+  darkMode = false,
+  icon: Icon,
+  maxHeight = '300px',
+  enableSearch = true,
+  disabled = false,
+  showCounts = false,
+  totalCount = 0,
+  isFiltered = false,
+  customLabels = {}
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const buttonRef = useRef(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (buttonRef.current && !buttonRef.current.contains(event.target) && 
+          !event.target.closest('.multiselect-dropdown-portal')) {
+        setIsOpen(false);
+      }
+    };
+    
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      
+      const position = {
+        left: rect.left,
+        width: rect.width,
+        top: spaceBelow > 350 || spaceBelow > spaceAbove 
+          ? rect.bottom + 4 
+          : rect.top - 350 - 4
+      };
+      
+      setDropdownPosition(position);
+    }
+  }, [isOpen]);
+
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm || !enableSearch) return options;
+    return options.filter(opt => {
+      const label = customLabels[opt] || opt;
+      return label.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+  }, [options, searchTerm, enableSearch, customLabels]);
+
+  const toggleOption = (option) => {
+    if (value.includes(option)) {
+      onChange(value.filter(v => v !== option));
+    } else {
+      onChange([...value, option]);
+    }
+  };
+
+  const selectAll = () => {
+    onChange([...options]);
+  };
+
+  const clearAll = () => {
+    onChange([]);
+  };
+
+  const getDisplayText = () => {
+    if (value.length === 0) return placeholder;
+    if (value.length === options.length && options.length > 0) return 'All Selected';
+    if (value.length === 1) {
+      return customLabels[value[0]] || value[0];
+    }
+    return `${value.length} Selected`;
+  };
+
+  const getOptionLabel = (option) => {
+    return customLabels[option] || option;
+  };
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={`min-w-[120px] px-2 py-1 border rounded-lg flex items-center justify-between transition-all text-xs ${
+          disabled
+            ? 'bg-gray-50 border-gray-300 text-gray-400 cursor-not-allowed'
+            : darkMode 
+              ? 'bg-gray-700 border-gray-600 text-gray-100 hover:bg-gray-600' 
+              : 'bg-white border-gray-200 text-gray-700 hover:border-blue-400 hover:bg-gray-50'
+        } ${isOpen && !disabled ? 'ring-2 ring-blue-400 border-blue-400' : ''}`}
+      >
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          {Icon && <Icon size={12} className={disabled ? 'text-gray-400' : 'text-blue-500'} />}
+          <span className="text-xs truncate">
+            {getDisplayText()}
+          </span>
+        </div>
+        <ChevronDown 
+          size={12} 
+          className={`transition-transform flex-shrink-0 ml-1 ${
+            disabled ? 'text-gray-400' : 'text-gray-400'
+          } ${isOpen ? 'rotate-180' : ''}`} 
+        />
+      </button>
+
+      {isOpen && !disabled && (
+        <DropdownPortal>
+          <div 
+            className="fixed inset-0 z-[9998]"
+            onClick={() => setIsOpen(false)}
+          />
+          
+          <div 
+            className={`multiselect-dropdown-portal fixed rounded-lg shadow-xl overflow-hidden ${
+              darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            } border z-[9999]`}
+            style={{ 
+              top: `${dropdownPosition.top}px`,
+              left: `${dropdownPosition.left}px`,
+              width: `${dropdownPosition.width}px`,
+              maxHeight: '350px'
+            }}
+          >
+            {enableSearch && options.length > 5 && (
+              <div className={`p-2 border-b ${
+                darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
+              } sticky top-0 z-10`}>
+                <div className="relative">
+                  <Search size={12} className="absolute left-2 top-2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className={`w-full pl-7 pr-2 py-1.5 text-xs rounded ${
+                      darkMode 
+                        ? 'bg-gray-700 text-gray-100 placeholder-gray-400' 
+                        : 'bg-white placeholder-gray-500 border border-gray-200'
+                    } focus:outline-none focus:ring-1 focus:ring-blue-400`}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className={`flex items-center justify-between px-3 py-1.5 border-b ${
+              darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-100 bg-gray-50'
+            } sticky ${enableSearch && options.length > 5 ? 'top-[46px]' : 'top-0'} z-10`}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  selectAll();
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Select All
+              </button>
+              <span className={`text-xs ${
+                darkMode ? 'text-gray-400' : 'text-gray-500'
+              }`}>
+                {value.length}/{options.length}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearAll();
+                }}
+                className={`text-xs font-medium ${
+                  darkMode 
+                    ? 'text-gray-400 hover:text-gray-300' 
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Clear
+              </button>
+            </div>
+
+            <div 
+              className={`overflow-y-auto ${
+                darkMode ? 'bg-gray-800' : 'bg-white'
+              }`} 
+              style={{ maxHeight: '250px' }}
+            >
+              {filteredOptions.length === 0 ? (
+                <div className={`px-3 py-4 text-xs text-center ${
+                  darkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  No options found
+                </div>
+              ) : (
+                filteredOptions.map(option => (
+                  <label
+                    key={option}
+                    className={`flex items-center gap-2 px-3 py-1.5 hover:${
+                      darkMode ? 'bg-gray-700' : 'bg-blue-50'
+                    } cursor-pointer transition-colors group`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-center w-3.5 h-3.5">
+                      <input
+                        type="checkbox"
+                        checked={value.includes(option)}
+                        onChange={() => toggleOption(option)}
+                        className="w-3.5 h-3.5 text-blue-500 rounded border-gray-300 focus:ring-blue-400 cursor-pointer"
+                      />
+                    </div>
+                    <span className={`text-xs truncate flex-1 ${
+                      darkMode ? 'text-gray-200' : 'text-gray-700'
+                    }`} 
+                    title={getOptionLabel(option)}>
+                      {getOptionLabel(option)}
+                    </span>
+                    {value.includes(option) && (
+                      <Check size={12} className="text-blue-500 flex-shrink-0" />
+                    )}
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+        </DropdownPortal>
+      )}
+    </>
+  );
+};
+
+// Range Slider component
+const RangeSlider = ({ 
+  min = 0, 
+  max = 100, 
+  step = 1, 
+  value = [0, 100], 
+  onChange, 
+  label, 
+  icon: Icon, 
+  darkMode = false,
+  formatValue,
+  unit = ''
+}) => {
+  const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleChange = (index, newValue) => {
+    const numValue = Number(newValue);
+    const updated = [...localValue];
+    
+    if (index === 0) {
+      updated[0] = Math.min(numValue, updated[1]);
+    } else {
+      updated[1] = Math.max(numValue, updated[0]);
+    }
+    
+    setLocalValue(updated);
+    onChange(updated);
+  };
+
+  const getTrackStyle = () => {
+    const start = ((localValue[0] - min) / (max - min)) * 100;
+    const end = ((localValue[1] - min) / (max - min)) * 100;
+    return {
+      left: `${start}%`,
+      width: `${end - start}%`
+    };
+  };
+
+  const resetRange = () => {
+    const resetValue = [min, max];
+    setLocalValue(resetValue);
+    onChange(resetValue);
+  };
+
+  const isModified = localValue[0] !== min || localValue[1] !== max;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-semibold flex items-center gap-1 text-gray-700">
+          {Icon && <Icon size={12} className="text-blue-500" />}
+          {label}
+        </label>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-gray-600">
+            {formatValue ? formatValue(localValue[0]) : `${localValue[0]}${unit}`} - {formatValue ? formatValue(localValue[1]) : `${localValue[1]}${unit}`}
+          </span>
+          {isModified && (
+            <button
+              onClick={resetRange}
+              className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+              title="Reset"
+            >
+              <RotateCcw size={10} className="text-gray-500" />
+            </button>
+          )}
+        </div>
+      </div>
+      
+      <div className="relative pt-1">
+        <div className="h-1.5 bg-gray-200 rounded-full">
+          <div 
+            className="absolute h-1.5 bg-blue-500 rounded-full"
+            style={getTrackStyle()}
+          />
+        </div>
+        
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={localValue[0]}
+          onChange={(e) => handleChange(0, e.target.value)}
+          className="absolute w-full -top-0.5 h-3 bg-transparent appearance-none cursor-pointer slider-thumb"
+          style={{ zIndex: localValue[0] === max ? 2 : 1 }}
+        />
+        
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={localValue[1]}
+          onChange={(e) => handleChange(1, e.target.value)}
+          className="absolute w-full -top-0.5 h-3 bg-transparent appearance-none cursor-pointer slider-thumb"
+          style={{ zIndex: 2 }}
+        />
+      </div>
+    </div>
+  );
+};
+
 // Helper functions
 const formatCurrency = (amount) => {
   if (!amount || amount === 0) return '₹0';
@@ -105,10 +470,27 @@ const parseDate = (dateStr) => {
   }
 };
 
+// Format date for display
+const formatDate = (dateStr) => {
+  const date = parseDate(dateStr);
+  if (!date) return 'N/A';
+  return date.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: '2-digit'
+  });
+};
+
 // Enhanced time metrics calculation with proper monthly progress logic
-const calculateTimeMetrics = (row) => {
-  const awardDate = parseDate(row.award_date);
-  const pdcDate = parseDate(row.pdc_revised) || parseDate(row.pdc_agreement);
+const calculateTimeMetrics = (row, fieldMappings) => {
+  // Use fieldMappings to get correct field names
+  const getFieldValue = (fieldKey) => {
+    const fieldName = fieldMappings[fieldKey];
+    return row[fieldName];
+  };
+
+  const awardDate = parseDate(getFieldValue('awardDate'));
+  const pdcDate = parseDate(getFieldValue('pdcRevised')) || parseDate(getFieldValue('pdcAgreement')) || parseDate(getFieldValue('PDC'));
   const today = new Date();
   
   if (!awardDate) {
@@ -129,22 +511,16 @@ const calculateTimeMetrics = (row) => {
   const elapsedDays = Math.floor((today - awardDate) / (1000 * 60 * 60 * 24));
   const remainingDays = Math.floor((pdcDate - today) / (1000 * 60 * 60 * 24));
   
-  // Calculate months for pace determination
   const totalMonths = Math.max(1, Math.round(totalDays / 30.44));
   const elapsedMonths = Math.max(0, Math.floor(elapsedDays / 30.44));
   
-  // Monthly expected progress rate (e.g., for 12 months = 8.33% per month)
   const monthlyProgressRate = 100 / totalMonths;
-  
-  // Expected progress based on elapsed time
   const expectedProgress = Math.min(100, elapsedMonths * monthlyProgressRate);
-  const actualProgress = parseFloat(row.physical_progress_percent) || 0;
+  const actualProgress = parseFloat(getFieldValue('physicalProgress')) || parseFloat(getFieldValue('COMPLETED_PERCENTAGE')) || 0;
   
-  // Track progress history for stuck detection (would need actual historical data)
   const previousMonthProgress = row.previous_month_progress || null;
   const progressHistory = row.progress_history || [];
   
-  // Check if progress is stuck (same as previous period)
   let isStuck = false;
   if (progressHistory.length >= 2) {
     const recentProgress = progressHistory.slice(-3);
@@ -153,16 +529,13 @@ const calculateTimeMetrics = (row) => {
     isStuck = Math.abs(actualProgress - previousMonthProgress) < 0.5;
   }
   
-  // Calculate monthly progress achieved
   const actualMonthlyRate = elapsedMonths > 0 ? actualProgress / elapsedMonths : 0;
   
-  // Determine pace status with enhanced logic
   let paceStatus = 'NOT_APPLICABLE';
   let paceDetails = {};
   
-  // Check for payment pending (completed but not fully paid)
   if (actualProgress >= 100) {
-    const expenditurePercent = parseFloat(row.expenditure_percent) || 0;
+    const expenditurePercent = parseFloat(getFieldValue('expenditurePercent')) || 0;
     if (expenditurePercent < 100) {
       paceStatus = 'PAYMENT_PENDING';
       paceDetails = {
@@ -179,7 +552,6 @@ const calculateTimeMetrics = (row) => {
       };
     }
   } else if (elapsedMonths === 0) {
-    // Just started (within first month)
     if (actualProgress >= monthlyProgressRate * 0.5) {
       paceStatus = 'PERFECT_PACE';
       paceDetails = {
@@ -194,11 +566,9 @@ const calculateTimeMetrics = (row) => {
       };
     }
   } else {
-    // Calculate progress variance
     const progressDifference = actualProgress - expectedProgress;
     const monthsBehind = progressDifference / monthlyProgressRate;
     
-    // Check for stuck/sleep pace
     if (isStuck && elapsedMonths >= 2 && actualProgress < 95) {
       paceStatus = 'SLEEP_PACE';
       paceDetails = {
@@ -208,7 +578,6 @@ const calculateTimeMetrics = (row) => {
         progressDifference
       };
     } else if (progressDifference >= -monthlyProgressRate * 0.25) {
-      // Within quarter month tolerance - Perfect Pace
       paceStatus = 'PERFECT_PACE';
       paceDetails = {
         message: progressDifference >= 0 ? 
@@ -219,7 +588,6 @@ const calculateTimeMetrics = (row) => {
         monthsAhead: Math.max(0, monthsBehind)
       };
     } else if (progressDifference >= -monthlyProgressRate * 1) {
-      // Within one month delay - Slow Pace
       paceStatus = 'SLOW_PACE';
       paceDetails = {
         message: `Behind by ${Math.abs(monthsBehind).toFixed(1)} months`,
@@ -228,7 +596,6 @@ const calculateTimeMetrics = (row) => {
         monthsBehind: Math.abs(monthsBehind)
       };
     } else if (progressDifference >= -monthlyProgressRate * 2) {
-      // Within two months delay - Bad Pace
       paceStatus = 'BAD_PACE';
       paceDetails = {
         message: `Critical: ${Math.abs(monthsBehind).toFixed(1)} months behind`,
@@ -237,7 +604,6 @@ const calculateTimeMetrics = (row) => {
         monthsBehind: Math.abs(monthsBehind)
       };
     } else {
-      // More than two months behind - Sleep Pace
       paceStatus = 'SLEEP_PACE';
       paceDetails = {
         message: `Severely delayed: ${Math.abs(monthsBehind).toFixed(1)} months behind`,
@@ -248,7 +614,6 @@ const calculateTimeMetrics = (row) => {
       };
     }
     
-    // Add monthly rate info
     paceDetails.monthlyRate = {
       expected: monthlyProgressRate,
       actual: actualMonthlyRate,
@@ -400,7 +765,6 @@ const ProgressBar = ({ progress, expected, paceStatus, showAnimation = true }) =
       </div>
       <div className="relative">
         <div className="w-full h-[3px] bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-          {/* Expected progress indicator */}
           {expected !== undefined && expected > 0 && expected < 100 && (
             <div 
               className="absolute top-0 h-full w-0.5 bg-gray-400 dark:bg-gray-500 z-10"
@@ -408,7 +772,6 @@ const ProgressBar = ({ progress, expected, paceStatus, showAnimation = true }) =
               title={`Expected: ${expected.toFixed(0)}%`}
             />
           )}
-          {/* Actual progress bar */}
           <div
             className={`h-full transition-all duration-500 rounded-full ${
               progress >= 100 ? 'bg-gradient-to-r from-green-500 to-green-600' :
@@ -420,7 +783,6 @@ const ProgressBar = ({ progress, expected, paceStatus, showAnimation = true }) =
           />
         </div>
       </div>
-      {/* Progress variance indicator */}
       {expected !== undefined && Math.abs(progress - expected) > 5 && (
         <div className={`text-[10px] mt-0.5 ${
           isDelayed ? 'text-red-500' : 'text-green-500'
@@ -486,6 +848,288 @@ const storeState = (key, databaseName, value) => {
   }
 };
 
+// Column Selector Modal Component
+const ColumnSelectorModal = ({ isOpen, onClose, columns, visibleColumns, onToggleColumn, onResetColumns, darkMode }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const filteredColumns = useMemo(() => {
+    if (!searchTerm) return columns;
+    return columns.filter(col => 
+      col.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      col.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [columns, searchTerm]);
+  
+  const selectAll = () => {
+    columns.forEach(col => {
+      if (!visibleColumns.includes(col.name)) {
+        onToggleColumn(col.name);
+      }
+    });
+  };
+  
+  const deselectAll = () => {
+    columns.forEach(col => {
+      if (visibleColumns.includes(col.name)) {
+        onToggleColumn(col.name);
+      }
+    });
+  };
+  
+  if (!isOpen) return null;
+  
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className={`relative w-full max-w-2xl max-h-[90vh] ${
+        darkMode ? 'bg-gray-800' : 'bg-white'
+      } rounded-2xl shadow-2xl overflow-hidden flex flex-col m-4`}>
+        <div className={`px-6 py-4 border-b ${
+          darkMode ? 'border-gray-700' : 'border-gray-200'
+        } flex justify-between items-center`}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
+              <Columns size={20} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Manage Columns
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {visibleColumns.length} of {columns.length} columns visible
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            <X size={20} className="text-gray-500" />
+          </button>
+        </div>
+        
+        <div className={`px-6 py-3 border-b ${
+          darkMode ? 'border-gray-700' : 'border-gray-200'
+        }`}>
+          <div className="relative mb-3">
+            <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search columns..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={`w-full pl-10 pr-4 py-2 text-sm rounded-lg border ${
+                darkMode 
+                  ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400' 
+                  : 'bg-white border-gray-300 placeholder-gray-500'
+              } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+            />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex gap-2">
+              <button
+                onClick={selectAll}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+              >
+                Select All
+              </button>
+              <button
+                onClick={deselectAll}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg ${
+                  darkMode 
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                } transition-colors`}
+              >
+                Deselect All
+              </button>
+            </div>
+            <button
+              onClick={onResetColumns}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg flex items-center gap-1 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+            >
+              <RotateCcw size={12} />
+              Reset to Default
+            </button>
+          </div>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {filteredColumns.map(col => (
+              <label
+                key={col.name}
+                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                  darkMode 
+                    ? 'hover:bg-gray-700' 
+                    : 'hover:bg-gray-50'
+                } ${visibleColumns.includes(col.name) ? 'ring-2 ring-blue-500/30' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={visibleColumns.includes(col.name)}
+                  onChange={() => onToggleColumn(col.name)}
+                  className="w-4 h-4 text-blue-500 rounded border-gray-300 focus:ring-blue-500"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                    {col.label}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {col.name}
+                  </div>
+                </div>
+                {visibleColumns.includes(col.name) ? (
+                  <CheckSquare size={16} className="text-blue-500 flex-shrink-0" />
+                ) : (
+                  <Square size={16} className="text-gray-400 flex-shrink-0" />
+                )}
+              </label>
+            ))}
+          </div>
+          
+          {filteredColumns.length === 0 && (
+            <div className="text-center py-12">
+              <Search size={48} className="mx-auto text-gray-400 mb-4" />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                No columns found matching "{searchTerm}"
+              </p>
+            </div>
+          )}
+        </div>
+        
+        <div className={`px-6 py-4 border-t ${
+          darkMode ? 'border-gray-700' : 'border-gray-200'
+        } flex justify-end gap-2`}>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// Dynamic cell renderer based on column configuration
+const DynamicCell = ({ column, value, row, dbConfig, fieldMappings }) => {
+  const { type, name } = column;
+  
+  // Handle different column types
+  switch (type) {
+    case 'id':
+      return (
+        <div className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+          {value || 'N/A'}
+        </div>
+      );
+      
+    case 'number':
+      // Check if it's a currency field
+      if (name.toLowerCase().includes('amount') || name.toLowerCase().includes('lakh') || name.toLowerCase().includes('cr')) {
+        const multiplier = name.toLowerCase().includes('cr') ? 10000000 : 100000;
+        return (
+          <div className="flex items-center gap-1">
+            <IndianRupee size={14} className="text-green-600" />
+            <span className="text-sm font-bold text-green-600">
+              {formatCurrency(parseFloat(value || 0) * multiplier)}
+            </span>
+          </div>
+        );
+      }
+      // Check if it's a percentage field
+      if (name.toLowerCase().includes('percent') || name.toLowerCase().includes('percentage')) {
+        return (
+          <span className="text-sm font-semibold text-blue-600">
+            {parseFloat(value || 0).toFixed(1)}%
+          </span>
+        );
+      }
+      // Regular number
+      return (
+        <span className="text-sm font-medium text-gray-900">
+          {parseFloat(value || 0).toLocaleString()}
+        </span>
+      );
+      
+    case 'date':
+      return (
+        <div className="flex items-center gap-1">
+          <Calendar size={12} className="text-gray-400" />
+          <span className="text-xs text-gray-600">
+            {formatDate(value)}
+          </span>
+        </div>
+      );
+      
+    case 'textarea':
+      return (
+        <div className="max-w-xs">
+          <p className="text-xs text-gray-600 truncate" title={value}>
+            {value || 'N/A'}
+          </p>
+        </div>
+      );
+      
+    case 'text':
+    default:
+      return (
+        <span className="text-sm text-gray-900 truncate" title={value}>
+          {value || 'N/A'}
+        </span>
+      );
+  }
+};
+
+// Create field mappings from config
+const createFieldMappings = (dbConfig) => {
+  const mappings = {};
+  
+  if (!dbConfig || !dbConfig.columns) {
+    return mappings;
+  }
+  
+  // Create a mapping of logical field names to actual column names
+  dbConfig.columns.forEach(col => {
+    const colName = typeof col === 'object' ? col.name : col;
+    const colLabel = typeof col === 'object' ? col.label : colName;
+    
+    // Map based on common patterns in column names
+    const nameLower = colName.toLowerCase();
+    
+    // Date fields
+    if (nameLower.includes('award') && nameLower.includes('date')) {
+      mappings.awardDate = colName;
+    } else if (nameLower.includes('tender') && nameLower.includes('date')) {
+      mappings.tenderDate = colName;
+    } else if (nameLower.includes('pdc') && nameLower.includes('revised')) {
+      mappings.pdcRevised = colName;
+    } else if (nameLower.includes('pdc') && nameLower.includes('agreement')) {
+      mappings.pdcAgreement = colName;
+    } else if (nameLower === 'pdc') {
+      mappings.PDC = colName;
+    }
+    
+    // Progress fields
+    if (nameLower.includes('physical') && nameLower.includes('progress')) {
+      mappings.physicalProgress = colName;
+    } else if (nameLower.includes('completed') && nameLower.includes('percentage')) {
+      mappings.COMPLETED_PERCENTAGE = colName;
+    }
+    
+    // Expenditure fields
+    if (nameLower.includes('expenditure') && nameLower.includes('percent')) {
+      mappings.expenditurePercent = colName;
+    }
+  });
+  
+  return mappings;
+};
+
 // Main DataTable Component
 const DataTable = ({ 
   data: initialData, 
@@ -497,9 +1141,24 @@ const DataTable = ({
   maxWidth = '100%',
   isEmbedded = false,
   onRefreshData,
-  databaseName = 'engineering'
+  databaseName = 'engineering',
+  heading,
+  subHeading,
+  onClose
 }) => {
-  // Get database data with useData hook instead of relying solely on props
+
+  // Get database configuration
+  const dbConfig = useMemo(() => getConfig(databaseName), [databaseName]);
+  const idField = useMemo(() => dbConfig?.idField || 'id', [dbConfig]);
+  
+  // Create field mappings from config
+  const fieldMappings = useMemo(() => createFieldMappings(dbConfig), [dbConfig]);
+
+  // Set dynamic heading if not provided
+  const tableHeading = heading || dbConfig?.displayName || 'Data Table';
+  const tableSubHeading = subHeading || dbConfig?.description || '';
+
+  // Get database data with useData hook
   const {
     rawData: hookData,
     loading: hookLoading,
@@ -510,11 +1169,10 @@ const DataTable = ({
     deleteRecords: hookDeleteRecords
   } = useData(databaseName);
 
-  // Use combined data approach - props have priority, fallback to hook data
+  // Use combined data approach
   const [localData, setLocalData] = useState(initialData || []);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Update local data when either props or hook data changes
   useEffect(() => {
     if (initialData && initialData.length > 0) {
       setLocalData(initialData);
@@ -523,7 +1181,103 @@ const DataTable = ({
     }
   }, [initialData, hookData]);
 
-  // Initialize state from localStorage, with fallbacks
+  // Build dynamic column definitions from config
+  const allColumnsFromConfig = useMemo(() => {
+    const columns = [];
+    
+    // Add ID column
+    columns.push({
+      name: 'row_number',
+      label: 'S.No',
+      type: 'system',
+      alwaysVisible: true
+    });
+    
+    // Add columns from database config
+    if (dbConfig?.columns) {
+      dbConfig.columns.forEach(col => {
+        columns.push({
+          name: col.name,
+          label: col.label || col.name,
+          type: col.type || 'text',
+          group: col.group,
+          calculated: col.calculated || false,
+          required: col.required || false
+        });
+      });
+    }
+    
+    // Add derived columns if certain fields exist
+    const hasProgressField = dbConfig?.columns?.some(c => 
+      c.name.toLowerCase().includes('progress') || 
+      c.name.toLowerCase().includes('percent')
+    );
+    
+    const hasDateFields = dbConfig?.columns?.some(c => c.type === 'date');
+    
+    if (hasProgressField && hasDateFields) {
+      columns.push({
+        name: 'paceStatus',
+        label: 'Pace Analysis',
+        type: 'derived',
+        derivedType: 'pace'
+      });
+      
+      columns.push({
+        name: 'timeStatus',
+        label: 'Time Status',
+        type: 'derived',
+        derivedType: 'time'
+      });
+    }
+    
+    // Add actions column
+    columns.push({
+      name: 'actions',
+      label: 'Actions',
+      type: 'system',
+      alwaysVisible: true
+    });
+    
+    return columns;
+  }, [dbConfig]);
+
+  // Define default visible columns based on config
+  const defaultVisibleColumns = useMemo(() => {
+    const defaults = ['row_number'];
+    
+    // Add ID field
+    if (idField) {
+      defaults.push(idField);
+    }
+    
+    // Add comparison columns if defined in config
+    if (dbConfig?.comparisonColumns && dbConfig.comparisonColumns.length > 0) {
+      defaults.push(...dbConfig.comparisonColumns);
+    } else {
+      // Fallback: add first 5 non-ID columns
+      const nonIdColumns = allColumnsFromConfig
+        .filter(col => col.type !== 'system' && col.type !== 'derived' && col.name !== idField)
+        .slice(0, 5)
+        .map(col => col.name);
+      defaults.push(...nonIdColumns);
+    }
+    
+    // Add derived columns if they exist
+    if (allColumnsFromConfig.some(col => col.name === 'paceStatus')) {
+      defaults.push('paceStatus');
+    }
+    if (allColumnsFromConfig.some(col => col.name === 'timeStatus')) {
+      defaults.push('timeStatus');
+    }
+    
+    // Always show actions
+    defaults.push('actions');
+    
+    return defaults;
+  }, [dbConfig, allColumnsFromConfig, idField]);
+
+  // Initialize state from localStorage
   const [sortConfig, setSortConfig] = useState(() => 
     getStoredState('sortConfig', databaseName, { key: null, direction: 'asc' })
   );
@@ -543,7 +1297,7 @@ const DataTable = ({
     getStoredState('showAdvancedMetrics', databaseName, false)
   );
   
-  // Modal states (not persisted as they should reset on page load)
+  // Modal states
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedProjectForReport, setSelectedProjectForReport] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -552,18 +1306,41 @@ const DataTable = ({
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [fitViewModalOpen, setFitViewModalOpen] = useState(false);
   const [selectedRowForFitView, setSelectedRowForFitView] = useState(null);
+  const [columnSelectorOpen, setColumnSelectorOpen] = useState(false);
 
-  // Filter states (persisted)
+  // Filter states
   const [filters, setFilters] = useState(() => 
     getStoredState('filters', databaseName, {
-      frontier: '',
-      sector: '',
-      paceStatus: '',
-      progressStatus: ''
+      columnFilters: {},
+      rangeFilters: {},
+      dateFilters: {}
     })
   );
 
-  // Store state in localStorage whenever it changes
+  // Column visibility state
+  const [visibleColumns, setVisibleColumns] = useState(() => 
+    getStoredState('visibleColumns', databaseName, defaultVisibleColumns)
+  );
+
+  // Toggle column visibility
+  const toggleColumnVisibility = useCallback((columnName) => {
+    setVisibleColumns(prev => {
+      const isVisible = prev.includes(columnName);
+      const updated = isVisible 
+        ? prev.filter(col => col !== columnName)
+        : [...prev, columnName];
+      storeState('visibleColumns', databaseName, updated);
+      return updated;
+    });
+  }, [databaseName]);
+
+  // Reset columns to default
+  const resetColumns = useCallback(() => {
+    setVisibleColumns(defaultVisibleColumns);
+    storeState('visibleColumns', databaseName, defaultVisibleColumns);
+  }, [databaseName, defaultVisibleColumns]);
+
+  // Store state in localStorage
   useEffect(() => {
     storeState('sortConfig', databaseName, sortConfig);
   }, [sortConfig, databaseName]);
@@ -592,63 +1369,42 @@ const DataTable = ({
     storeState('filters', databaseName, filters);
   }, [filters, databaseName]);
 
-  // Function to clear all stored state (for manual resets)
-  const clearTableState = useCallback(() => {
-    localStorage.removeItem(`bsfDashboard_${databaseName}_sortConfig`);
-    localStorage.removeItem(`bsfDashboard_${databaseName}_currentPage`);
-    localStorage.removeItem(`bsfDashboard_${databaseName}_itemsPerPage`);
-    localStorage.removeItem(`bsfDashboard_${databaseName}_searchTerm`);
-    localStorage.removeItem(`bsfDashboard_${databaseName}_showFilters`);
-    localStorage.removeItem(`bsfDashboard_${databaseName}_showAdvancedMetrics`);
-    localStorage.removeItem(`bsfDashboard_${databaseName}_filters`);
+  // Get unique filter options for text columns
+  const filterOptions = useMemo(() => {
+    const options = {};
     
-    // Reset state to defaults
-    setSortConfig({ key: null, direction: 'asc' });
-    setCurrentPage(1);
-    setItemsPerPage(25);
-    setSearchTerm('');
-    setShowFilters(false);
-    setShowAdvancedMetrics(false);
-    setFilters({
-      frontier: '',
-      sector: '',
-      paceStatus: '',
-      progressStatus: ''
-    });
-  }, [databaseName]);
-
-  // Add this to window object for debugging (can be removed in production)
-  useEffect(() => {
-    if (!window.bsfDashboardHelpers) {
-      window.bsfDashboardHelpers = {};
+    if (dbConfig?.columns) {
+      dbConfig.columns.forEach(col => {
+        if (col.type === 'text' || col.type === 'textarea') {
+          const values = [...new Set(localData.map(d => d[col.name]).filter(Boolean))];
+          options[col.name] = values.sort();
+        }
+      });
     }
-    window.bsfDashboardHelpers[`clearTable_${databaseName}`] = clearTableState;
-  }, [databaseName, clearTableState]);
-
-  // Handle beforeunload to ensure state is saved before the page unloads
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      storeState('sortConfig', databaseName, sortConfig);
-      storeState('currentPage', databaseName, currentPage);
-      storeState('itemsPerPage', databaseName, itemsPerPage);
-      storeState('searchTerm', databaseName, searchTerm);
-      storeState('showFilters', databaseName, showFilters);
-      storeState('showAdvancedMetrics', databaseName, showAdvancedMetrics);
-      storeState('filters', databaseName, filters);
-    };
     
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [
-    sortConfig, currentPage, itemsPerPage, searchTerm, 
-    showFilters, showAdvancedMetrics, filters, databaseName
-  ]);
+    return options;
+  }, [localData, dbConfig]);
 
-  // Get database configuration
-  const dbConfig = useMemo(() => getConfig(databaseName), [databaseName]);
-  const idField = useMemo(() => dbConfig?.idField || 'id', [dbConfig]);
+  // Get range bounds for number columns
+  const rangeBounds = useMemo(() => {
+    const bounds = {};
+    
+    if (dbConfig?.columns) {
+      dbConfig.columns.forEach(col => {
+        if (col.type === 'number') {
+          const values = localData.map(d => parseFloat(d[col.name]) || 0).filter(v => !isNaN(v));
+          if (values.length > 0) {
+            bounds[col.name] = {
+              min: Math.min(...values),
+              max: Math.max(...values)
+            };
+          }
+        }
+      });
+    }
+    
+    return bounds;
+  }, [localData, dbConfig]);
 
   // Process and filter data
   const processedData = useMemo(() => {
@@ -671,27 +1427,41 @@ const DataTable = ({
       );
     }
     
-    // Apply filters
-    if (filters.frontier) {
-      processed = processed.filter(item => item.ftr_hq_name === filters.frontier);
-    }
-    
-    if (filters.sector) {
-      processed = processed.filter(item => item.shq_name === filters.sector);
-    }
-    
-    if (filters.paceStatus) {
-      processed = processed.filter(item => {
-        const metrics = calculateTimeMetrics(item);
-        return metrics?.paceStatus === filters.paceStatus;
+    // Apply column filters (multi-select)
+    if (filters.columnFilters) {
+      Object.entries(filters.columnFilters).forEach(([field, values]) => {
+        if (values && values.length > 0) {
+          processed = processed.filter(item => values.includes(item[field]));
+        }
       });
     }
     
-    if (filters.progressStatus) {
-      processed = processed.filter(item => {
-        const progress = parseFloat(item.physical_progress_percent) || 0;
-        const status = getProgressStatus(progress);
-        return status === filters.progressStatus;
+    // Apply range filters
+    if (filters.rangeFilters) {
+      Object.entries(filters.rangeFilters).forEach(([field, range]) => {
+        if (range && range.length === 2) {
+          processed = processed.filter(item => {
+            const value = parseFloat(item[field]) || 0;
+            return value >= range[0] && value <= range[1];
+          });
+        }
+      });
+    }
+    
+    // Apply date filters
+    if (filters.dateFilters) {
+      Object.entries(filters.dateFilters).forEach(([field, dateFilter]) => {
+        if (dateFilter && dateFilter.enabled) {
+          processed = processed.filter(item => {
+            const date = parseDate(item[field]);
+            if (!date) return !dateFilter.requireValue;
+            
+            if (dateFilter.start && date < new Date(dateFilter.start)) return false;
+            if (dateFilter.end && date > new Date(dateFilter.end)) return false;
+            
+            return true;
+          });
+        }
       });
     }
 
@@ -700,15 +1470,6 @@ const DataTable = ({
       processed.sort((a, b) => {
         let aVal = a[sortConfig.key];
         let bVal = b[sortConfig.key];
-        
-        // Special handling for pace status
-        if (sortConfig.key === 'paceStatus') {
-          const aMetrics = calculateTimeMetrics(a);
-          const bMetrics = calculateTimeMetrics(b);
-          const aPriority = getPaceConfig(aMetrics?.paceStatus).priority;
-          const bPriority = getPaceConfig(bMetrics?.paceStatus).priority;
-          return sortConfig.direction === 'asc' ? aPriority - bPriority : bPriority - aPriority;
-        }
         
         if (aVal == null) aVal = '';
         if (bVal == null) bVal = '';
@@ -732,61 +1493,34 @@ const DataTable = ({
     return processedData.slice(startIndex, startIndex + itemsPerPage);
   }, [processedData, currentPage, itemsPerPage]);
 
-  // Calculate total pages and adjust current page if needed
   const totalPages = Math.ceil(processedData.length / itemsPerPage);
   
-  // Ensure current page is valid when data changes
   useEffect(() => {
     if (totalPages > 0 && currentPage > totalPages) {
       setCurrentPage(Math.max(1, totalPages));
     }
   }, [totalPages, currentPage]);
 
-  // Get unique values for filters
-  const uniqueFrontiers = useMemo(() => 
-    [...new Set(processedData.map(row => row.ftr_hq_name).filter(Boolean))],
-    [processedData]
-  );
-  
-  const uniqueSectors = useMemo(() => 
-    [...new Set(processedData.map(row => row.shq_name).filter(Boolean))],
-    [processedData]
-  );
-  
-  const uniquePaceStatuses = ['PERFECT_PACE', 'SLOW_PACE', 'BAD_PACE', 'SLEEP_PACE', 'PAYMENT_PENDING', 'COMPLETED', 'NOT_STARTED'];
-
-  // Calculate aggregate statistics
-  const aggregateStats = useMemo(() => {
-    const paceDistribution = {};
-    let totalExpectedProgress = 0;
-    let totalActualProgress = 0;
-    let criticalCount = 0;
-    let onTrackCount = 0;
-    
-    processedData.forEach(row => {
-      const metrics = calculateTimeMetrics(row);
-      if (metrics) {
-        paceDistribution[metrics.paceStatus] = (paceDistribution[metrics.paceStatus] || 0) + 1;
-        totalExpectedProgress += metrics.expectedProgress || 0;
-        totalActualProgress += metrics.actualProgress || 0;
-        
-        if (metrics.paceStatus === 'SLEEP_PACE' || metrics.paceStatus === 'BAD_PACE') {
-          criticalCount++;
-        } else if (metrics.paceStatus === 'PERFECT_PACE') {
-          onTrackCount++;
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (searchTerm) count++;
+    if (filters.columnFilters) {
+      count += Object.values(filters.columnFilters).filter(v => v && v.length > 0).length;
+    }
+    if (filters.rangeFilters) {
+      Object.entries(filters.rangeFilters).forEach(([field, range]) => {
+        const bounds = rangeBounds[field];
+        if (bounds && range && (range[0] !== bounds.min || range[1] !== bounds.max)) {
+          count++;
         }
-      }
-    });
-    
-    return {
-      paceDistribution,
-      avgExpectedProgress: processedData.length > 0 ? totalExpectedProgress / processedData.length : 0,
-      avgActualProgress: processedData.length > 0 ? totalActualProgress / processedData.length : 0,
-      criticalCount,
-      onTrackCount,
-      totalProjects: processedData.length
-    };
-  }, [processedData]);
+      });
+    }
+    if (filters.dateFilters) {
+      count += Object.values(filters.dateFilters).filter(v => v?.enabled).length;
+    }
+    return count;
+  }, [searchTerm, filters, rangeBounds]);
 
   // Handlers
   const handleSort = useCallback((key) => {
@@ -796,22 +1530,15 @@ const DataTable = ({
     }));
   }, []);
 
-  // Enhanced refresh handler using useData hook's refetch
   const handleRefreshData = useCallback(async () => {
     try {
       setIsRefreshing(true);
-      
-      // First try the parent's refresh handler if available
       if (onRefreshData && typeof onRefreshData === 'function') {
         await onRefreshData();
       }
-      
-      // Then use the hook's refetch as a backup or additional refresh
       if (hookRefetch && typeof hookRefetch === 'function') {
         await hookRefetch();
       }
-      
-      // Success visual feedback
       setTimeout(() => setIsRefreshing(false), 500);
     } catch (error) {
       console.error("Error refreshing data:", error);
@@ -819,28 +1546,22 @@ const DataTable = ({
     }
   }, [onRefreshData, hookRefetch]);
 
-  // Function to handle successful data update locally without refreshing
   const handleDataUpdate = useCallback((updatedData) => {
-    // Find and update the record in our local data
     setLocalData(prevData => {
       return prevData.map(item => 
         item[idField] === updatedData[idField] ? { ...item, ...updatedData } : item
       );
     });
     
-    // Close the edit modal
     setEditModalOpen(false);
     setSelectedProjectForEdit(null);
     setSelectedRowId(null);
     
-    // Also update the report modal if it's the same record
     if (selectedProjectForReport && selectedProjectForReport[idField] === updatedData[idField]) {
       setSelectedProjectForReport({ ...selectedProjectForReport, ...updatedData });
     }
     
-    // Try to update using the hook's API
     if (hookUpdateRecord && typeof hookUpdateRecord === 'function') {
-      // Find the index if needed by the hook
       const recordIndex = localData.findIndex(item => item[idField] === updatedData[idField]);
       if (recordIndex !== -1) {
         hookUpdateRecord(recordIndex, updatedData).catch(err => 
@@ -850,25 +1571,19 @@ const DataTable = ({
     }
   }, [idField, localData, selectedProjectForReport, hookUpdateRecord]);
 
-  // Function to handle successful record deletion
   const handleDeleteSuccess = useCallback((deletedId) => {
-    // Remove the record from our local data
     setLocalData(prevData => {
       return prevData.filter(item => item[idField] !== deletedId);
     });
     
-    // Close the edit modal
     setEditModalOpen(false);
     
-    // Close the report modal if it's showing the deleted record
     if (selectedProjectForReport && selectedProjectForReport[idField] === deletedId) {
       setReportModalOpen(false);
       setSelectedProjectForReport(null);
     }
     
-    // Try to delete using the hook's API
     if (hookDeleteRecords && typeof hookDeleteRecords === 'function') {
-      // Find the index if needed by the hook
       const recordIndex = localData.findIndex(item => item[idField] === deletedId);
       if (recordIndex !== -1) {
         hookDeleteRecords([recordIndex]).catch(err => 
@@ -878,20 +1593,14 @@ const DataTable = ({
     }
   }, [idField, localData, selectedProjectForReport, hookDeleteRecords]);
 
-  // Function to handle successful record addition
   const handleAddSuccess = useCallback((newRecord) => {
-    // Add the new record to our local data
     setLocalData(prevData => {
       return [...prevData, newRecord];
     });
     
-    // Close the add modal
     setAddModalOpen(false);
-    
-    // Navigate to the first page to show the new record
     setCurrentPage(1);
     
-    // Try to add using the hook's API
     if (hookAddRecord && typeof hookAddRecord === 'function') {
       hookAddRecord(newRecord).catch(err => 
         console.error("Error syncing new record with API:", err)
@@ -924,49 +1633,100 @@ const DataTable = ({
   }, []);
 
   const exportTableData = useCallback(() => {
-    const csvContent = [
-      ['S.No', 'Scheme Name', 'Frontier', 'Sector', 'Project Cost', 'Total Expense', 'Progress %', 'Expected %', 'Pace Status', 'Monthly Rate', 'Time Status', 'Days Per %'],
-      ...processedData.map((row, index) => {
-        const metrics = calculateTimeMetrics(row);
-        return [
-          index + 1,
-          row.sub_scheme_name || row.name_of_scheme || '',
-          row.ftr_hq_name || '',
-          row.shq_name || '',
-          row.sd_amount_lakh || 0,
-          (parseFloat(row.expenditure_previous_fy || 0) + parseFloat(row.expenditure_current_fy || 0)).toFixed(2),
-          row.physical_progress_percent || 0,
-          metrics?.expectedProgress?.toFixed(1) || 0,
-          metrics?.paceStatus || 'N/A',
-          metrics?.actualMonthlyRate?.toFixed(2) || 0,
-          metrics?.isOverdue ? `Overdue by ${Math.abs(metrics.remainingDays)} days` : `${metrics?.remainingDays || 0} days remaining`,
-          metrics?.daysPerPercent || 'N/A'
-        ];
+    const headers = visibleColumns
+      .map(colName => allColumnsFromConfig.find(c => c.name === colName))
+      .filter(Boolean)
+      .map(col => col.label);
+    
+    const rows = processedData.map(row => 
+      visibleColumns.map(colName => {
+        const value = row[colName];
+        return value !== undefined && value !== null ? value : '';
       })
+    );
+    
+    const csvContent = [
+      headers,
+      ...rows
     ].map(row => row.join(',')).join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${databaseName}-pace-analysis-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `${databaseName}-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [processedData, databaseName]);
+  }, [processedData, databaseName, visibleColumns, allColumnsFromConfig]);
 
-  // Utility function to reset filters
   const resetFilters = useCallback(() => {
     setFilters({
-      frontier: '',
-      sector: '',
-      paceStatus: '',
-      progressStatus: ''
+      columnFilters: {},
+      rangeFilters: {},
+      dateFilters: {}
     });
     setSearchTerm('');
     setCurrentPage(1);
   }, []);
 
-  // Show loading state either from props or from hook
+  const handleClose = useCallback(() => {
+    if (onClose && typeof onClose === 'function') {
+      onClose();
+    }
+  }, [onClose]);
+
+  const handleRowClick = useCallback((row, event) => {
+    if (event && event.target.closest('button')) {
+      return;
+    }
+    openReportModal(row);
+  }, [openReportModal]);
+
+  // Column filter handlers
+  const handleColumnFilterChange = useCallback((columnName, values) => {
+    setFilters(prev => ({
+      ...prev,
+      columnFilters: {
+        ...prev.columnFilters,
+        [columnName]: values
+      }
+    }));
+    setCurrentPage(1);
+  }, []);
+
+  // Range filter handlers
+  const handleRangeFilterChange = useCallback((columnName, range) => {
+    setFilters(prev => ({
+      ...prev,
+      rangeFilters: {
+        ...prev.rangeFilters,
+        [columnName]: range
+      }
+    }));
+    setCurrentPage(1);
+  }, []);
+
+  // Get icon for column
+  const getColumnIcon = useCallback((column) => {
+    const iconMap = {
+      text: FileText,
+      number: Hash,
+      date: Calendar,
+      textarea: FileText
+    };
+    
+    // Check for specific field patterns
+    const nameLower = column.name.toLowerCase();
+    if (nameLower.includes('amount') || nameLower.includes('budget')) return DollarSign;
+    if (nameLower.includes('location')) return MapPin;
+    if (nameLower.includes('date')) return Calendar;
+    if (nameLower.includes('progress')) return TrendingUp;
+    if (nameLower.includes('status')) return Activity;
+    
+    return iconMap[column.type] || FileText;
+  }, []);
+
+  // Show loading state
   if ((hookLoading && !localData.length) || (isRefreshing && !localData.length)) {
     return (
       <div className={`${darkMode ? 'bg-gray-900' : 'bg-white'} rounded-xl shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} overflow-hidden flex flex-col h-full`}>
@@ -1031,266 +1791,154 @@ const DataTable = ({
     <>
       <div className={`${darkMode ? 'bg-gray-900' : 'bg-white'} rounded-xl shadow-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} overflow-hidden flex flex-col h-full`}>
         {/* Header */}
-        <div className={`p-4 border-b ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}`}>
+        <div className="p-3 border-b border-gray-200 bg-white">
           <div className="flex flex-wrap gap-2 items-center justify-between">
-            {/* Search Bar */}
-            <div className="relative flex-1 min-w-[250px] max-w-md">
-              <Search size={18} className="absolute left-3 top-2.5 text-gray-400" />
+            <div className="flex flex-col">
+              <h2 className="text-sm font-semibold text-gray-800">{tableHeading}</h2>
+              {tableSubHeading && (
+                <p className="text-xs text-gray-500 mt-0.5">{tableSubHeading}</p>
+              )}
+            </div>
+
+            <div className="relative flex-1 min-w-[200px] max-w-md mx-4">
+              <Search size={16} className="absolute left-2.5 top-2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search projects..."
+                placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2 rounded-lg border text-sm ${
-                  darkMode 
-                    ? 'bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-400' 
-                    : 'bg-white border-gray-300 placeholder-gray-500'
-                } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                className="w-full pl-9 pr-8 py-1.5 rounded-lg border border-gray-300 bg-white placeholder-gray-400 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               {searchTerm && (
                 <button 
-                  className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
                   onClick={() => setSearchTerm('')}
                   title="Clear search"
                 >
-                  <X size={16} />
+                  <X size={14} />
                 </button>
               )}
             </div>
 
-            {/* Right Controls */}
             <div className="flex items-center gap-2">
-              {/* Advanced Metrics Toggle */}
               <button
-                onClick={() => setShowAdvancedMetrics(!showAdvancedMetrics)}
-                className={`px-3 py-2 rounded-lg border flex items-center gap-2 text-sm font-medium ${
-                  darkMode 
-                    ? 'bg-gray-800 border-gray-600 text-gray-100 hover:bg-gray-700' 
-                    : 'bg-white border-gray-300 hover:bg-gray-50'
-                } ${showAdvancedMetrics ? 'ring-2 ring-purple-500' : ''}`}
-                title="Show Advanced Metrics"
+                onClick={() => setColumnSelectorOpen(true)}
+                className="px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white flex items-center gap-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                title="Manage Columns"
               >
-                <Gauge size={16} />
-                Metrics
+                <Columns size={14} />
+                Columns
+                <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded-full">
+                  {visibleColumns.length}
+                </span>
               </button>
 
-              {/* Filter Button */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`px-3 py-2 rounded-lg border flex items-center gap-2 text-sm font-medium ${
-                  darkMode 
-                    ? 'bg-gray-800 border-gray-600 text-gray-100 hover:bg-gray-700' 
-                    : 'bg-white border-gray-300 hover:bg-gray-50'
-                } ${showFilters ? 'ring-2 ring-blue-500' : ''}`}
+                className={`px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white flex items-center gap-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 ${showFilters ? 'ring-2 ring-blue-500' : ''}`}
               >
-                <Filter size={16} />
+                <Filter size={14} />
                 Filters
-                {(filters.frontier || filters.sector || filters.paceStatus || filters.progressStatus || searchTerm) && (
-                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                {activeFilterCount > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 bg-blue-500 text-white rounded-full">
+                    {activeFilterCount}
+                  </span>
                 )}
               </button>
 
-              {/* Items per page */}
               <select
                 value={itemsPerPage}
                 onChange={(e) => {
                   setItemsPerPage(parseInt(e.target.value));
                   setCurrentPage(1);
                 }}
-                className={`px-3 py-2 rounded-lg border text-sm ${
-                  darkMode 
-                    ? 'bg-gray-800 border-gray-600 text-gray-100' 
-                    : 'bg-white border-gray-300'
-                } focus:ring-2 focus:ring-blue-500`}
+                className="px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white text-xs text-gray-700 focus:ring-2 focus:ring-blue-500"
               >
-                <option value={10}>10 rows</option>
-                <option value={25}>25 rows</option>
-                <option value={50}>50 rows</option>
-                <option value={100}>100 rows</option>
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
               </select>
 
-              {/* Action Buttons */}
               <button
                 onClick={openAddModal}
-                className="px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:opacity-90 flex items-center gap-2 text-sm font-medium shadow-sm"
+                className="px-2.5 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:opacity-90 flex items-center gap-1.5 text-xs font-medium shadow-sm"
               >
-                <Plus size={16} />
+                <Plus size={14} />
                 Add
               </button>
 
               <button
                 onClick={exportTableData}
-                className="px-3 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:opacity-90 flex items-center gap-2 text-sm font-medium shadow-sm"
+                className="px-2.5 py-1.5 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:opacity-90 flex items-center gap-1.5 text-xs font-medium shadow-sm"
               >
-                <Download size={16} />
+                <Download size={14} />
                 Export
               </button>
 
               <button
                 onClick={handleRefreshData}
                 disabled={isRefreshing}
-                className={`p-2 rounded-lg border ${
-                  darkMode ? 'bg-gray-800 border-gray-600 text-gray-100 hover:bg-gray-700' : 'bg-white border-gray-300 hover:bg-gray-50'
-                } ${isRefreshing ? 'opacity-50' : ''}`}
+                className={`p-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 ${isRefreshing ? 'opacity-50' : ''}`}
               >
-                <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+                <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
               </button>
+
+              {onClose && (
+                <button
+                  onClick={handleClose}
+                  className="p-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+                  title="Close"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
           </div>
           
-          {/* Advanced Metrics Panel */}
-          {showAdvancedMetrics && (
-            <div className={`mt-4 p-3 rounded-lg ${
-              darkMode ? 'bg-gray-900' : 'bg-gray-50'
-            } border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
-                <div className="text-center">
-                  <div className="font-bold text-lg text-blue-600">{aggregateStats.totalProjects}</div>
-                  <div className="text-gray-500">Total Projects</div>
-                </div>
-                <div className="text-center">
-                  <div className="font-bold text-lg text-green-600">{aggregateStats.onTrackCount}</div>
-                  <div className="text-gray-500">On Track</div>
-                </div>
-                <div className="text-center">
-                  <div className="font-bold text-lg text-red-600">{aggregateStats.criticalCount}</div>
-                  <div className="text-gray-500">Critical</div>
-                </div>
-                <div className="text-center">
-                  <div className="font-bold text-lg text-purple-600">
-                    {aggregateStats.avgActualProgress.toFixed(1)}%
-                  </div>
-                  <div className="text-gray-500">Avg Progress</div>
-                </div>
-                <div className="text-center">
-                  <div className="font-bold text-lg text-orange-600">
-                    {aggregateStats.avgExpectedProgress.toFixed(1)}%
-                  </div>
-                  <div className="text-gray-500">Avg Expected</div>
-                </div>
-                <div className="text-center">
-                  <div className={`font-bold text-lg ${
-                    aggregateStats.avgActualProgress >= aggregateStats.avgExpectedProgress 
-                      ? 'text-green-600' 
-                      : 'text-red-600'
-                  }`}>
-                    {(aggregateStats.avgActualProgress - aggregateStats.avgExpectedProgress).toFixed(1)}%
-                  </div>
-                  <div className="text-gray-500">Variance</div>
-                </div>
-              </div>
-              
-              {/* Pace Distribution */}
-              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                <div className="text-xs font-semibold mb-2">Pace Distribution</div>
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(aggregateStats.paceDistribution).map(([status, count]) => {
-                    const config = getPaceConfig(status);
-                    return (
-                      <div 
-                        key={status}
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${config.bgClass} ${config.textClass}`}
-                      >
-                        <config.icon size={10} />
-                        <span className="font-semibold">{count}</span>
-                        <span>{config.shortLabel}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Filters Panel */}
+          {/* Enhanced Filters Section */}
           {showFilters && (
-            <div className={`mt-4 p-3 rounded-lg ${
-              darkMode ? 'bg-gray-900' : 'bg-white'
-            } border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                <select
-                  value={filters.frontier}
-                  onChange={(e) => {
-                    setFilters(prev => ({ ...prev, frontier: e.target.value }));
-                    setCurrentPage(1); // Reset to first page when filter changes
-                  }}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                    darkMode 
-                      ? 'bg-gray-800 border-gray-600 text-gray-100' 
-                      : 'bg-white border-gray-300'
-                  } focus:ring-2 focus:ring-blue-500`}
-                >
-                  <option value="">All Frontiers</option>
-                  {uniqueFrontiers.map(frontier => (
-                    <option key={frontier} value={frontier}>{frontier}</option>
-                  ))}
-                </select>
-                
-                <select
-                  value={filters.sector}
-                  onChange={(e) => {
-                    setFilters(prev => ({ ...prev, sector: e.target.value }));
-                    setCurrentPage(1); // Reset to first page when filter changes
-                  }}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                    darkMode 
-                      ? 'bg-gray-800 border-gray-600 text-gray-100' 
-                      : 'bg-white border-gray-300'
-                  } focus:ring-2 focus:ring-blue-500`}
-                >
-                  <option value="">All Sectors</option>
-                  {uniqueSectors.map(sector => (
-                    <option key={sector} value={sector}>{sector}</option>
-                  ))}
-                </select>
-                
-                <select
-                  value={filters.progressStatus}
-                  onChange={(e) => {
-                    setFilters(prev => ({ ...prev, progressStatus: e.target.value }));
-                    setCurrentPage(1); // Reset to first page when filter changes
-                  }}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                    darkMode 
-                      ? 'bg-gray-800 border-gray-600 text-gray-100' 
-                      : 'bg-white border-gray-300'
-                  } focus:ring-2 focus:ring-blue-500`}
-                >
-                  <option value="">All Progress</option>
-                  <option value="Completed">Completed (100%)</option>
-                  <option value="75-99%">Near Completion (75-99%)</option>
-                  <option value="50-74%">Advanced (50-74%)</option>
-                  <option value="25-49%">In Progress (25-49%)</option>
-                  <option value="1-24%">Early Stage (1-24%)</option>
-                  <option value="Not Started">Not Started (0%)</option>
-                </select>
-                
-                <select
-                  value={filters.paceStatus}
-                  onChange={(e) => {
-                    setFilters(prev => ({ ...prev, paceStatus: e.target.value }));
-                    setCurrentPage(1); // Reset to first page when filter changes
-                  }}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                    darkMode 
-                      ? 'bg-gray-800 border-gray-600 text-gray-100' 
-                      : 'bg-white border-gray-300'
-                  } focus:ring-2 focus:ring-blue-500`}
-                >
-                  <option value="">All Pace Status</option>
-                  {uniquePaceStatuses.map(status => {
-                    const config = getPaceConfig(status);
+            <div className="mt-3 space-y-3">
+              {/* Text Column Filters with Multi-select */}
+              <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sliders size={14} className="text-blue-500" />
+                  <span className="text-xs font-semibold text-gray-700">Category Filters</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                  {Object.entries(filterOptions).map(([field, options]) => {
+                    const column = allColumnsFromConfig.find(c => c.name === field);
+                    if (!column) return null;
+                    
                     return (
-                      <option key={status} value={status}>{config.label}</option>
+                      <MultiSelect
+                        key={field}
+                        options={options}
+                        value={filters.columnFilters?.[field] || []}
+                        onChange={(values) => handleColumnFilterChange(field, values)}
+                        placeholder={`All ${column.label}`}
+                        darkMode={darkMode}
+                        icon={getColumnIcon(column)}
+                        enableSearch={options.length > 5}
+                      />
                     );
                   })}
-                </select>
-                
+                </div>
+              </div>
+
+              {/* Filter Actions */}
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-500">
+                  {activeFilterCount > 0 && (
+                    <span>{activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''} active</span>
+                  )}
+                </div>
                 <button
                   onClick={resetFilters}
-                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-medium"
+                  className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-xs font-medium flex items-center gap-1"
                 >
-                  Clear Filters
+                  <RotateCcw size={12} />
+                  Clear All Filters
                 </button>
               </div>
             </div>
@@ -1298,280 +1946,152 @@ const DataTable = ({
         </div>
 
         {/* Table */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto bg-gradient-to-b from-gray-50 to-white">
           <table className="w-full">
-            <thead className={`sticky top-0 z-10 ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
+            <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  #
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  {idField}
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                  onClick={() => handleSort('sub_scheme_name')}
-                >
-                  <div className="flex items-center gap-2">
-                    Scheme Name
-                    {sortConfig.key === 'sub_scheme_name' && (
-                      sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                    )}
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Location
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                  onClick={() => handleSort('sd_amount_lakh')}
-                >
-                  <div className="flex items-center gap-2">
-                    Project Cost
-                    {sortConfig.key === 'sd_amount_lakh' && (
-                      sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                    )}
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Expense
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                  onClick={() => handleSort('physical_progress_percent')}
-                >
-                  <div className="flex items-center gap-2">
-                    Progress
-                    {sortConfig.key === 'physical_progress_percent' && (
-                      sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                    )}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                  onClick={() => handleSort('paceStatus')}
-                >
-                  <div className="flex items-center gap-2">
-                    Pace Analysis
-                    {sortConfig.key === 'paceStatus' && (
-                      sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                    )}
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Time Status
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Actions
-                </th>
+                {allColumnsFromConfig
+                  .filter(col => visibleColumns.includes(col.name))
+                  .map(col => (
+                    <th 
+                      key={col.name}
+                      className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 ${
+                        col.type !== 'system' ? 'cursor-pointer hover:bg-gray-100' : ''
+                      }`}
+                      onClick={() => col.type !== 'system' && handleSort(col.name)}
+                    >
+                      <div className="flex items-center gap-2">
+                        {col.label}
+                        {sortConfig.key === col.name && (
+                          sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                        )}
+                      </div>
+                    </th>
+                  ))}
               </tr>
             </thead>
             
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody className="divide-y divide-gray-200">
               {paginatedData.map((row, index) => {
-                const metrics = calculateTimeMetrics(row);
-                const paceConfig = getPaceConfig(metrics?.paceStatus || 'NOT_STARTED');
-                const PaceIcon = paceConfig.icon;
-                
-                const sanctioned = parseFloat(row.sd_amount_lakh) || 0;
-                const expPrev = parseFloat(row.expenditure_previous_fy) || 0;
-                const expCurr = parseFloat(row.expenditure_current_fy) || 0;
-                const totalExpense = expPrev + expCurr;
-                const utilization = sanctioned > 0 ? (totalExpense / sanctioned * 100) : 0;
-                const progress = parseFloat(row.physical_progress_percent) || 0;
+                const metrics = calculateTimeMetrics(row, fieldMappings);
                 
                 return (
                   <tr
                     key={row[idField] || index}
-                    className={`${
-                      darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-50'
-                    } cursor-pointer transition-colors ${
-                      metrics?.paceStatus === 'SLEEP_PACE' ? 'bg-red-50/10 dark:bg-red-900/10' : ''
-                    }`}
-                    onClick={(e) => {
-                      if (!e.target.closest('button')) {
-                        openReportModal(row);
-                      }
-                    }}
+                    className="bg-white hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={(e) => handleRowClick(row, e)}
                   >
-                    {/* Serial Number */}
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {((currentPage - 1) * itemsPerPage) + index + 1}
-                    </td>
-                    
-                    {/* ID Field */}
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-                      <div className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded">
-                        {row[idField] || 'N/A'}
-                      </div>
-                    </td>
-                    
-                    {/* Scheme Name */}
-                    <td className="px-4 py-3">
-                      <div className="max-w-xs">
-                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-                          {row.sub_scheme_name || row.name_of_scheme || 'N/A'}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">
-                          {row.work_description || 'No description'}
-                        </p>
-                      </div>
-                    </td>
-                    
-                    {/* Location */}
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col space-y-1">
-                        <div className="flex items-center gap-1">
-                          <Building2 size={12} className="text-purple-500" />
-                          <span className="text-xs font-medium text-gray-900 dark:text-gray-100">
-                            {row.ftr_hq_name || 'N/A'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <MapPin size={12} className="text-blue-500" />
-                          <span className="text-xs text-gray-600 dark:text-gray-400">
-                            {row.shq_name || 'N/A'}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    
-                    {/* Project Cost */}
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <IndianRupee size={14} className="text-green-600" />
-                        <span className="text-sm font-bold text-green-600 dark:text-green-400">
-                          {formatCurrency(sanctioned * 100000)}
-                        </span>
-                      </div>
-                    </td>
-                    
-                    {/* Total Expense */}
-                    <td className="px-4 py-3">
-                      <div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                            {formatCurrency(totalExpense * 100000)}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {utilization.toFixed(1)}% utilized
-                        </div>
-                      </div>
-                    </td>
-                    
-                    {/* Enhanced Progress Display */}
-                    <td className="px-4 py-3">
-                      <ProgressBar 
-                        progress={progress}
-                        expected={metrics?.expectedProgress}
-                        paceStatus={metrics?.paceStatus}
-                      />
-                    </td>
-                    
-                    {/* Enhanced Pace Analysis */}
-                    <td className="px-4 py-3">
-                      <div className="space-y-1">
-                        <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold
-                          ${paceConfig.bgClass} ${paceConfig.textClass} ${paceConfig.pulse ? 'sleep-pace-pulse' : ''}`}
-                        >
-                          <PaceIcon size={12} />
-                          {paceConfig.label}
-                        </div>
-                        
-                        {metrics?.paceDetails && (
-                          <div className="text-[10px] text-gray-500 dark:text-gray-400">
-                            {metrics.paceDetails.message}
-                            {metrics.monthlyRate && metrics.elapsedMonths > 0 && (
-                              <div className="mt-0.5">
-                                Rate: {metrics.actualMonthlyRate?.toFixed(1)}%/mo 
-                                (Need: {metrics.monthlyProgressRate?.toFixed(1)}%/mo)
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    
-                    {/* Time Status with Enhanced Details */}
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        {metrics?.isOverdue ? (
-                          <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
-                            <Timer size={12} />
-                            <span className="text-xs font-semibold">
-                              Overdue: {Math.abs(metrics.remainingDays)}d
+                    {allColumnsFromConfig
+                      .filter(col => visibleColumns.includes(col.name))
+                      .map(col => (
+                        <td key={col.name} className="px-4 py-3">
+                          {col.name === 'row_number' ? (
+                            <span className="text-sm font-medium text-gray-900">
+                              {((currentPage - 1) * itemsPerPage) + index + 1}
                             </span>
-                          </div>
-                        ) : metrics?.remainingDays !== undefined ? (
-                          <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
-                            <Clock size={12} className={metrics.remainingDays < 30 ? 'text-orange-500' : 'text-green-500'} />
-                            <span className="text-xs font-medium">
-                              {metrics.remainingDays}d remaining
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-500">No timeline</span>
-                        )}
-                        
-                        {row.pdc_revised || row.pdc_agreement ? (
-                          <div className="flex items-center gap-1 mt-1">
-                            <Flag size={10} className="text-gray-400" />
-                            <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                              PDC: {new Date(row.pdc_revised || row.pdc_agreement).toLocaleDateString('en-IN', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: '2-digit'
-                              })}
-                            </span>
-                          </div>
-                        ) : null}
-                        
-                        {metrics?.daysPerPercent && (
-                          <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
-                            {metrics.daysPerPercent} days/%
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    
-                    {/* Actions */}
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openReportModal(row);
-                          }}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all group"
-                          title="View Details"
-                        >
-                          <Eye size={14} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-500" />
-                        </button>
-                        
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditModal(row, e);
-                          }}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all group"
-                          title="Edit"
-                        >
-                          <Edit size={14} className="text-gray-700 dark:text-gray-300 group-hover:text-green-500" />
-                        </button>
-                        
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openFitViewModal(row);
-                          }}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all group"
-                          title="Analytics View"
-                        >
-                          <Maximize2 size={14} className="text-gray-700 dark:text-gray-300 group-hover:text-purple-500" />
-                        </button>
-                      </div>
-                    </td>
+                          ) : col.name === 'paceStatus' ? (
+                            <div className="space-y-1">
+                              {(() => {
+                                const paceConfig = getPaceConfig(metrics?.paceStatus || 'NOT_STARTED');
+                                const PaceIcon = paceConfig.icon;
+                                return (
+                                  <>
+                                    <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${paceConfig.bgClass} ${paceConfig.textClass} ${paceConfig.pulse ? 'sleep-pace-pulse' : ''}`}>
+                                      <PaceIcon size={12} />
+                                      {paceConfig.label}
+                                    </div>
+                                    {metrics?.paceDetails && (
+                                      <div className="text-[10px] text-gray-500">
+                                        {metrics.paceDetails.message}
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          ) : col.name === 'timeStatus' ? (
+                            <div className="flex flex-col">
+                              {metrics?.isOverdue ? (
+                                <div className="flex items-center gap-1 text-red-600">
+                                  <Timer size={12} />
+                                  <span className="text-xs font-semibold">
+                                    Overdue: {Math.abs(metrics.remainingDays)}d
+                                  </span>
+                                </div>
+                              ) : metrics?.remainingDays !== undefined ? (
+                                <div className="flex items-center gap-1 text-gray-700">
+                                  <Clock size={12} className={metrics.remainingDays < 30 ? 'text-orange-500' : 'text-green-500'} />
+                                  <span className="text-xs font-medium">
+                                    {metrics.remainingDays}d remaining
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-500">No timeline</span>
+                              )}
+                            </div>
+                          ) : col.name === 'actions' ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openReportModal(row);
+                                }}
+                                className="p-1.5 hover:bg-gray-100 rounded transition-all group"
+                                title="View Details"
+                              >
+                                <Eye size={14} className="text-gray-700 group-hover:text-blue-500" />
+                              </button>
+                              
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal(row, e);
+                                }}
+                                className="p-1.5 hover:bg-gray-100 rounded transition-all group"
+                                title="Edit"
+                              >
+                                <Edit size={14} className="text-gray-700 group-hover:text-green-500" />
+                              </button>
+                              
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openFitViewModal(row);
+                                }}
+                                className="p-1.5 hover:bg-gray-100 rounded transition-all group"
+                                title="Analytics View"
+                              >
+                                <Maximize2 size={14} className="text-gray-700 group-hover:text-purple-500" />
+                              </button>
+                            </div>
+                          ) : col.type === 'derived' && col.derivedType === 'progress' ? (
+                            (() => {
+                              // Find the progress field dynamically from config
+                              const progressField = dbConfig?.columns?.find(c => {
+                                const name = c.name.toLowerCase();
+                                return name.includes('physical') && name.includes('progress') ||
+                                       name.includes('completed') && name.includes('percentage');
+                              });
+                              const progress = progressField ? parseFloat(row[progressField.name]) || 0 : 0;
+                              return (
+                                <ProgressBar 
+                                  progress={progress}
+                                  expected={metrics?.expectedProgress}
+                                  paceStatus={metrics?.paceStatus}
+                                />
+                              );
+                            })()
+                          ) : (
+                            <DynamicCell 
+                              column={col} 
+                              value={row[col.name]} 
+                              row={row}
+                              dbConfig={dbConfig}
+                              fieldMappings={fieldMappings}
+                            />
+                          )}
+                        </td>
+                      ))}
                   </tr>
                 );
               })}
@@ -1579,26 +2099,21 @@ const DataTable = ({
           </table>
         </div>
 
-        {/* Pagination */}
-        <div className={`p-4 border-t ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}`}>
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
+        {/* Footer */}
+        <div className="p-3 border-t border-gray-200 bg-white">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div className="text-xs text-gray-500">
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, processedData.length)} of {processedData.length} entries
-              {aggregateStats.criticalCount > 0 && (
-                <span className="ml-2 text-red-600 font-semibold">
-                  ({aggregateStats.criticalCount} critical)
-                </span>
-              )}
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className={`px-3 py-1.5 text-sm rounded font-medium ${
+                className={`px-2.5 py-1 text-xs rounded font-medium ${
                   currentPage === 1
-                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750'
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
                 }`}
               >
                 First
@@ -1607,10 +2122,10 @@ const DataTable = ({
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className={`px-3 py-1.5 text-sm rounded font-medium ${
+                className={`px-2.5 py-1 text-xs rounded font-medium ${
                   currentPage === 1
-                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750'
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
                 }`}
               >
                 Previous
@@ -1624,10 +2139,10 @@ const DataTable = ({
                     <button
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`px-3 py-1.5 text-sm rounded font-medium ${
+                      className={`px-2.5 py-1 text-xs rounded font-medium ${
                         currentPage === pageNum
                           ? 'bg-blue-500 text-white shadow'
-                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750'
+                          : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
                       }`}
                     >
                       {pageNum}
@@ -1639,10 +2154,10 @@ const DataTable = ({
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages || totalPages === 0}
-                className={`px-3 py-1.5 text-sm rounded font-medium ${
+                className={`px-2.5 py-1 text-xs rounded font-medium ${
                   currentPage === totalPages || totalPages === 0
-                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750'
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
                 }`}
               >
                 Next
@@ -1651,10 +2166,10 @@ const DataTable = ({
               <button
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages || totalPages === 0}
-                className={`px-3 py-1.5 text-sm rounded font-medium ${
+                className={`px-2.5 py-1 text-xs rounded font-medium ${
                   currentPage === totalPages || totalPages === 0
-                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750'
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
                 }`}
               >
                 Last
@@ -1665,19 +2180,16 @@ const DataTable = ({
       </div>
 
       {/* Modals */}
-      {typeof Report !== 'undefined' && (
-        <ReportModal 
-          isOpen={reportModalOpen}
-          onClose={() => {
-            setReportModalOpen(false);
-            setSelectedProjectForReport(null);
-          }}
-          projectData={selectedProjectForReport}
-          darkMode={darkMode}
-        />
-      )}
+      <ReportModal 
+        isOpen={reportModalOpen}
+        onClose={() => {
+          setReportModalOpen(false);
+          setSelectedProjectForReport(null);
+        }}
+        projectData={selectedProjectForReport}
+        darkMode={darkMode}
+      />
 
-      {/* Modified EditRow to pass the handleDataUpdate callback */}
       <EditRow
         isOpen={editModalOpen}
         onClose={() => {
@@ -1690,11 +2202,10 @@ const DataTable = ({
         idField={idField}
         rowId={selectedRowId}
         rowData={selectedProjectForEdit}
-        onSuccess={handleDataUpdate} // Use our local data update handler
-        onDelete={handleDeleteSuccess} // Use our local delete handler
+        onSuccess={handleDataUpdate}
+        onDelete={handleDeleteSuccess}
       />
 
-      {/* Modified AddRow to pass the handleAddSuccess callback */}
       <AddRow
         isOpen={addModalOpen}
         onClose={() => {
@@ -1703,7 +2214,7 @@ const DataTable = ({
         darkMode={darkMode}
         databaseName={databaseName}
         idField={idField}
-        onSuccess={handleAddSuccess} // Use our local add handler
+        onSuccess={handleAddSuccess}
         defaultValues={{}}
       />
 
@@ -1714,6 +2225,16 @@ const DataTable = ({
           setFitViewModalOpen(false);
           setSelectedRowForFitView(null);
         }}
+        darkMode={darkMode}
+      />
+
+      <ColumnSelectorModal
+        isOpen={columnSelectorOpen}
+        onClose={() => setColumnSelectorOpen(false)}
+        columns={allColumnsFromConfig.filter(c => c.type !== 'system' || c.name === idField)}
+        visibleColumns={visibleColumns}
+        onToggleColumn={toggleColumnVisibility}
+        onResetColumns={resetColumns}
         darkMode={darkMode}
       />
     </>

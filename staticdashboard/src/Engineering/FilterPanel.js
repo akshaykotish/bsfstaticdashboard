@@ -200,7 +200,7 @@ const MultiSelect = ({
         ref={buttonRef}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
-        className={`w-full px-3 py-2 border rounded-lg flex items-center justify-between transition-all text-sm ${
+        className={`w-full px-4 py-2.5 border rounded-lg flex items-center justify-between transition-all text-sm ${
           disabled
             ? darkMode 
               ? 'bg-gray-800 border-gray-700 text-gray-500 cursor-not-allowed' 
@@ -211,18 +211,18 @@ const MultiSelect = ({
         } ${isOpen && !disabled ? 'ring-2 ring-blue-400 border-blue-400' : ''}`}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          {Icon && <Icon size={14} className={disabled ? 'text-gray-400' : 'text-blue-500'} />}
-          <span className="text-xs truncate">
+          {Icon && <Icon size={16} className={disabled ? 'text-gray-400' : 'text-blue-500'} />}
+          <span className="text-sm truncate">
             {getDisplayText()}
           </span>
           {isFilteredByOthers && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 rounded">
+            <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 rounded">
               Filtered
             </span>
           )}
         </div>
         <ChevronDown 
-          size={14} 
+          size={16} 
           className={`transition-transform flex-shrink-0 ml-2 ${
             disabled ? 'text-gray-400' : 'text-gray-400'
           } ${isOpen ? 'rotate-180' : ''}`} 
@@ -252,13 +252,13 @@ const MultiSelect = ({
                 darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
               } sticky top-0 z-10`}>
                 <div className="relative">
-                  <Search size={12} className="absolute left-2 top-2.5 text-gray-400" />
+                  <Search size={14} className="absolute left-2.5 top-3 text-gray-400" />
                   <input
                     type="text"
                     placeholder="Search..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`w-full pl-7 pr-2 py-1.5 text-xs rounded ${
+                    className={`w-full pl-8 pr-2 py-2 text-sm rounded ${
                       darkMode 
                         ? 'bg-gray-700 text-gray-100 placeholder-gray-400' 
                         : 'bg-white placeholder-gray-500 border border-gray-200'
@@ -269,19 +269,19 @@ const MultiSelect = ({
               </div>
             )}
 
-            <div className={`flex items-center justify-between px-3 py-1.5 border-b ${
+            <div className={`flex items-center justify-between px-4 py-2 border-b ${
               darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-100 bg-gray-50'
-            } sticky ${enableSearch ? 'top-[46px]' : 'top-0'} z-10`}>
+            } sticky ${enableSearch ? 'top-[52px]' : 'top-0'} z-10`}>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   selectAll();
                 }}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
                 Select All
               </button>
-              <span className={`text-xs ${
+              <span className={`text-sm ${
                 darkMode ? 'text-gray-400' : 'text-gray-500'
               }`}>
                 {value.length}/{options.length}
@@ -292,7 +292,7 @@ const MultiSelect = ({
                   e.stopPropagation();
                   clearAll();
                 }}
-                className={`text-xs font-medium ${
+                className={`text-sm font-medium ${
                   darkMode 
                     ? 'text-gray-400 hover:text-gray-300' 
                     : 'text-gray-500 hover:text-gray-700'
@@ -309,7 +309,7 @@ const MultiSelect = ({
               style={{ maxHeight: '250px' }}
             >
               {filteredOptions.length === 0 ? (
-                <div className={`px-3 py-4 text-xs text-center ${
+                <div className={`px-4 py-6 text-sm text-center ${
                   darkMode ? 'text-gray-400' : 'text-gray-500'
                 }`}>
                   No options found
@@ -318,7 +318,7 @@ const MultiSelect = ({
                 filteredOptions.map(option => (
                   <label
                     key={option}
-                    className={`flex items-center gap-2 px-3 py-2 hover:${
+                    className={`flex items-center gap-2.5 px-4 py-2.5 hover:${
                       darkMode ? 'bg-gray-700' : 'bg-blue-50'
                     } cursor-pointer transition-colors group`}
                     onClick={(e) => e.stopPropagation()}
@@ -331,18 +331,18 @@ const MultiSelect = ({
                         className="w-4 h-4 text-blue-500 rounded border-gray-300 focus:ring-blue-400 cursor-pointer"
                       />
                     </div>
-                    <span className={`text-xs truncate flex-1 ${
+                    <span className={`text-sm truncate flex-1 ${
                       darkMode ? 'text-gray-200' : 'text-gray-700'
                     }`} 
                     title={getOptionLabel(option)}>
                       {getOptionLabel(option)}
                     </span>
                     {showCounts && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
                         darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
                       }`}>
                         {value.includes(option) && (
-                          <Check size={12} className="text-blue-500 flex-shrink-0" />
+                          <Check size={14} className="text-blue-500 flex-shrink-0" />
                         )}
                       </span>
                     )}
@@ -431,26 +431,26 @@ const RangeSlider = ({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="text-xs font-semibold flex items-center gap-2 text-gray-700 dark:text-gray-300">
-          {Icon && <Icon size={14} className="text-blue-500" />}
+        <label className="text-sm font-semibold flex items-center gap-2 text-gray-700 dark:text-gray-300">
+          {Icon && <Icon size={16} className="text-blue-500" />}
           {label}
           {isModified && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">
+            <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">
               Active
             </span>
           )}
         </label>
         <div className="flex items-center gap-2">
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400`}>
+          <span className={`text-sm font-medium px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400`}>
             {formatValue ? formatValue(localValue[0]) : `${localValue[0]}${unit}`} - {formatValue ? formatValue(localValue[1]) : `${localValue[1]}${unit}`}
           </span>
           {isModified && (
             <button
               onClick={resetRange}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
               title="Reset range"
             >
-              <RotateCcw size={12} className="text-gray-500" />
+              <RotateCcw size={14} className="text-gray-500" />
             </button>
           )}
         </div>
@@ -651,21 +651,21 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
     } overflow-visible relative`}>
       
       {/* Header */}
-      <div className={`px-4 py-3 border-b ${
+      <div className={`px-5 py-4 border-b ${
         darkMode ? 'border-gray-700' : 'border-gray-100'
       } flex justify-between items-center`}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600">
-            <Filter size={16} className="text-white" />
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600">
+            <Filter size={18} className="text-white" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Smart Filters</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Smart Filters</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               {filters.filteredData?.length || 0} of {rawData?.length || 0} records
             </p>
           </div>
           {activeFilterCount > 0 && (
-            <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-full text-xs font-semibold">
+            <span className="px-2.5 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-full text-sm font-semibold">
               {activeFilterCount} active
             </span>
           )}
@@ -673,14 +673,14 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
         
         <div className="flex items-center gap-2">
           <div className="relative group">
-            <button className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 ${
+            <button className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${
               darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
             } transition-all`}>
-              <Sparkles size={12} />
+              <Sparkles size={14} />
               Quick Filters
-              <ChevronDown size={12} />
+              <ChevronDown size={14} />
             </button>
-            <div className={`absolute top-full mt-2 right-0 w-56 rounded-lg shadow-xl z-50 ${
+            <div className={`absolute top-full mt-2 right-0 w-60 rounded-lg shadow-xl z-50 ${
               darkMode ? 'bg-gray-800' : 'bg-white'
             } border ${darkMode ? 'border-gray-700' : 'border-gray-200'}
             opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all`}>
@@ -688,11 +688,11 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                 <button
                   key={idx}
                   onClick={preset.action}
-                  className={`w-full px-3 py-2.5 text-left text-xs hover:${
+                  className={`w-full px-4 py-3 text-left text-sm hover:${
                     darkMode ? 'bg-gray-700' : 'bg-blue-50'
-                  } transition-colors flex items-center gap-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}
+                  } transition-colors flex items-center gap-2.5 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}
                 >
-                  <preset.icon size={12} className="text-blue-500" />
+                  <preset.icon size={14} className="text-blue-500" />
                   {preset.name}
                 </button>
               ))}
@@ -701,26 +701,26 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
           
           <button
             onClick={handleResetAll}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 ${
+            className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${
               darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
             } transition-all`}
           >
-            <RotateCcw size={12} />
+            <RotateCcw size={14} />
             Reset All
           </button>
         </div>
       </div>
 
       {/* Search Bar */}
-      <div className="p-4 border-b border-gray-100 dark:border-gray-700">
+      <div className="p-5 border-b border-gray-100 dark:border-gray-700">
         <div className="relative">
-          <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
+          <Search size={18} className="absolute left-3.5 top-3 text-gray-400" />
           <input
             type="text"
             placeholder={`Search ${dbConfig.displayName || 'records'}...`}
             value={filters.searchTerm}
             onChange={(e) => filters.setSearchTerm(e.target.value)}
-            className={`w-full pl-9 pr-4 py-2 text-sm rounded-lg border ${
+            className={`w-full pl-11 pr-4 py-2.5 text-sm rounded-lg border ${
               darkMode 
                 ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400' 
                 : 'bg-white border-gray-200 placeholder-gray-500 text-gray-900'
@@ -729,9 +729,9 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
           {filters.searchTerm && (
             <button
               onClick={() => filters.setSearchTerm('')}
-              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+              className="absolute right-3.5 top-3 text-gray-400 hover:text-gray-600"
             >
-              <X size={16} />
+              <X size={18} />
             </button>
           )}
         </div>
@@ -741,22 +741,22 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
       <div className="border-b border-gray-100 dark:border-gray-700">
         <button
           onClick={() => toggleSection('basic')}
-          className={`w-full px-4 py-3 flex justify-between items-center hover:${
+          className={`w-full px-5 py-4 flex justify-between items-center hover:${
             darkMode ? 'bg-gray-700/50' : 'bg-gray-50'
           } transition-all`}
         >
-          <span className="text-sm font-semibold flex items-center gap-2 text-gray-900 dark:text-gray-100">
-            <Sliders size={14} className="text-blue-500" />
+          <span className="text-base font-semibold flex items-center gap-2.5 text-gray-900 dark:text-gray-100">
+            <Sliders size={16} className="text-blue-500" />
             Category Filters
           </span>
           {expandedSections.basic ? 
-            <ChevronUp size={16} className="text-gray-400" /> : 
-            <ChevronDown size={16} className="text-gray-400" />
+            <ChevronUp size={18} className="text-gray-400" /> : 
+            <ChevronDown size={18} className="text-gray-400" />
           }
         </button>
         
         {expandedSections.basic && (
-          <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 relative bg-gray-50/50 dark:bg-gray-900/20">
+          <div className="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 relative bg-gray-50/50 dark:bg-gray-900/20">
             
             {/* Text columns as multi-select dropdowns */}
             {columnsByType.text.map(col => (
@@ -835,22 +835,22 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
         <div className="border-b border-gray-100 dark:border-gray-700">
           <button
             onClick={() => toggleSection('dates')}
-            className={`w-full px-4 py-3 flex justify-between items-center hover:${
+            className={`w-full px-5 py-4 flex justify-between items-center hover:${
               darkMode ? 'bg-gray-700/50' : 'bg-gray-50'
             } transition-all`}
           >
-            <span className="text-sm font-semibold flex items-center gap-2 text-gray-900 dark:text-gray-100">
-              <Calendar size={14} className="text-purple-500" />
+            <span className="text-base font-semibold flex items-center gap-2.5 text-gray-900 dark:text-gray-100">
+              <Calendar size={16} className="text-purple-500" />
               Date Filters
             </span>
             {expandedSections.dates ? 
-              <ChevronUp size={16} className="text-gray-400" /> : 
-              <ChevronDown size={16} className="text-gray-400" />
+              <ChevronUp size={18} className="text-gray-400" /> : 
+              <ChevronDown size={18} className="text-gray-400" />
             }
           </button>
           
           {expandedSections.dates && filters.dateFilters && (
-            <div className="p-4 space-y-4 bg-gray-50/50 dark:bg-gray-900/20">
+            <div className="p-5 space-y-4 bg-gray-50/50 dark:bg-gray-900/20">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {columnsByType.date.map(col => {
                   const dateFilter = filters.dateFilters[col.name] || {};
@@ -860,8 +860,8 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                   return (
                     <div key={col.name} className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-semibold flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                          <FieldIcon size={14} className="text-purple-500" />
+                        <label className="text-sm font-semibold flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                          <FieldIcon size={16} className="text-purple-500" />
                           {col.label || col.name}
                           <input
                             type="checkbox"
@@ -870,7 +870,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                               ...dateFilter,
                               enabled: e.target.checked
                             })}
-                            className="ml-2 accent-blue-500"
+                            className="ml-2 w-4 h-4 accent-blue-500"
                           />
                         </label>
                       </div>
@@ -879,7 +879,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                         <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <label className="text-[10px] text-gray-500 dark:text-gray-400 mb-1 block">From</label>
+                              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">From</label>
                               <input
                                 type="date"
                                 value={dateFilter.start || ''}
@@ -889,13 +889,13 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                                 })}
                                 min={dateBounds.min}
                                 max={dateBounds.max}
-                                className={`w-full px-2 py-1 text-xs rounded border ${
+                                className={`w-full px-2.5 py-1.5 text-sm rounded border ${
                                   darkMode ? 'bg-gray-600 border-gray-500 text-gray-200' : 'bg-white border-gray-200'
                                 } focus:ring-1 focus:ring-blue-400 focus:outline-none`}
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] text-gray-500 dark:text-gray-400 mb-1 block">To</label>
+                              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">To</label>
                               <input
                                 type="date"
                                 value={dateFilter.end || ''}
@@ -905,7 +905,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
                                 })}
                                 min={dateFilter.start || dateBounds.min}
                                 max={dateBounds.max}
-                                className={`w-full px-2 py-1 text-xs rounded border ${
+                                className={`w-full px-2.5 py-1.5 text-sm rounded border ${
                                   darkMode ? 'bg-gray-600 border-gray-500 text-gray-200' : 'bg-white border-gray-200'
                                 } focus:ring-1 focus:ring-blue-400 focus:outline-none`}
                               />
@@ -921,11 +921,11 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
               {Object.values(filters.dateFilters).some(f => f?.enabled) && (
                 <button
                   onClick={() => filters.clearAllDateFilters()}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${
                     darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                   } transition-all`}
                 >
-                  <X size={12} />
+                  <X size={14} />
                   Clear All Date Filters
                 </button>
               )}
@@ -939,23 +939,23 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
         <div className="border-b border-gray-100 dark:border-gray-700">
           <button
             onClick={() => toggleSection('sliders')}
-            className={`w-full px-4 py-3 flex justify-between items-center hover:${
+            className={`w-full px-5 py-4 flex justify-between items-center hover:${
               darkMode ? 'bg-gray-700/50' : 'bg-gray-50'
             } transition-all`}
           >
-            <span className="text-sm font-semibold flex items-center gap-2 text-gray-900 dark:text-gray-100">
-              <TrendingUp size={14} className="text-blue-500" />
+            <span className="text-base font-semibold flex items-center gap-2.5 text-gray-900 dark:text-gray-100">
+              <TrendingUp size={16} className="text-blue-500" />
               Range Filters
             </span>
             {expandedSections.sliders ? 
-              <ChevronUp size={16} className="text-gray-400" /> : 
-              <ChevronDown size={16} className="text-gray-400" />
+              <ChevronUp size={18} className="text-gray-400" /> : 
+              <ChevronDown size={18} className="text-gray-400" />
             }
           </button>
           
           {expandedSections.sliders && (
-            <div className="p-4 space-y-5 bg-gray-50/50 dark:bg-gray-900/20">
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+            <div className="p-5 space-y-6 bg-gray-50/50 dark:bg-gray-900/20">
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                 {/* Number columns as range sliders */}
                 {columnsByType.number.map(col => {
                   const range = filters.rangeFilters?.[col.name] || { min: 0, max: 100, current: [0, 100] };
@@ -1028,18 +1028,18 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
 
       {/* Active Filters Summary */}
       {activeFilterCount > 0 && (
-        <div className={`px-4 py-3 ${
+        <div className={`px-5 py-4 ${
           darkMode ? 'bg-gray-900/50' : 'bg-blue-50/50'
         } flex items-center justify-between`}>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-gray-500">Active:</span>
+            <span className="text-sm font-semibold text-gray-500">Active:</span>
             
             {filters.searchTerm && (
-              <span className="px-2 py-0.5 bg-white dark:bg-gray-700 text-xs rounded-full flex items-center gap-1 shadow-sm">
-                <Search size={10} />
+              <span className="px-2.5 py-1 bg-white dark:bg-gray-700 text-sm rounded-full flex items-center gap-1.5 shadow-sm">
+                <Search size={12} />
                 "{filters.searchTerm}"
                 <button onClick={() => filters.setSearchTerm('')} className="ml-1">
-                  <X size={10} />
+                  <X size={12} />
                 </button>
               </span>
             )}
@@ -1048,7 +1048,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
               if (!values || values.length === 0) return null;
               const col = dbConfig.columns?.find(c => c.name === field);
               return (
-                <span key={field} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded-full">
+                <span key={field} className="px-2.5 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm rounded-full">
                   {values.length} {col?.label || field}
                 </span>
               );
@@ -1058,7 +1058,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
               if (!range || !range.current || (range.current[0] === range.min && range.current[1] === range.max)) return null;
               const col = dbConfig.columns?.find(c => c.name === field);
               return (
-                <span key={field} className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full">
+                <span key={field} className="px-2.5 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm rounded-full">
                   {col?.label || field}: {range.current[0]}-{range.current[1]}
                 </span>
               );
@@ -1068,7 +1068,7 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
               if (!filter?.enabled) return null;
               const col = dbConfig.columns?.find(c => c.name === field);
               return (
-                <span key={field} className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded-full">
+                <span key={field} className="px-2.5 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-sm rounded-full">
                   {col?.label || field}
                 </span>
               );
@@ -1077,9 +1077,9 @@ const FilterPanel = ({ filters, darkMode, rawData = [], databaseName = 'engineer
           
           <button
             onClick={handleResetAll}
-            className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+            className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1.5"
           >
-            <X size={12} />
+            <X size={14} />
             Clear All
           </button>
         </div>

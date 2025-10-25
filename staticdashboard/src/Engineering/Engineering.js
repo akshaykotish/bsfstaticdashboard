@@ -129,7 +129,7 @@ const Engineering = () => {
   // Get filtered data from filters
   const filteredData = filters.filteredData || [];
   
-  // Normalized scheme name helper function to improve matching
+  // Enhanced normalized scheme name helper function to improve matching
   const normalizeScheme = useCallback((schemeName) => {
     if (!schemeName) return '';
     return schemeName.toLowerCase()
@@ -139,35 +139,92 @@ const Engineering = () => {
       .trim();
   }, []);
 
-  // Create comprehensive filter object for patch data with enhanced scheme name mapping
+  // Create comprehensive filter object for patch data with enhanced scheme name and shq_name mapping
   const patchFilters = useMemo(() => {
     const mappedFilters = {
       searchTerm: filters.searchTerm || '',
-      selectedBudgetHeads: filters.selectedBudgetHeads || [],
-      selectedFrontierHQs: filters.selectedFrontierHQs || [],
-      selectedSectorHQs: filters.selectedSectorHQs || [],
-      selectedRiskLevels: filters.selectedRiskLevels || [],
-      selectedHealthStatuses: filters.selectedHealthStatuses || [],
+      selectedBudgetHeads: [],
+      selectedFrontierHQs: [],
+      selectedSectorHQs: [],
+      selectedRiskLevels: [],
+      selectedHealthStatuses: [],
       selectedSchemes: [],
-      utilizationRange: null
+      utilizationRange: null,
+      selectedAgencies: []
     };
     
-    // Enhanced scheme name mapping
-    if (filters.selectedSchemes?.length > 0 || filters.columnFilters?.name_of_scheme?.length > 0 || 
-        filters.columnFilters?.sub_scheme_name?.length > 0) {
+    // Map budget heads
+    if (filters.selectedBudgetHeads?.length > 0) {
+      mappedFilters.selectedBudgetHeads = filters.selectedBudgetHeads;
+    } else if (filters.columnFilters?.budget_head?.length > 0) {
+      mappedFilters.selectedBudgetHeads = filters.columnFilters.budget_head;
+    }
+    
+    // Map frontier HQs (handle both ftr_hq_name and ftr_hq fields)
+    if (filters.selectedFrontierHQs?.length > 0) {
+      mappedFilters.selectedFrontierHQs = filters.selectedFrontierHQs;
+    } else if (filters.columnFilters?.ftr_hq_name?.length > 0) {
+      mappedFilters.selectedFrontierHQs = filters.columnFilters.ftr_hq_name;
+    } else if (filters.columnFilters?.ftr_hq?.length > 0) {
+      mappedFilters.selectedFrontierHQs = filters.columnFilters.ftr_hq;
+    }
+    
+    // Enhanced sector HQ mapping - handle multiple field names
+    const sectorHQSources = [
+      ...(filters.selectedSectorHQs || []),
+      ...(filters.columnFilters?.shq_name || []),
+      ...(filters.columnFilters?.shq || []),
+      ...(filters.columnFilters?.sector_hq || []),
+      ...(filters.columnFilters?.['Sector HQ'] || [])
+    ];
+    
+    if (sectorHQSources.length > 0) {
+      // Deduplicate and filter out empty values
+      mappedFilters.selectedSectorHQs = Array.from(new Set(
+        sectorHQSources.filter(shq => shq && shq.trim() !== '')
+      ));
       
-      // Gather scheme names from all possible sources
-      const schemeNames = [
-        ...(filters.selectedSchemes || []),
-        ...(filters.columnFilters?.name_of_scheme || []),
-        ...(filters.columnFilters?.sub_scheme_name || []),
-        ...(filters.columnFilters?.['Name of scheme'] || []),
-        ...(filters.columnFilters?.['Sub head'] || [])
-      ];
-      
+      console.log('[Engineering] Mapped sector HQs:', 
+        mappedFilters.selectedSectorHQs.slice(0, 3), 
+        `(${mappedFilters.selectedSectorHQs.length} total)`
+      );
+    }
+    
+    // Map executive agencies
+    if (filters.selectedAgencies?.length > 0) {
+      mappedFilters.selectedAgencies = filters.selectedAgencies;
+    } else if (filters.columnFilters?.executive_agency?.length > 0) {
+      mappedFilters.selectedAgencies = filters.columnFilters.executive_agency;
+    }
+    
+    // Map risk levels
+    if (filters.selectedRiskLevels?.length > 0) {
+      mappedFilters.selectedRiskLevels = filters.selectedRiskLevels;
+    } else if (filters.columnFilters?.risk_level?.length > 0) {
+      mappedFilters.selectedRiskLevels = filters.columnFilters.risk_level;
+    }
+    
+    // Map health statuses
+    if (filters.selectedHealthStatuses?.length > 0) {
+      mappedFilters.selectedHealthStatuses = filters.selectedHealthStatuses;
+    } else if (filters.columnFilters?.health_status?.length > 0) {
+      mappedFilters.selectedHealthStatuses = filters.columnFilters.health_status;
+    }
+    
+    // Enhanced scheme name mapping - gather from all possible sources and normalize
+    const schemeNameSources = [
+      ...(filters.selectedSchemes || []),
+      ...(filters.columnFilters?.name_of_scheme || []),
+      ...(filters.columnFilters?.sub_scheme_name || []),
+      ...(filters.columnFilters?.['sub_scheme-name'] || []), // Handle hyphenated version
+      ...(filters.columnFilters?.['Name of scheme'] || []),
+      ...(filters.columnFilters?.['Sub head'] || [])
+    ];
+    
+    if (schemeNameSources.length > 0) {
       // Normalize and deduplicate scheme names
       mappedFilters.selectedSchemes = Array.from(new Set(
-        schemeNames
+        schemeNameSources
           .filter(Boolean)
           .map(scheme => normalizeScheme(scheme))
       )).filter(Boolean);
@@ -188,7 +245,9 @@ const Engineering = () => {
       searchTerm: mappedFilters.searchTerm,
       budgetHeads: mappedFilters.selectedBudgetHeads.length,
       frontierHQs: mappedFilters.selectedFrontierHQs.length,
-      schemes: mappedFilters.selectedSchemes.length
+      sectorHQs: mappedFilters.selectedSectorHQs.length,
+      schemes: mappedFilters.selectedSchemes.length,
+      agencies: mappedFilters.selectedAgencies.length
     });
     
     return mappedFilters;
@@ -200,22 +259,33 @@ const Engineering = () => {
     filters.selectedRiskLevels,
     filters.selectedHealthStatuses,
     filters.selectedSchemes,
+    filters.selectedAgencies,
     filters.columnFilters,
     filters.efficiencyRange,
     normalizeScheme
   ]);
 
-  // Enhanced patch data processor with scheme name matching
+  // Enhanced patch data processor with scheme name and shq_name matching
   const processPatchData = useCallback((data) => {
     if (!data) return [];
     
     return data.map(item => {
       // Add normalized scheme names for better matching
-      if (item.scheme_name || item.sub_head) {
-        item.normalized_scheme_name = normalizeScheme(item.scheme_name || '') || 
-                                       normalizeScheme(item.sub_head || '');
-      }
-      return item;
+      const normalizedName = normalizeScheme(item.scheme_name || '') || 
+                             normalizeScheme(item.name_of_scheme || '') ||
+                             normalizeScheme(item.sub_scheme_name || '') ||
+                             normalizeScheme(item.sub_head || '');
+      
+      // Normalize sector HQ name for better matching
+      const normalizedSectorHQ = item.shq_name ? item.shq_name.trim() : '';
+      
+      return {
+        ...item,
+        normalized_scheme_name: normalizedName,
+        normalized_shq_name: normalizedSectorHQ,
+        // Also map shq_name to sector_hq for compatibility
+        sector_hq: item.shq_name || item.sector_hq || ''
+      };
     });
   }, [normalizeScheme]);
 
@@ -311,7 +381,7 @@ const Engineering = () => {
     const uniqueLocations = new Set(
       filteredData
         .map(item => {
-          const location = item.work_site;
+          const location = item.work_site || item.location;
           if (!location || location === '' || location === 'N/A' || location === 'Unknown Location') return null;
           return location.split(',')[0].trim();
         })
@@ -637,9 +707,9 @@ const Engineering = () => {
       const projectWithDefaults = {
         ...project,
         serial_no: project.serial_no || 'N/A',
-        scheme_name: project.scheme_name || 'Unknown Project',
+        scheme_name: project.scheme_name || project.name_of_scheme || 'Unknown Project',
         budget_head: project.budget_head || 'N/A',
-        work_site: project.work_site || 'N/A',
+        work_site: project.work_site || project.location || 'N/A',
         executive_agency: project.executive_agency || 'N/A',
         firm_name: project.firm_name || 'N/A',
         physical_progress: project.physical_progress || 0,
@@ -649,14 +719,19 @@ const Engineering = () => {
         risk_level: project.risk_level || 'LOW',
         status: project.status || 'NOT_STARTED',
         priority: project.priority || 'LOW',
-        sanctioned_amount: project.sanctioned_amount || 0,
-        total_expdr: project.total_expdr || 0,
-        percent_expdr: project.percent_expdr || 0,
+        sanctioned_amount: project.sanctioned_amount || project.sd_amount_lakh || 0,
+        total_expdr: project.total_expdr || project.expenditure_total || 0,
+        percent_expdr: project.percent_expdr || project.expenditure_percent || 0,
         remaining_amount: project.remaining_amount || 0,
         // Add normalized scheme name if not already present
         normalized_scheme_name: project.normalized_scheme_name || 
                                 normalizeScheme(project.scheme_name || '') || 
-                                normalizeScheme(project.sub_scheme_name || '')
+                                normalizeScheme(project.name_of_scheme || '') ||
+                                normalizeScheme(project.sub_scheme_name || ''),
+        // Add normalized shq_name
+        normalized_shq_name: project.normalized_shq_name || 
+                            project.shq_name || 
+                            project.sector_hq || ''
       };
       
       console.log('Engineering: Setting selected project and opening modal', projectWithDefaults);
@@ -804,7 +879,6 @@ const Engineering = () => {
             padding: 15px; 
             border-radius: 8px;
             background: #fff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
           }
           .metric-value { 
             font-size: 24px; 
@@ -870,11 +944,11 @@ const Engineering = () => {
             ${filteredData.slice(0, 50).map(project => `
               <tr>
                 <td>${project.serial_no}</td>
-                <td>${project.scheme_name}</td>
-                <td>${project.work_site}</td>
+                <td>${project.scheme_name || project.name_of_scheme}</td>
+                <td>${project.work_site || project.location}</td>
                 <td>${project.executive_agency}</td>
-                <td>${formatAmount(project.sanctioned_amount)}</td>
-                <td>${project.physical_progress}%</td>
+                <td>${formatAmount(project.sanctioned_amount || project.sd_amount_lakh)}</td>
+                <td>${project.physical_progress || project.physical_progress_percent}%</td>
                 <td>${project.risk_level}</td>
               </tr>
             `).join('')}
@@ -978,8 +1052,8 @@ const Engineering = () => {
       showQuickActions ? 'block' : 'hidden'
     }`}>
       <div className={`${
-        darkMode ? 'bg-gray-800' : 'bg-white'
-      } rounded-xl shadow-2xl p-4 border ${
+        darkMode ? 'bg-gray-800/90' : 'bg-white/90'
+      } rounded-xl border ${
         darkMode ? 'border-gray-700' : 'border-blue-200'
       }`}>
         <h3 className="text-sm font-bold mb-3">Quick Actions</h3>
@@ -1024,8 +1098,8 @@ const Engineering = () => {
 
     return (
       <div className={`fixed bottom-20 left-4 z-30 max-w-sm ${
-        darkMode ? 'bg-gray-800' : 'bg-white'
-      } rounded-xl shadow-2xl p-4 border ${
+        darkMode ? 'bg-gray-800/90' : 'bg-white/90'
+      } rounded-xl border ${
         darkMode ? 'border-gray-700' : 'border-blue-200'
       }`}>
         <div className="flex items-center justify-between mb-3">
@@ -1054,6 +1128,18 @@ const Engineering = () => {
                   ).reduce((a, b) => a + b, 0)} related sectors
                 </p>
               )}
+            </div>
+          )}
+          
+          {filters.selectedSectorHQs?.length > 0 && (
+            <div className="p-2 bg-cyan-50 dark:bg-cyan-900/20 rounded">
+              <p className="font-semibold text-cyan-700 dark:text-cyan-400">
+                Sector HQ: {filters.selectedSectorHQs[0]}
+                {filters.selectedSectorHQs.length > 1 && ` +${filters.selectedSectorHQs.length - 1}`}
+              </p>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Filtering by shq_name across databases
+              </p>
             </div>
           )}
           
@@ -1104,7 +1190,7 @@ const Engineering = () => {
             normalizeScheme={normalizeScheme}
           />
 
-          {/* Metrics Cards - Pass patchFilters */}
+          {/* Metrics Cards - Pass patchFilters and processPatchData */}
           <MetricsCards 
             metrics={metrics} 
             darkMode={darkMode}
@@ -1140,7 +1226,7 @@ const Engineering = () => {
     // Default content for other view modes
     return (
       <>
-        {/* Metrics Cards - Pass patchFilters */}
+        {/* Metrics Cards - Pass patchFilters and processPatchData */}
         <MetricsCards 
           metrics={metrics} 
           darkMode={darkMode}
@@ -1189,12 +1275,12 @@ const Engineering = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
             {['NOT_STARTED', 'IN_PROGRESS', 'ADVANCED', 'COMPLETED'].map(status => (
               <div key={status} className={`${
-                darkMode ? 'bg-gray-800' : 'bg-white'
-              } rounded-2xl shadow-sm p-4 border ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                darkMode ? 'bg-gray-800/90' : 'bg-white/90'
+              } rounded-2xl border ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
                 <h3 className="font-semibold mb-3 text-sm uppercase tracking-wider flex items-center justify-between">
                   {status.replace('_', ' ')}
                   <span className={`px-2 py-1 rounded-full text-xs ${
-                    darkMode ? 'bg-gray-700' : 'bg-gray-100'
+                    darkMode ? 'bg-gray-700/90' : 'bg-gray-100/90'
                   }`}>
                     {filteredData.filter(p => {
                       if (status === 'NOT_STARTED') return p.physical_progress === 0;
@@ -1220,14 +1306,14 @@ const Engineering = () => {
                         key={project.id}
                         onClick={() => handleProjectSelect(project)}
                         className={`p-3 rounded-lg cursor-pointer transition-all ${
-                          darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'
+                          darkMode ? 'bg-gray-700/90 hover:bg-gray-600/90' : 'bg-gray-50/90 hover:bg-gray-100/90'
                         } ${selectedProjects.find(p => p.id === project.id) ? 'ring-2 ring-blue-500' : ''}`}
                       >
                         <p className="text-sm font-semibold mb-1 truncate">
-                          {project.scheme_name}
+                          {project.scheme_name || project.name_of_scheme}
                         </p>
                         <div className="flex justify-between text-xs text-gray-500">
-                          <span>{formatAmount(project.sanctioned_amount)}</span>
+                          <span>{formatAmount(project.sanctioned_amount || project.sd_amount_lakh)}</span>
                           <span className={`px-2 py-0.5 rounded-full ${
                             project.risk_level === 'CRITICAL' ? 'bg-red-100 text-red-700' :
                             project.risk_level === 'HIGH' ? 'bg-orange-100 text-orange-700' :
@@ -1240,7 +1326,7 @@ const Engineering = () => {
                         <div className="mt-2 w-full bg-gray-200 rounded-full h-1">
                           <div 
                             className="h-1 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
-                            style={{ width: `${project.physical_progress}%` }}
+                            style={{ width: `${project.physical_progress || project.physical_progress_percent}%` }}
                           />
                         </div>
                         <div className="mt-2 flex items-center justify-between text-xs">
@@ -1267,7 +1353,7 @@ const Engineering = () => {
   if (loading) {
     return (
       <div className={`flex flex-col items-center justify-center min-h-screen ${
-        darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100'
+        darkMode ? 'bg-transparent' : 'bg-transparent'
       }`}>
         <div className="text-center">
           <div className="w-20 h-20 mx-auto mb-4">
@@ -1287,7 +1373,7 @@ const Engineering = () => {
   if (error) {
     return (
       <div className={`flex flex-col items-center justify-center min-h-screen ${
-        darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100'
+        darkMode ? 'bg-transparent' : 'bg-transparent'
       }`}>
         <AlertCircle size={48} className="text-red-500 mb-4" />
         <p className={`text-lg font-bold ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
@@ -1307,20 +1393,20 @@ const Engineering = () => {
   return (
     <div className={`min-h-screen transition-colors duration-300 relative z-0 ${
       darkMode 
-        ? 'bg-gray-900 text-gray-100' 
-        : 'bg-gradient-to-br from-slate-50 via-gray-50 to-gray-100'
+        ? 'bg-transparent text-gray-100' 
+        : 'bg-transparent'
     }`}>
-      <div className={`p-4 lg:p-6 ${layoutMode === 'compact' ? 'max-w-[1600px]' : 'max-w-[1920px]'} mx-auto relative z-10`}>
+      <div className={`${layoutMode === 'compact' ? 'max-w-[1600px]' : 'max-w-[1920px]'} mx-auto relative z-10`}>
         <div className="space-y-6">
           {/* Header */}
-          <div className={`${
-            darkMode ? 'bg-gray-800/90' : 'bg-white'
-          } backdrop-blur rounded-2xl shadow-sm p-6 border ${
-            darkMode ? 'border-gray-700' : 'border-gray-100'
-          }`}>
+          <div
+              className={`backdrop-blur rounded-2xl border ${
+                darkMode ? 'border-gray-700' : 'border-gray-100'
+              } bg-transparent`}
+            >
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
+                <div className="w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600">
                   <Building size={28} className="text-white" />
                 </div>
                 <div>
@@ -1336,7 +1422,7 @@ const Engineering = () => {
                     <span>{new Date().toLocaleString()}</span>
                     {isCascadingActive && (
                       <>
-                        <span>•</span>
+                      <span>•</span>
                         <span className="flex items-center gap-1 text-orange-500">
                           <Link2 size={12} />
                           Smart Filters Active
@@ -1346,10 +1432,9 @@ const Engineering = () => {
                   </p>
                 </div>
               </div>
-              
               <div className="flex flex-wrap gap-2">
                 {/* View Mode Toggle - Updated with Fast Filter option */}
-                <div className="flex rounded-lg overflow-hidden shadow-sm">
+                <div className="flex rounded-lg overflow-hidden">
                   {['dashboard', 'table', 'kanban', 'fastfilter'].map(mode => (
                     <button
                       key={mode}
@@ -1357,7 +1442,7 @@ const Engineering = () => {
                       className={`px-3 py-2 text-sm capitalize ${
                         viewMode === mode
                           ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
-                          : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+                          : darkMode ? 'bg-gray-700/90 text-gray-300' : 'bg-gray-100/90 text-gray-700'
                       } hover:opacity-90 transition-all flex items-center gap-1`}
                     >
                       {mode === 'fastfilter' && <Layers size={14} />}
@@ -1373,7 +1458,7 @@ const Engineering = () => {
                     className={`px-4 py-2 text-sm rounded-lg transition-all flex items-center gap-2 ${
                       showFilterInfo 
                         ? 'bg-orange-500 text-white' 
-                        : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+                        : darkMode ? 'bg-gray-700/90 text-gray-300' : 'bg-gray-100/90 text-gray-700'
                     }`}
                   >
                     <Link2 size={16} />
@@ -1390,7 +1475,7 @@ const Engineering = () => {
                   className={`px-4 py-2 text-sm rounded-lg transition-all flex items-center gap-2 ${
                     compareMode 
                       ? 'bg-blue-500 text-white' 
-                      : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+                      : darkMode ? 'bg-gray-700/90 text-gray-300' : 'bg-gray-100/90 text-gray-700'
                   }`}
                 >
                   <GitBranch size={16} />
@@ -1404,7 +1489,7 @@ const Engineering = () => {
                     setSelectedProjects([]);
                   }}
                   className={`px-4 py-2 text-sm rounded-lg hover:opacity-90 transition-all flex items-center gap-2 ${
-                    darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+                    darkMode ? 'bg-gray-700/90 text-gray-300' : 'bg-gray-100/90 text-gray-700'
                   }`}
                 >
                   <RefreshCw size={16} />
@@ -1413,7 +1498,7 @@ const Engineering = () => {
 
                 <button
                   onClick={() => handleExport('csv')}
-                  className="px-4 py-2 text-sm text-white rounded-lg shadow-sm hover:shadow-md transition-all flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600"
+                  className="px-4 py-2 text-sm text-white rounded-lg hover:opacity-90 transition-all flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600"
                 >
                   <Download size={16} />
                   Export
@@ -1422,14 +1507,14 @@ const Engineering = () => {
                 {/* Quick Filters Dropdown */}
                 <div className="relative group">
                   <button className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1 ${
-                    darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
+                    darkMode ? 'bg-gray-700/90 hover:bg-gray-600/90 text-gray-200' : 'bg-blue-50/90 hover:bg-blue-100/90 text-blue-700'
                   } transition-all`}>
                     <Sparkles size={14} />
                     Quick Filters
                     <ChevronDown size={14} />
                   </button>
-                  <div className={`absolute top-full mt-2 right-0 w-56 rounded-lg shadow-xl z-50 ${
-                    darkMode ? 'bg-gray-800' : 'bg-white'
+                  <div className={`absolute top-full mt-2 right-0 w-56 rounded-lg z-50 ${
+                    darkMode ? 'bg-gray-800/90' : 'bg-white/90'
                   } border ${darkMode ? 'border-gray-700' : 'border-gray-200'}
                   opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all`}>
                     {filterPresets.map((preset, idx) => (
@@ -1437,7 +1522,7 @@ const Engineering = () => {
                         key={idx}
                         onClick={() => applyPreset(preset)}
                         className={`w-full px-3 py-2.5 text-left text-xs hover:${
-                          darkMode ? 'bg-gray-700' : 'bg-blue-50'
+                          darkMode ? 'bg-gray-700/90' : 'bg-blue-50/90'
                         } transition-colors flex items-center gap-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}
                       >
                         <preset.icon size={12} className="text-blue-500" />
@@ -1451,7 +1536,7 @@ const Engineering = () => {
                 <button
                   onClick={() => setDarkMode(!darkMode)}
                   className={`px-3 py-2 rounded-lg transition-all ${
-                    darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-700'
+                    darkMode ? 'bg-gray-700/90 text-yellow-400' : 'bg-gray-100/90 text-gray-700'
                   }`}
                 >
                   {darkMode ? <Sun size={16} /> : <Moon size={16} />}
@@ -1460,11 +1545,11 @@ const Engineering = () => {
             </div>
           </div>
 
-          {/* Scheme Name Mapping Info Banner - NEW ADDITION */}
+          {/* Enhanced Scheme Name Mapping Info Banner */}
           {(patchFilters.selectedSchemes.length > 0 || (filters.selectedSchemes?.length > 0)) && (
             <div className={`${
-              darkMode ? 'bg-green-900/20 border-green-800' : 'bg-green-50 border-green-200'
-            } rounded-xl p-3 border flex items-center gap-3`}>
+              darkMode ? 'bg-green-900/20 border-green-800' : 'bg-green-50/90 border-green-200'
+            } rounded-xl border flex items-center gap-3  p-2`}>
               <Info size={16} className="text-green-500 flex-shrink-0" />
               <div className="flex-1 text-sm">
                 <span className="font-semibold text-green-700 dark:text-green-400">
@@ -1492,11 +1577,43 @@ const Engineering = () => {
             </div>
           )}
 
+          {/* Enhanced Sector HQ Mapping Info Banner */}
+          {patchFilters.selectedSectorHQs.length > 0 && (
+            <div className={`${
+              darkMode ? 'bg-cyan-900/20 border-cyan-800' : 'bg-cyan-50/90 border-cyan-200'
+            } rounded-xl border flex items-center gap-3`}>
+              <Info size={16} className="text-cyan-500 flex-shrink-0" />
+              <div className="flex-1 text-sm">
+                <span className="font-semibold text-cyan-700 dark:text-cyan-400">
+                  Sector HQ Mapping Active:
+                </span>
+                <span className={darkMode ? 'text-gray-300 ml-2' : 'text-gray-600 ml-2'}>
+                  Filtering by {patchFilters.selectedSectorHQs.length} sector headquarters. 
+                  The shq_name field is mapped across both engineering and current year budget databases.
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  filters.setSelectedSectorHQs([]);
+                  if (filters.columnFilters?.shq_name) {
+                    filters.setColumnFilter('shq_name', []);
+                  }
+                  if (filters.columnFilters?.shq) {
+                    filters.setColumnFilter('shq', []);
+                  }
+                }}
+                className="px-3 py-1 text-xs bg-cyan-500 text-white rounded hover:bg-cyan-600 transition-colors"
+              >
+                Clear Sector Filters
+              </button>
+            </div>
+          )}
+
           {/* Cascading Filter Info Banner */}
           {isCascadingActive && filters.availableOptions && viewMode !== 'fastfilter' && (
             <div className={`${
-              darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'
-            } rounded-xl p-3 border flex items-center gap-3`}>
+              darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50/90 border-blue-200'
+            } rounded-xl border flex items-center gap-3 p-2`}>
               <Info size={16} className="text-blue-500 flex-shrink-0" />
               <div className="flex-1 text-sm">
                 <span className="font-semibold text-blue-700 dark:text-blue-400">
@@ -1539,7 +1656,7 @@ const Engineering = () => {
                 onClick={closeProjectModal}
               />
               <div className="fixed inset-0 z-[100001] overflow-y-auto animate-fadeIn">
-                <div className="flex min-h-full items-center justify-center p-4">
+                <div className="flex min-h-full items-center justify-center">
                   <div className="animate-modalZoomIn">
                     <Modal
                       isOpen={modalOpen}
@@ -1563,15 +1680,15 @@ const Engineering = () => {
           {activeFilterCount > 0 && viewMode !== 'fastfilter' && (
             <div className={`fixed bottom-4 left-4 right-4 max-w-[1920px] mx-auto z-20 ${
               darkMode ? 'bg-gray-800/95' : 'bg-white/95'
-            } backdrop-blur rounded-xl shadow-lg p-3 border ${
+            } backdrop-blur rounded-xl border ${
               darkMode ? 'border-gray-700' : 'border-gray-200'
             }`}>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between p-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-semibold text-gray-500">Active:</span>
                   
                   {filters.searchTerm && (
-                    <span className="px-2 py-0.5 bg-white dark:bg-gray-700 text-xs rounded-full flex items-center gap-1 shadow-sm">
+                    <span className="px-2 py-0.5 bg-white/90 dark:bg-gray-700/90 text-xs rounded-full flex items-center gap-1">
                       <Search size={10} />
                       "{filters.searchTerm}"
                       <button onClick={() => filters.setSearchTerm('')} className="ml-1">
@@ -1581,37 +1698,37 @@ const Engineering = () => {
                   )}
                   
                   {filters.selectedSchemes?.length > 0 && (
-                    <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-xs rounded-full">
+                    <span className="px-2 py-0.5 bg-indigo-100/90 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-xs rounded-full">
                       {filters.selectedSchemes.length} Scheme{filters.selectedSchemes.length > 1 ? 's' : ''}
                     </span>
                   )}
                   
                   {filters.selectedProgressCategories?.length > 0 && (
-                    <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded-full">
+                    <span className="px-2 py-0.5 bg-purple-100/90 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded-full">
                       {filters.selectedProgressCategories.length} Progress Stage{filters.selectedProgressCategories.length > 1 ? 's' : ''}
                     </span>
                   )}
                   
                   {filters.selectedHealthStatuses?.length > 0 && (
-                    <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded-full">
+                    <span className="px-2 py-0.5 bg-red-100/90 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded-full">
                       {filters.selectedHealthStatuses.length} Health Status{filters.selectedHealthStatuses.length > 1 ? 'es' : ''}
                     </span>
                   )}
                   
                   {filters.selectedBudgetHeads?.length > 0 && (
-                    <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full">
+                    <span className="px-2 py-0.5 bg-green-100/90 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full">
                       {filters.selectedBudgetHeads.length} Budget Head{filters.selectedBudgetHeads.length > 1 ? 's' : ''}
                     </span>
                   )}
                   
                   {filters.selectedFrontierHQs?.length > 0 && (
-                    <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded-full">
+                    <span className="px-2 py-0.5 bg-blue-100/90 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded-full">
                       {filters.selectedFrontierHQs.length} Frontier HQ{filters.selectedFrontierHQs.length > 1 ? 's' : ''}
                     </span>
                   )}
                   
                   {filters.selectedSectorHQs?.length > 0 && (
-                    <span className="px-2 py-0.5 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 text-xs rounded-full">
+                    <span className="px-2 py-0.5 bg-cyan-100/90 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 text-xs rounded-full">
                       {filters.selectedSectorHQs.length} Sector HQ{filters.selectedSectorHQs.length > 1 ? 's' : ''}
                     </span>
                   )}
@@ -1631,8 +1748,8 @@ const Engineering = () => {
           {/* Comparison Panel */}
           {compareMode && selectedProjects.length > 0 && (
             <div className={`fixed bottom-4 left-4 right-4 max-w-[1920px] mx-auto z-30 ${
-              darkMode ? 'bg-gray-800' : 'bg-white'
-            } rounded-xl shadow-lg p-4 border ${
+              darkMode ? 'bg-gray-800/90' : 'bg-white/90'
+            } rounded-xl border ${
               darkMode ? 'border-gray-700' : 'border-gray-100'
             } transform transition-all duration-300 animate-slide-up`}>
               <div className="flex items-center justify-between mb-3">
@@ -1649,18 +1766,18 @@ const Engineering = () => {
               </div>
               <div className="flex gap-2 overflow-x-auto">
                 {selectedProjects.map(project => (
-                  <div key={project.id} className={`min-w-[250px] p-3 rounded-lg ${
-                    darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                  <div key={project.id} className={`min-w-[250px] rounded-lg ${
+                    darkMode ? 'bg-gray-700/90' : 'bg-gray-50/90'
                   }`}>
-                    <p className="text-sm font-semibold truncate">{project.scheme_name}</p>
+                    <p className="text-sm font-semibold truncate">{project.scheme_name || project.name_of_scheme}</p>
                     <div className="mt-2 space-y-1 text-xs">
                       <div className="flex justify-between">
                         <span>Progress:</span>
-                        <span className="font-medium">{project.physical_progress}%</span>
+                        <span className="font-medium">{project.physical_progress || project.physical_progress_percent}%</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Budget:</span>
-                        <span className="font-medium">{formatAmount(project.sanctioned_amount)}</span>
+                        <span className="font-medium">{formatAmount(project.sanctioned_amount || project.sd_amount_lakh)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Risk:</span>
@@ -1673,6 +1790,12 @@ const Engineering = () => {
                           {project.risk_level}
                         </span>
                       </div>
+                      {project.shq_name && (
+                        <div className="flex justify-between">
+                          <span>Sector HQ:</span>
+                          <span className="font-medium truncate">{project.shq_name}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

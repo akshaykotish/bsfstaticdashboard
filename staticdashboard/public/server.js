@@ -46,7 +46,9 @@ const databaseConfigs = {
     idField: 's_no',
     idPrefix: 'ENG',
     idFormat: 'ENG-{timestamp}-{sequence}',
-    columns: ['s_no', 'budget_head', 'name_of_scheme', 'sub_scheme_name', 'ftr_hq_name', 'shq_name', 'location', 'work_description', 'executive_agency', 'firm_name', 'sd_amount_lakh', 'expenditure_previous_fy', 'expenditure_current_fy', 'expenditure_total', 'expenditure_percent', 'physical_progress_percent', 'ts_date', 'tender_date', 'acceptance_date', 'award_date', 'pdc_agreement', 'pdc_revised', 'completion_date_actual', 'time_allowed_days', 'current_status', 'aa_es_reference', 'remarks']
+    columns: ['s_no', 'budget_head', 'name_of_scheme', 'sub_scheme_name', 'ftr_hq_name', 'shq_name', 'location', 'work_description', 'executive_agency', 'firm_name', 'sd_amount_lakh', 'expenditure_previous_fy', 'expenditure_current_fy', 'expenditure_total', 'expenditure_percent', 'physical_progress_percent', 'ts_date', 'tender_date', 'acceptance_date', 'award_date', 'pdc_agreement', 'pdc_revised', 'completion_date_actual', 'time_allowed_days', 'current_status', 'aa_es_reference', 'remarks'],
+    // Columns to use for duplicate detection (excluding ID and timestamps)
+    comparisonColumns: ['name_of_scheme', 'ftr_hq_name', 'shq_name', 'location', 'work_description', 'executive_agency', 'firm_name', 'sd_amount_lakh']
   },
   operations: {
     displayName: 'Operations Database',
@@ -54,7 +56,8 @@ const databaseConfigs = {
     idField: 'S_No',
     idPrefix: 'OPS',
     idFormat: 'OPS-{timestamp}-{sequence}',
-    columns: ['S_No', 'WORK_TYPE', 'SOURCE_SHEET', 'NAME_OF_WORK', 'FRONTIER', 'SECTOR_HQ', 'LENGTH_KM', 'UNITS_AOR', 'HLEC_YEAR', 'SANCTIONED_AMOUNT_CR', 'SDC', 'PDC', 'COMPLETED_PERCENTAGE', 'REMARKS', 'APPROVED AMOUNT (CR)']
+    columns: ['S_No', 'WORK_TYPE', 'SOURCE_SHEET', 'NAME_OF_WORK', 'FRONTIER', 'SECTOR_HQ', 'LENGTH_KM', 'UNITS_AOR', 'HLEC_YEAR', 'SANCTIONED_AMOUNT_CR', 'SDC', 'PDC', 'COMPLETED_PERCENTAGE', 'REMARKS', 'APPROVED AMOUNT (CR)'],
+    comparisonColumns: ['NAME_OF_WORK', 'FRONTIER', 'SECTOR_HQ', 'LENGTH_KM', 'SANCTIONED_AMOUNT_CR']
   },
   enggcurrentyear: {
     displayName: 'Engineering Current Year',
@@ -62,7 +65,8 @@ const databaseConfigs = {
     idField: 'S/No.',
     idPrefix: 'ECY',
     idFormat: 'ECY-{timestamp}-{sequence}',
-    columns: ['S/No.', 'ftr_hq', 'budget_head', 'Sub head', 'Allotment Previous Financial year', 'Expdr previous year', 'Liabilities', 'Fresh Sanction issued during CFY', 'Effective sanction', 'Allotment', 'Expdr booked as per e-lekha as on 22/07/25', '% Age of expdr as per e-lekha', 'Bill pending with PAD', 'Bill pending with HQrs', 'Total Expdr', '% Age of total Expdr', 'Balance fund']
+    columns: ['S/No.', 'ftr_hq', 'budget_head', 'Sub head', 'Allotment Previous Financial year', 'Expdr previous year', 'Liabilities', 'Fresh Sanction issued during CFY', 'Effective sanction', 'Allotment', 'Expdr booked as per e-lekha as on 22/07/25', '% Age of expdr as per e-lekha', 'Bill pending with PAD', 'Bill pending with HQrs', 'Total Expdr', '% Age of total Expdr', 'Balance fund'],
+    comparisonColumns: ['ftr_hq', 'budget_head', 'Sub head', 'Allotment Previous Financial year']
   }
 };
 
@@ -74,7 +78,8 @@ const getConfig = (databaseName) => {
     idField: 'id',
     idPrefix: databaseName.toUpperCase().slice(0, 3),
     idFormat: '{prefix}-{timestamp}-{sequence}',
-    columns: []
+    columns: [],
+    comparisonColumns: []
   };
 };
 
@@ -96,6 +101,179 @@ const needsIdRegeneration = (id) => {
   // Check if it's a sequential number like "1", "2", "3"
   if (Number.isInteger(Number(id)) && Number(id) < 10000) return true;
   return false;
+};
+
+// Fuzzy string matching function using Levenshtein distance
+const levenshteinDistance = (str1, str2) => {
+  if (!str1 || !str2) return Math.max(str1?.length || 0, str2?.length || 0);
+  
+  str1 = String(str1).toLowerCase().trim();
+  str2 = String(str2).toLowerCase().trim();
+  
+  const matrix = [];
+  
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
+};
+
+// Calculate similarity score between two strings (0 to 1)
+const stringSimilarity = (str1, str2) => {
+  if (!str1 && !str2) return 1;
+  if (!str1 || !str2) return 0;
+  
+  str1 = String(str1).toLowerCase().trim();
+  str2 = String(str2).toLowerCase().trim();
+  
+  if (str1 === str2) return 1;
+  
+  const maxLength = Math.max(str1.length, str2.length);
+  if (maxLength === 0) return 1;
+  
+  const distance = levenshteinDistance(str1, str2);
+  return 1 - (distance / maxLength);
+};
+
+// Compare two values based on their type
+const compareValues = (val1, val2, fieldName = '') => {
+  // Handle null/undefined/empty
+  if (!val1 && !val2) return 1;
+  if (!val1 || !val2) return 0;
+  
+  val1 = String(val1).trim();
+  val2 = String(val2).trim();
+  
+  // Check if numeric
+  const num1 = parseFloat(val1);
+  const num2 = parseFloat(val2);
+  
+  if (!isNaN(num1) && !isNaN(num2)) {
+    // For numeric values, use percentage difference
+    if (num1 === num2) return 1;
+    if (num1 === 0 || num2 === 0) return 0;
+    
+    const diff = Math.abs(num1 - num2);
+    const avg = (Math.abs(num1) + Math.abs(num2)) / 2;
+    const percentDiff = diff / avg;
+    
+    // If difference is less than 5%, consider it very similar
+    if (percentDiff < 0.05) return 0.95;
+    // If difference is less than 10%, consider it similar
+    if (percentDiff < 0.1) return 0.85;
+    // If difference is less than 20%, consider it somewhat similar
+    if (percentDiff < 0.2) return 0.7;
+    
+    return Math.max(0, 1 - percentDiff);
+  }
+  
+  // Check if date
+  const date1 = new Date(val1);
+  const date2 = new Date(val2);
+  
+  if (!isNaN(date1.getTime()) && !isNaN(date2.getTime()) && 
+      val1.includes('-') && val2.includes('-')) {
+    // For dates, exact match or no match
+    return date1.getTime() === date2.getTime() ? 1 : 0;
+  }
+  
+  // For text, use fuzzy string matching
+  return stringSimilarity(val1, val2);
+};
+
+// Calculate overall similarity between two records
+const calculateRecordSimilarity = (record1, record2, comparisonColumns) => {
+  if (!comparisonColumns || comparisonColumns.length === 0) {
+    // If no comparison columns specified, use all non-ID columns
+    const allColumns = [...new Set([...Object.keys(record1), ...Object.keys(record2)])];
+    comparisonColumns = allColumns.filter(col => 
+      !col.toLowerCase().includes('id') && 
+      !col.toLowerCase().includes('created') && 
+      !col.toLowerCase().includes('updated')
+    );
+  }
+  
+  let totalScore = 0;
+  let totalWeight = 0;
+  
+  for (const column of comparisonColumns) {
+    // Give different weights to different types of fields
+    let weight = 1;
+    
+    // Important fields get higher weight
+    if (column.toLowerCase().includes('name') || 
+        column.toLowerCase().includes('work') ||
+        column.toLowerCase().includes('scheme')) {
+      weight = 2;
+    }
+    
+    // Location fields are also important
+    if (column.toLowerCase().includes('location') || 
+        column.toLowerCase().includes('hq') ||
+        column.toLowerCase().includes('sector') ||
+        column.toLowerCase().includes('frontier')) {
+      weight = 1.5;
+    }
+    
+    // Financial fields are important for matching
+    if (column.toLowerCase().includes('amount') || 
+        column.toLowerCase().includes('sanction') ||
+        column.toLowerCase().includes('allotment')) {
+      weight = 1.5;
+    }
+    
+    const similarity = compareValues(record1[column], record2[column], column);
+    totalScore += similarity * weight;
+    totalWeight += weight;
+  }
+  
+  if (totalWeight === 0) return 0;
+  
+  return totalScore / totalWeight;
+};
+
+// Check if a record is duplicate based on similarity threshold
+const isDuplicateRecord = (newRecord, existingRecords, config, threshold = 0.95) => {
+  const comparisonColumns = config.comparisonColumns || [];
+  
+  for (const existingRecord of existingRecords) {
+    const similarity = calculateRecordSimilarity(newRecord, existingRecord, comparisonColumns);
+    
+    if (similarity >= threshold) {
+      return {
+        isDuplicate: true,
+        matchedRecord: existingRecord,
+        similarity: similarity,
+        similarityPercent: Math.round(similarity * 100)
+      };
+    }
+  }
+  
+  return {
+    isDuplicate: false,
+    matchedRecord: null,
+    similarity: 0,
+    similarityPercent: 0
+  };
 };
 
 // Helper function to read CSV file
@@ -263,17 +441,17 @@ app.get('/api/databases/:name/export', async (req, res) => {
   }
 });
 
-// Get rows from CSV with automatic ID checking - UPGRADED TO REMOVE LIMIT
+// Get rows from CSV with automatic ID checking
 app.get('/api/csv/:database/rows', async (req, res) => {
   try {
     const { database } = req.params;
     const { 
       page = 1, 
-      limit, // No default limit - if not provided, return all rows
+      limit,
       search = '', 
       sortBy = '', 
       sortOrder = 'asc',
-      all = 'false' // New parameter to explicitly request all rows
+      all = 'false'
     } = req.query;
     
     const filePath = path.join(DATA_DIR, `${database}.csv`);
@@ -324,14 +502,12 @@ app.get('/api/csv/:database/rows', async (req, res) => {
     // Apply pagination ONLY if limit is specified and not requesting all rows
     let paginatedData = data;
     let currentPage = parseInt(page);
-    let pageLimit = limit ? parseInt(limit) : data.length; // If no limit, return all
+    let pageLimit = limit ? parseInt(limit) : data.length;
     
     if (all === 'true' || !limit) {
-      // Return all data without pagination
       paginatedData = data;
       console.log(`Returning all ${data.length} rows (no pagination)`);
     } else {
-      // Apply pagination with specified limit
       const startIndex = (currentPage - 1) * pageLimit;
       const endIndex = startIndex + pageLimit;
       paginatedData = data.slice(startIndex, endIndex);
@@ -340,8 +516,8 @@ app.get('/api/csv/:database/rows', async (req, res) => {
     
     const response = {
       rows: paginatedData,
-      total: data.length, // Always return total count of all data
-      count: data.length, // Total count after filters
+      total: data.length,
+      count: data.length,
       page: currentPage,
       limit: pageLimit,
       totalPages: Math.ceil(data.length / pageLimit),
@@ -349,7 +525,7 @@ app.get('/api/csv/:database/rows', async (req, res) => {
       idField: idField,
       config: config,
       idsUpdated: updated,
-      allRows: all === 'true' || !limit // Indicate if all rows are being returned
+      allRows: all === 'true' || !limit
     };
     
     console.log(`Response: Returning ${paginatedData.length} rows out of ${data.length} total`);
@@ -380,7 +556,7 @@ app.get('/api/csv/:database/rows/:index', async (req, res) => {
   }
 });
 
-// Add new row with automatic unique ID generation
+// Add new row with duplicate detection
 app.post('/api/csv/:database/rows', async (req, res) => {
   try {
     const { database } = req.params;
@@ -392,7 +568,19 @@ app.post('/api/csv/:database/rows', async (req, res) => {
     // Read existing data
     let data = await readCSV(filePath);
     
-    // Always generate a new unique ID for new rows
+    // Check for duplicates using similarity matching
+    const duplicateCheck = isDuplicateRecord(newRow, data, config, 0.7);
+    
+    if (duplicateCheck.isDuplicate) {
+      return res.status(409).json({ 
+        error: `Duplicate record detected with ${duplicateCheck.similarityPercent}% similarity`,
+        isDuplicate: true,
+        similarity: duplicateCheck.similarityPercent,
+        matchedRecord: duplicateCheck.matchedRecord
+      });
+    }
+    
+    // Generate unique ID for new row
     const timestamp = Date.now();
     const sequence = data.length + 1;
     newRow[idField] = generateId(config, timestamp, sequence);
@@ -402,13 +590,6 @@ app.post('/api/csv/:database/rows', async (req, res) => {
       newRow.s_no = newRow[idField];
     }
     
-    // Check for duplicates based on ID
-    const isDuplicate = data.some(row => row[idField] === newRow[idField]);
-    if (isDuplicate) {
-      // Generate alternative ID if duplicate
-      newRow[idField] = generateId(config, timestamp + 1, sequence);
-    }
-    
     // Add timestamps
     newRow.created_at = new Date().toISOString();
     newRow.updated_at = new Date().toISOString();
@@ -416,7 +597,7 @@ app.post('/api/csv/:database/rows', async (req, res) => {
     // Add the new row
     data.push(newRow);
     
-    // Get all columns (including new ones from the new row)
+    // Get all columns
     const allColumns = [...new Set([
       ...Object.keys(data[0] || {}),
       ...Object.keys(newRow)
@@ -464,7 +645,7 @@ app.put('/api/csv/:database/rows/:index', async (req, res) => {
       data[rowIndex] = {
         ...data[rowIndex],
         ...updatedRow,
-        [idField]: originalId, // Always preserve original ID
+        [idField]: originalId,
         updated_at: new Date().toISOString()
       };
       
@@ -508,10 +689,8 @@ app.delete('/api/csv/:database/rows/:index', async (req, res) => {
     if (rowIndex >= 0 && rowIndex < data.length) {
       const deletedRow = data.splice(rowIndex, 1)[0];
       
-      // Get columns from remaining data
       const columns = data.length > 0 ? Object.keys(data[0]) : Object.keys(deletedRow);
       
-      // Write back to file
       await writeCSV(filePath, data, columns);
       
       res.json({ 
@@ -527,7 +706,7 @@ app.delete('/api/csv/:database/rows/:index', async (req, res) => {
   }
 });
 
-// Analyze Excel file structure (works with both .xls and .xlsx)
+// Analyze Excel file structure
 app.post('/api/analyze/excel', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -539,36 +718,28 @@ app.post('/api/analyze/excel', upload.single('file'), async (req, res) => {
     const sheets = {};
     
     try {
-      // Use XLSX package to read the file
       const workbook = XLSX.read(req.file.buffer, { 
         type: 'buffer',
         cellDates: true,
         cellNF: true,
         cellStyles: true,
-        sheetRows: 0 // Read ALL rows, no limit
+        sheetRows: 0
       });
       
       console.log('Workbook loaded, sheets:', workbook.SheetNames);
       
-      // Process each sheet
       workbook.SheetNames.forEach(sheetName => {
         const worksheet = workbook.Sheets[sheetName];
-        
-        // Get sheet range
         const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
         console.log(`Processing sheet: ${sheetName}, range: ${worksheet['!ref']}`);
         
-        // Convert sheet to JSON to get data - NO LIMIT
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-          header: 1, // Return array of arrays
-          defval: '', // Default value for empty cells
-          blankrows: false // Skip blank rows
+          header: 1,
+          defval: '',
+          blankrows: false
         });
         
-        // Get headers from first row
         const headers = jsonData.length > 0 ? jsonData[0].map(h => String(h || '').trim()).filter(h => h) : [];
-        
-        // Count data rows (excluding header)
         const dataRows = jsonData.length > 1 ? jsonData.slice(1).filter(row => 
           row.some(cell => cell !== null && cell !== undefined && cell !== '')
         ) : [];
@@ -577,8 +748,8 @@ app.post('/api/analyze/excel', upload.single('file'), async (req, res) => {
           name: sheetName,
           rowCount: dataRows.length,
           columns: headers,
-          totalRows: range.e.r + 1, // End row + 1
-          actualColumns: range.e.c + 1 // End column + 1
+          totalRows: range.e.r + 1,
+          actualColumns: range.e.c + 1
         };
         
         console.log(`Sheet ${sheetName} analysis:`, {
@@ -624,7 +795,7 @@ app.post('/api/analyze/excel', upload.single('file'), async (req, res) => {
   }
 });
 
-// Upload Excel file with automatic unique ID generation for every row - NO LIMITS
+// Upload Excel file with smart duplicate detection
 app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -637,11 +808,13 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
       key_columns = '[]',
       config_name = '',
       id_field = '',
-      id_prefix = ''
+      id_prefix = '',
+      duplicate_threshold = '0.7' // Similarity threshold for duplicate detection
     } = req.body;
     
     const columnMapping = JSON.parse(column_mapping);
     const keyColumns = JSON.parse(key_columns);
+    const similarityThreshold = parseFloat(duplicate_threshold) || 0.7;
     
     if (!database_name) {
       return res.status(400).json({ error: 'Database name is required' });
@@ -649,6 +822,7 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
 
     console.log('Processing upload for database:', database_name);
     console.log('File:', req.file.originalname, 'Size:', req.file.size);
+    console.log('Duplicate detection threshold:', similarityThreshold);
 
     const filePath = path.join(DATA_DIR, `${database_name}.csv`);
     
@@ -669,14 +843,14 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
       console.log('No existing data file');
     }
 
-    // Parse Excel file using XLSX with NO ROW LIMIT
+    // Parse Excel file
     const workbook = XLSX.read(req.file.buffer, { 
       type: 'buffer',
       cellDates: true,
       cellNF: true,
       cellStyles: true,
       dateNF: 'yyyy-mm-dd',
-      sheetRows: 0 // Read ALL rows, no limit
+      sheetRows: 0
     });
     
     console.log('Workbook loaded, sheets:', workbook.SheetNames);
@@ -687,7 +861,8 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
       new_records: 0,
       duplicates_skipped: 0,
       sheets_processed: 0,
-      ids_generated: 0
+      ids_generated: 0,
+      duplicate_details: []
     };
 
     const timestamp = Date.now();
@@ -698,12 +873,10 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
       console.log(`Processing sheet: ${sheetName}`);
       
       const worksheet = workbook.Sheets[sheetName];
-      
-      // Convert sheet to JSON - NO LIMIT
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-        header: 1, // Get array of arrays
-        defval: '', // Default value for empty cells
-        blankrows: false, // Skip blank rows
+        header: 1,
+        defval: '',
+        blankrows: false,
         dateNF: 'yyyy-mm-dd'
       });
       
@@ -714,17 +887,16 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
         return;
       }
       
-      // Get headers from first row
       const headers = jsonData[0].map(h => String(h || '').trim());
       console.log(`Found headers:`, headers.slice(0, 10));
       
-      // Apply column mapping to headers
+      // Apply column mapping
       const mappedHeaders = headers.map(header => {
         if (!header) return null;
         return columnMapping[header] || header;
       });
       
-      // Process ALL data rows (skip header row)
+      // Process data rows
       let sheetRowCount = 0;
       for (let i = 1; i < jsonData.length; i++) {
         const row = jsonData[i];
@@ -747,9 +919,7 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
             if (value !== null && value !== undefined && value !== '') {
               hasData = true;
               
-              // Handle different value types
               if (value instanceof Date) {
-                // Format date as YYYY-MM-DD
                 rowData[mappedHeaders[index]] = value.toISOString().split('T')[0];
               } else if (typeof value === 'number') {
                 rowData[mappedHeaders[index]] = value.toString();
@@ -772,43 +942,54 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
 
     console.log('Total rows extracted from all sheets:', allNewData.length);
 
-    // Generate unique IDs for ALL rows and check for duplicates
+    // Process rows with duplicate detection
     const processedData = [];
     
     for (let i = 0; i < allNewData.length; i++) {
       const row = allNewData[i];
       stats.total_records++;
       
-      // Always generate a unique ID for each row
-      row[idField] = generateId(config, timestamp, globalSequence++);
-      stats.ids_generated++;
-      
       if (i % 100 === 0) {
         console.log(`Processing row ${i + 1}/${allNewData.length}`);
       }
       
-      // Check for duplicates based on key columns
-      let isDuplicate = false;
-      if (keyColumns.length > 0 && keyColumns[0] !== idField) {
-        isDuplicate = [...existingData, ...processedData].some(existingRow => 
-          keyColumns.every(key => key !== idField && existingRow[key] === row[key])
-        );
-      }
+      // Check for duplicates ONLY against existing database records
+      const duplicateCheck = isDuplicateRecord(
+        row, 
+        existingData,  // Only compare against existing database records
+        config, 
+        similarityThreshold
+      );
       
-      if (!isDuplicate) {
+      if (duplicateCheck.isDuplicate) {
+        stats.duplicates_skipped++;
+        stats.duplicate_details.push({
+          rowIndex: i + 1,
+          similarity: duplicateCheck.similarityPercent,
+          matchedId: duplicateCheck.matchedRecord[idField]
+        });
+        
+        if (stats.duplicates_skipped <= 10) {
+          console.log(`Row ${i + 1} is duplicate of existing record (${duplicateCheck.similarityPercent}% similar)`);
+        }
+      } else {
+        // Generate unique ID for new row
+        row[idField] = generateId(config, timestamp, globalSequence++);
         row.created_at = new Date().toISOString();
         row.updated_at = new Date().toISOString();
+        
         processedData.push(row);
         stats.new_records++;
-      } else {
-        stats.duplicates_skipped++;
+        stats.ids_generated++;
       }
     }
 
     console.log('Processing complete:', {
       totalExtracted: allNewData.length,
-      processed: processedData.length,
-      duplicatesSkipped: stats.duplicates_skipped
+      existingRecords: existingData.length,
+      newRecords: processedData.length,
+      duplicatesSkipped: stats.duplicates_skipped,
+      threshold: similarityThreshold
     });
 
     // Merge with existing data
@@ -819,7 +1000,7 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
       finalData.flatMap(row => Object.keys(row))
     )];
     
-    // Ensure ID field is first column
+    // Ensure ID field is first
     if (allColumns.includes(idField)) {
       const index = allColumns.indexOf(idField);
       allColumns.splice(index, 1);
@@ -829,7 +1010,8 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
     console.log('Final data summary:', {
       totalRows: finalData.length,
       columns: allColumns.length,
-      idField: idField
+      idField: idField,
+      duplicatesSkipped: stats.duplicates_skipped
     });
     
     // Write to CSV file
@@ -838,9 +1020,10 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
     console.log('Upload complete!');
     
     res.json({
-      message: 'File uploaded and processed successfully with unique IDs for all rows',
+      message: `File processed: ${stats.new_records} new records added, ${stats.duplicates_skipped} duplicates skipped`,
       filename: database_name,
-      stats
+      stats,
+      threshold: similarityThreshold
     });
   } catch (error) {
     console.error('Error uploading Excel:', error);
@@ -869,7 +1052,6 @@ app.post('/api/databases/:name/regenerate-ids', async (req, res) => {
     let updatedCount = 0;
     const timestamp = Date.now();
     
-    // Regenerate IDs for all rows that need it
     data = data.map((row, index) => {
       const currentId = row[idField];
       
@@ -877,7 +1059,6 @@ app.post('/api/databases/:name/regenerate-ids', async (req, res) => {
         updatedCount++;
         row[idField] = generateId(config, timestamp, index + 1);
         
-        // For engineering database, also update s_no
         if (name === 'engineering' && needsIdRegeneration(row.s_no)) {
           row.s_no = row[idField];
         }
@@ -892,10 +1073,8 @@ app.post('/api/databases/:name/regenerate-ids', async (req, res) => {
       return row;
     });
     
-    // Save updated data
     const columns = Object.keys(data[0]);
     
-    // Ensure ID field is first column
     if (columns.includes(idField)) {
       const index = columns.indexOf(idField);
       columns.splice(index, 1);
@@ -917,7 +1096,7 @@ app.post('/api/databases/:name/regenerate-ids', async (req, res) => {
   }
 });
 
-// Get database statistics
+// Get database statistics with duplicate detection info
 app.get('/api/stats/:database', async (req, res) => {
   try {
     const { database } = req.params;
@@ -932,10 +1111,10 @@ app.get('/api/stats/:database', async (req, res) => {
       columns: data.length > 0 ? Object.keys(data[0]) : [],
       idField: config.idField,
       config: config,
-      idsNeedingRegeneration: 0
+      idsNeedingRegeneration: 0,
+      comparisonColumns: config.comparisonColumns || []
     };
     
-    // Count IDs that need regeneration
     stats.idsNeedingRegeneration = data.filter(row => 
       needsIdRegeneration(row[config.idField])
     ).length;
@@ -998,9 +1177,6 @@ app.get('/api/stats/:database', async (req, res) => {
   }
 });
 
-// Add these new endpoints to server.js
-// These would be inserted into the existing server.js file
-
 // Get single row by ID
 app.get('/api/csv/:database/row/:id', async (req, res) => {
   try {
@@ -1009,10 +1185,7 @@ app.get('/api/csv/:database/row/:id', async (req, res) => {
     const config = getConfig(database);
     const idField = config.idField || 'id';
     
-    // Read the CSV file
     const data = await readCSV(filePath);
-    
-    // Find the row by ID
     const row = data.find(r => String(r[idField]) === String(id));
     
     if (row) {
@@ -1035,40 +1208,32 @@ app.put('/api/csv/:database/row/:id', async (req, res) => {
     const config = getConfig(database);
     const idField = config.idField || 'id';
     
-    // Read the CSV file
     let data = await readCSV(filePath);
-    
-    // Find the row index by ID
     const rowIndex = data.findIndex(r => String(r[idField]) === String(id));
     
     if (rowIndex === -1) {
       return res.status(404).json({ error: `Row with ID '${id}' not found` });
     }
     
-    // Preserve original ID
     const originalId = data[rowIndex][idField];
     
-    // Update the row
     data[rowIndex] = {
       ...data[rowIndex],
       ...updatedRow,
-      [idField]: originalId, // Always preserve original ID
+      [idField]: originalId,
       updated_at: new Date().toISOString()
     };
     
-    // Get all columns
     const allColumns = [...new Set(
       data.flatMap(row => Object.keys(row))
     )];
     
-    // Ensure ID field is first
     if (allColumns.includes(idField)) {
       const idx = allColumns.indexOf(idField);
       allColumns.splice(idx, 1);
       allColumns.unshift(idField);
     }
     
-    // Write back to file
     await writeCSV(filePath, data, allColumns);
     
     res.json({ 
@@ -1089,23 +1254,16 @@ app.delete('/api/csv/:database/row/:id', async (req, res) => {
     const config = getConfig(database);
     const idField = config.idField || 'id';
     
-    // Read the CSV file
     let data = await readCSV(filePath);
-    
-    // Find the row index by ID
     const rowIndex = data.findIndex(r => String(r[idField]) === String(id));
     
     if (rowIndex === -1) {
       return res.status(404).json({ error: `Row with ID '${id}' not found` });
     }
     
-    // Delete the row
     const deletedRow = data.splice(rowIndex, 1)[0];
-    
-    // Get columns from remaining data
     const columns = data.length > 0 ? Object.keys(data[0]) : Object.keys(deletedRow);
     
-    // Write back to file
     await writeCSV(filePath, data, columns);
     
     res.json({ 
@@ -1119,7 +1277,7 @@ app.delete('/api/csv/:database/row/:id', async (req, res) => {
   }
 });
 
-// Find row index by ID (helper endpoint)
+// Find row index by ID
 app.get('/api/csv/:database/findRowIndex/:id', async (req, res) => {
   try {
     const { database, id } = req.params;
@@ -1127,10 +1285,7 @@ app.get('/api/csv/:database/findRowIndex/:id', async (req, res) => {
     const config = getConfig(database);
     const idField = config.idField || 'id';
     
-    // Read the CSV file
     const data = await readCSV(filePath);
-    
-    // Find the row index by ID
     const rowIndex = data.findIndex(r => String(r[idField]) === String(id));
     
     if (rowIndex === -1) {
@@ -1154,13 +1309,15 @@ app.get('/api/health', (req, res) => {
     status: 'healthy',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    version: '3.1.0',
+    version: '4.0.0',
     features: {
       automaticIdGeneration: true,
       databaseConfigurations: true,
       duplicateDetection: true,
+      smartDuplicateDetection: true,
+      similarityMatching: true,
       columnMapping: true,
-      unlimitedRows: true // New feature flag
+      unlimitedRows: true
     }
   });
 });
@@ -1179,11 +1336,13 @@ app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Data directory: ${DATA_DIR}`);
   console.log('Features enabled:');
-  console.log('  ✓ Automatic unique ID generation for all rows');
-  console.log('  ✓ Database configurations support');
-  console.log('  ✓ ID regeneration for existing data');
-  console.log('  ✓ Duplicate detection');
-  console.log('  ✓ Column mapping');
-  console.log('  ✓ UNLIMITED ROW SUPPORT - No limits on data size');
+  console.log('  ✔ Automatic unique ID generation');
+  console.log('  ✔ Smart duplicate detection (70% similarity threshold)');
+  console.log('  ✔ Fuzzy string matching for text fields');
+  console.log('  ✔ Numeric comparison for financial data');
+  console.log('  ✔ Database configurations support');
+  console.log('  ✔ ID regeneration for existing data');
+  console.log('  ✔ Column mapping');
+  console.log('  ✔ UNLIMITED ROW SUPPORT');
   console.log('Supported databases:', Object.keys(databaseConfigs).join(', '));
 });

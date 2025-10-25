@@ -7,7 +7,7 @@ import {
   XCircle, AlertTriangle, Link2, Layers, Key, Fingerprint,
   ChevronDown, ChevronUp, Search, Building2, Activity, Calendar,
   Table, GitBranch, Zap, Filter, Copy, Hash, Calculator, Clock,
-  MapPin, DollarSign
+  MapPin, DollarSign, Percent
 } from 'lucide-react';
 
 // Import database configurations from config.js
@@ -49,12 +49,17 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
     upload: true,
     mapping: true,
     existing: false,
-    config: true
+    config: true,
+    advanced: false
   });
   const [autoMapColumns, setAutoMapColumns] = useState(true);
   const [showIdGeneration, setShowIdGeneration] = useState(true);
   const [mappingSearchTerm, setMappingSearchTerm] = useState('');
   const [mappingFilter, setMappingFilter] = useState('all');
+  
+  // Duplicate detection threshold - now user configurable
+  const [duplicateThreshold, setDuplicateThreshold] = useState(0.95);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   
   const fileInputRef = useRef(null);
   const dropdownRef = useRef(null);
@@ -261,6 +266,7 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
       formData.append('column_mapping', JSON.stringify(columnMappings));
       formData.append('key_columns', JSON.stringify(keyColumns));
       formData.append('generate_ids', 'true');
+      formData.append('duplicate_threshold', duplicateThreshold.toString());
       
       if (selectedConfig) {
         formData.append('id_field', selectedConfig.idField);
@@ -271,7 +277,15 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
         formData.append('config_metadata', JSON.stringify({
           calculations: Object.keys(selectedConfig.calculations || {}),
           columnGroups: selectedConfig.columnGroups,
-          idFormat: selectedConfig.idFormat
+          idFormat: selectedConfig.idFormat,
+          comparisonColumns: selectedConfig.columns
+            .filter(col => {
+              const colName = typeof col === 'object' ? col.name : col;
+              return !colName.toLowerCase().includes('id') && 
+                     !colName.toLowerCase().includes('created') && 
+                     !colName.toLowerCase().includes('updated');
+            })
+            .map(col => typeof col === 'object' ? col.name : col)
         }));
       }
 
@@ -369,6 +383,7 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
     setKeyColumns([]);
     setUploadResult(null);
     setError('');
+    setDuplicateThreshold(0.7);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -465,7 +480,7 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
               Data Configuration Center
             </h2>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-1`}>
-              Upload Excel files with automatic ID generation for each row
+              Upload Excel files with automatic ID generation and smart duplicate detection
             </p>
           </div>
         </div>
@@ -494,7 +509,7 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle size={20} className="text-green-600" />
             <span className="font-semibold text-green-700 dark:text-green-400">
-              Upload Successful - All Rows Have Unique IDs!
+              Upload Successful - Smart Duplicate Detection Applied!
             </span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-xs">
@@ -504,17 +519,27 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
             </div>
             <div className="bg-white dark:bg-gray-800 p-2 rounded">
               <span className="text-gray-500">IDs Generated:</span>
-              <span className="ml-2 font-bold text-blue-600">{uploadResult.stats?.ids_generated || uploadResult.stats?.new_records || 0}</span>
+              <span className="ml-2 font-bold text-blue-600">{uploadResult.stats?.ids_generated || 0}</span>
             </div>
             <div className="bg-white dark:bg-gray-800 p-2 rounded">
-              <span className="text-gray-500">Duplicates:</span>
+              <span className="text-gray-500">Duplicates Skipped:</span>
               <span className="ml-2 font-bold text-orange-600">{uploadResult.stats?.duplicates_skipped || 0}</span>
             </div>
             <div className="bg-white dark:bg-gray-800 p-2 rounded">
-              <span className="text-gray-500">Database:</span>
-              <span className="ml-2 font-bold text-purple-600">{uploadResult.filename}</span>
+              <span className="text-gray-500">Similarity Threshold:</span>
+              <span className="ml-2 font-bold text-purple-600">{Math.round((uploadResult.threshold || duplicateThreshold) * 100)}%</span>
             </div>
           </div>
+          {uploadResult.stats?.duplicate_details && uploadResult.stats.duplicate_details.length > 0 && (
+            <div className="mt-2 p-2 bg-orange-50 dark:bg-orange-900/10 rounded text-xs">
+              <span className="text-orange-700 dark:text-orange-400">
+                Duplicates detected: {uploadResult.stats.duplicate_details.slice(0, 3).map(d => 
+                  `Row ${d.rowIndex} (${d.similarity}% match with ID: ${d.matchedId})`
+                ).join(', ')}
+                {uploadResult.stats.duplicate_details.length > 3 && ` and ${uploadResult.stats.duplicate_details.length - 3} more...`}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -675,17 +700,20 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
               </div>
             )}
 
-            {/* ID Generation Info */}
+            {/* ID Generation & Duplicate Detection Info */}
             {showIdGeneration && selectedConfig && (
               <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <div className="flex items-center gap-2">
                   <Fingerprint size={18} className="text-blue-600 dark:text-blue-400" />
                   <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                    Automatic ID Generation Enabled
+                    Automatic ID Generation & Smart Duplicate Detection
                   </p>
                 </div>
                 <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 ml-6">
-                  Each row will receive a unique ID: {getExampleId()}
+                  ✓ Each row will receive a unique ID: {getExampleId()}
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 ml-6">
+                  ✓ Smart duplicate detection ({Math.round(duplicateThreshold * 100)}% similarity threshold)
                 </p>
                 {selectedConfig.calculations && Object.keys(selectedConfig.calculations).length > 0 && (
                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 ml-6">
@@ -873,6 +901,91 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Advanced Settings Section */}
+      <div className={`mt-6 p-5 rounded-xl border ${
+        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+      }`}>
+        <div 
+          className="flex items-center justify-between mb-4 cursor-pointer"
+          onClick={() => {
+            toggleSection('advanced');
+            setShowAdvancedSettings(!showAdvancedSettings);
+          }}
+        >
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Shield size={20} className="text-orange-500" />
+            Advanced Settings
+          </h3>
+          {expandedSections.advanced ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+        </div>
+
+        {expandedSections.advanced && (
+          <div className="space-y-4">
+            {/* Duplicate Detection Threshold */}
+            <div>
+              <label className={`block text-sm font-medium mb-2 flex items-center gap-2 ${
+                darkMode ? 'text-gray-300' : 'text-gray-700'
+              }`}>
+                <Percent size={16} />
+                Duplicate Detection Similarity Threshold
+              </label>
+              <div className="flex items-center gap-4">
+                <input
+                  type="range"
+                  min="50"
+                  max="100"
+                  value={Math.round(duplicateThreshold * 100)}
+                  onChange={(e) => setDuplicateThreshold(parseInt(e.target.value) / 100)}
+                  className="flex-1 accent-orange-500"
+                />
+                <div className={`px-3 py-1.5 rounded-lg ${
+                  darkMode ? 'bg-gray-700' : 'bg-white'
+                } border ${darkMode ? 'border-gray-600' : 'border-gray-200'} min-w-[80px] text-center`}>
+                  <span className="font-semibold text-orange-600">{Math.round(duplicateThreshold * 100)}%</span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Records with similarity above this threshold will be considered duplicates and skipped.
+                • 50-60%: Very loose (catches only obvious duplicates)
+                • 70%: Balanced (recommended)
+                • 80-90%: Strict (may miss some valid new records)
+                • 100%: Exact match only
+              </p>
+            </div>
+
+            {/* Comparison Columns Info */}
+            {selectedConfig && (
+              <div className={`p-3 rounded-lg ${
+                darkMode ? 'bg-gray-700' : 'bg-white'
+              } border ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Info size={16} className="text-blue-500" />
+                  <span className="text-sm font-medium">Duplicate Detection Method</span>
+                </div>
+                <p className="text-xs text-gray-500 mb-2">
+                  The system uses fuzzy matching with Levenshtein distance for text fields and percentage-based comparison for numeric fields.
+                </p>
+                <p className="text-xs text-gray-500">
+                  Key comparison fields for {selectedConfig.displayName}:
+                </p>
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {selectedConfig.comparisonColumns?.slice(0, 8).map(col => (
+                    <span key={col} className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded">
+                      {col}
+                    </span>
+                  ))}
+                  {selectedConfig.comparisonColumns?.length > 8 && (
+                    <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
+                      +{selectedConfig.comparisonColumns.length - 8} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Enhanced Column Mapping Section */}
@@ -1255,7 +1368,7 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
           ) : (
             <>
               <Server size={18} />
-              Upload & Generate IDs
+              Upload & Process
             </>
           )}
         </button>
@@ -1295,6 +1408,11 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
                         {config && Object.keys(config.calculations || {}).length > 0 && (
                           <span className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 rounded">
                             {Object.keys(config.calculations).length} calc fields
+                          </span>
+                        )}
+                        {db.config?.idsNeedingRegeneration > 0 && (
+                          <span className="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded">
+                            {db.config.idsNeedingRegeneration} IDs need regeneration
                           </span>
                         )}
                       </p>
@@ -1353,7 +1471,14 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
               darkMode ? 'text-blue-400' : 'text-blue-600'
             }`}>
               <li>
-                <strong>Automatic ID Generation:</strong> Each row receives a unique ID automatically
+                <strong>Smart Duplicate Detection:</strong> Uses fuzzy matching with Levenshtein distance for text and percentage-based comparison for numbers
+              </li>
+              <li>
+                <strong>Configurable Similarity Threshold:</strong> Adjust from 50% to 100% to control duplicate sensitivity
+                {duplicateThreshold && ` (Currently: ${Math.round(duplicateThreshold * 100)}%)`}
+              </li>
+              <li>
+                <strong>Automatic ID Generation:</strong> Each new row receives a unique ID automatically
                 {selectedConfig && ` (Format: ${getExampleId()})`}
               </li>
               <li>
@@ -1369,13 +1494,13 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
                 <strong>Field Grouping:</strong> Organizes fields into logical groups for better management
               </li>
               <li>
-                <strong>Duplicate Detection:</strong> Prevents duplicate entries based on key columns
-              </li>
-              <li>
-                <strong>Data Validation:</strong> Ensures required fields are present and properly formatted
+                <strong>Comparison-Based Detection:</strong> Only compares against existing database records, not within uploaded data
               </li>
               <li>
                 <strong>Multi-Sheet Support:</strong> Processes all sheets in Excel files automatically
+              </li>
+              <li>
+                <strong>Data Validation:</strong> Ensures required fields are present and properly formatted
               </li>
               {selectedConfig && (
                 <li>
@@ -1403,6 +1528,90 @@ const Configure = ({ darkMode = false, onConfigComplete }) => {
                   );
                 })}
               </div>
+            </div>
+            
+            {/* Duplicate Detection Details */}
+            <div className="mt-3 pt-3 border-t border-blue-300 dark:border-blue-700">
+              <p className={`font-semibold mb-2 ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
+                Duplicate Detection System:
+              </p>
+              <ul className={`list-disc list-inside space-y-1 ${
+                darkMode ? 'text-blue-400' : 'text-blue-600'
+              } text-xs`}>
+                <li>Configurable similarity threshold ({Math.round(duplicateThreshold * 100)}% currently)</li>
+                <li>Fuzzy text matching using Levenshtein distance algorithm</li>
+                <li>Percentage-based numeric comparison with tolerance ranges</li>
+                <li>Weighted multi-column comparison for accuracy</li>
+                <li>Higher weights for important fields (names, locations, amounts)</li>
+                <li>Only compares against existing database records</li>
+                <li>Skips records that exceed similarity threshold</li>
+                <li>Detailed duplicate reporting with matched record IDs</li>
+              </ul>
+            </div>
+            
+            {/* Algorithm Details */}
+            <div className="mt-3 pt-3 border-t border-blue-300 dark:border-blue-700">
+              <p className={`font-semibold mb-2 ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
+                Matching Algorithm Details:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="space-y-1">
+                  <p className="font-medium">Text Field Matching:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Levenshtein distance calculation</li>
+                    <li>Case-insensitive comparison</li>
+                    <li>Trimmed whitespace</li>
+                    <li>Similarity score 0-1 range</li>
+                  </ul>
+                </div>
+                <div className="space-y-1">
+                  <p className="font-medium">Numeric Field Matching:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>&lt;5% difference = 95% similar</li>
+                    <li>&lt;10% difference = 85% similar</li>
+                    <li>&lt;20% difference = 70% similar</li>
+                    <li>Percentage-based comparison</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            
+            {/* Field Weighting */}
+            {selectedConfig && (
+              <div className="mt-3 pt-3 border-t border-blue-300 dark:border-blue-700">
+                <p className={`font-semibold mb-2 ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
+                  Field Importance Weighting:
+                </p>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className="px-2 py-1 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded">
+                    High (2x): Name/Work/Scheme fields
+                  </span>
+                  <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded">
+                    Medium (1.5x): Location/Financial fields
+                  </span>
+                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded">
+                    Normal (1x): Other fields
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {/* Tips */}
+            <div className="mt-3 pt-3 border-t border-blue-300 dark:border-blue-700">
+              <p className={`font-semibold mb-2 ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
+                Tips for Best Results:
+              </p>
+              <ul className={`list-disc list-inside space-y-1 ${
+                darkMode ? 'text-blue-400' : 'text-blue-600'
+              } text-xs`}>
+                <li>Use 70% threshold for balanced duplicate detection</li>
+                <li>Select appropriate database configuration before uploading</li>
+                <li>Enable auto-mapping for faster setup</li>
+                <li>Review column mappings before upload</li>
+                <li>Check duplicate report after upload</li>
+                <li>Regenerate IDs for records with simple numeric IDs</li>
+                <li>Export databases regularly for backup</li>
+              </ul>
             </div>
           </div>
         </div>

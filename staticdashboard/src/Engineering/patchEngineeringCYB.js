@@ -7,11 +7,16 @@ import {
   IndianRupee, Banknote, Coins, Receipt,
   RefreshCw, ChevronDown, ChevronUp, Settings,
   Calendar, Clock, Calculator, Hash, Building2,
-  MapPin, Layers, Shield, Fingerprint, Key
+  MapPin, Layers, Shield, Fingerprint, Key, Edit,
+  Plus
 } from 'lucide-react';
 
 // Import database configurations from config.js
 import { getConfig, generateId, applyCalculations } from '../System/config';
+
+// Import EditRow and AddRow components
+import EditRow from '../System/EditRow';
+import AddRow from '../System/AddRow';
 
 const API_URL = 'http://localhost:3456';
 
@@ -21,11 +26,26 @@ export const usePatchEngineeringCYB = (filters = {}) => {
   const [patchLoading, setPatchLoading] = useState(true);
   const [patchError, setPatchError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [selectedRowId, setSelectedRowId] = useState(null);
+  const [selectedRowIndex, setSelectedRowIndex] = useState(null);
+  const [showAddRowModal, setShowAddRowModal] = useState(false);
 
   console.log('[PatchCYB] Filters received:', filters);
   
   // Get database configuration for enggcurrentyear
   const dbConfig = useMemo(() => getConfig('enggcurrentyear'), []);
+
+  // Enhanced scheme name normalization helper
+  const normalizeScheme = useCallback((schemeName) => {
+    if (!schemeName) return '';
+    return schemeName.toLowerCase()
+      .replace(/\s+/g, ' ')
+      .replace(/-/g, ' ')
+      .replace(/\(|\)|,|\.|\//g, '')
+      .trim();
+  }, []);
 
   // Process data using config-based calculations
   const processPatchData = useCallback((data) => {
@@ -85,43 +105,80 @@ export const usePatchEngineeringCYB = (filters = {}) => {
         };
 
         // Map config column names to processed fields with proper cleaning
+        // USING EXACT COLUMN NAMES FROM CONFIG.JS
         const processed = {
+          // ID field
           id: processedRow[dbConfig.idField] || `cy_${index + 1}`,
           serial_no: processedRow[dbConfig.idField],
+          'S/No.': processedRow[dbConfig.idField],
           
-          // Map using config column names
-          ftr_hq: processedRow['Name of Ftr HQ'] || 'Unknown',
-          budget_head: processedRow['Budget head'] || 'Unknown',
-          sub_head: processedRow['Sub head'] || '',
+          // Basic Information - EXACT field names from config.js
+          ftr_hq_name: processedRow['ftr_hq_name'] || 'Unknown',
+          shq_name: processedRow['shq_name'] || '',
+          budget_head: processedRow['budget_head'] || 'Unknown',
+          'sub_scheme-name': processedRow['sub_scheme-name'] || '',
+          executive_agency: processedRow['executive_agency'] || '',
           
-          // Enhanced scheme mapping to use multiple sources
-          scheme_name: processedRow['Name of scheme'] || processedRow['Sub head'] || '',
-          // Add additional mappings to ensure compatibility
-          name_of_scheme: processedRow['Name of scheme'] || processedRow['Sub head'] || '',
-          sub_scheme_name: processedRow['Sub head'] || processedRow['Name of scheme'] || '',
+          // Legacy field mappings for backward compatibility
+          ftr_hq: processedRow['ftr_hq_name'] || 'Unknown',
+          sub_scheme_name: processedRow['sub_scheme-name'] || '',
+          sub_head: processedRow['sub_scheme-name'] || '',
+          scheme_name: processedRow['sub_scheme-name'] || '',
+          name_of_scheme: processedRow['sub_scheme-name'] || '',
           
-          // Financial values (assuming in lakhs) - all properly cleaned
+          // Add normalized scheme name for filtering
+          normalized_scheme_name: normalizeScheme(processedRow['sub_scheme-name'] || ''),
+          
+          // Previous Year Financial Data - EXACT field names from config.js
+          'Allotment Previous Financila year': cleanNumber(processedRow['Allotment Previous Financila year']),
+          'Expdr previous year': cleanNumber(processedRow['Expdr previous year']),
+          'Liabilities': cleanNumber(processedRow['Liabilities']),
+          
+          // Legacy mappings
           allotment_prev_fy: cleanNumber(processedRow['Allotment Previous Financila year']),
           expdr_prev_year: cleanNumber(processedRow['Expdr previous year']),
           liabilities: cleanNumber(processedRow['Liabilities']),
+          
+          // Current Year Sanctions & Allotments - EXACT field names from config.js
+          'Fresh Sanction issued during CFY': cleanNumber(processedRow['Fresh Sanction issued during CFY']),
+          'Effective sanction': cleanNumber(processedRow['Effective sanction']),
+          'Allotment CFY': cleanNumber(processedRow['Allotment CFY']),
+          'Allotment (FY 24-25)': cleanNumber(processedRow['Allotment (FY 24-25)']),
+          
+          // Legacy mappings
           fresh_sanction_cfy: cleanNumber(processedRow['Fresh Sanction issued during CFY']),
           effective_sanction: cleanNumber(processedRow['Effective sanction']),
           allotment_cfy: cleanNumber(processedRow['Allotment CFY']),
-          allotment_fy_24_25: cleanNumber(processedRow['Allotment  (FY 24-25)']),
+          allotment_fy_24_25: cleanNumber(processedRow['Allotment (FY 24-25)']),
           
-          // Expenditure fields - properly cleaned
-          expdr_elekha_22_07: cleanNumber(processedRow['Expdr booked as per e-lekha as on 22/07/25']),
-          expdr_elekha_31_03: cleanNumber(processedRow['Expdr booked as per e-lekha as on 31/03/25']),
-          total_expdr_register: cleanNumber(processedRow['Total Expdr as per contengency register']),
-          percent_expdr_elekha: 0, // Will calculate below
-          percent_total_expdr: 0, // Will calculate below
+          // Current Year Expenditure - EXACT field names from config.js
+          'Expdr_as_per_elekha': cleanNumber(processedRow['Expdr_as_per_elekha']),
+          '% Age of expdr as per e-lekha': cleanPercentage(processedRow['% Age of expdr as per e-lekha']),
           
-          // Pending bills - properly cleaned
+          // Legacy mappings
+          expdr_elekha: cleanNumber(processedRow['Expdr_as_per_elekha']),
+          expdr_elekha_22_07: cleanNumber(processedRow['Expdr_as_per_elekha']),
+          expdr_elekha_31_03: cleanNumber(processedRow['Expdr_as_per_elekha']),
+          percent_expdr_elekha: cleanPercentage(processedRow['% Age of expdr as per e-lekha']),
+          
+          // Pending Bills - EXACT field names from config.js
+          'Bill pending with PAD': cleanNumber(processedRow['Bill pending with PAD']),
+          'Bill pending with HQrs': cleanNumber(processedRow['Bill pending with HQrs']),
+          
+          // Legacy mappings
           bill_pending_pad: cleanNumber(processedRow['Bill pending with PAD']),
           bill_pending_hqrs: cleanNumber(processedRow['Bill pending with HQrs']),
           
-          // Balance fund - will calculate below
-          balance_fund: 0,
+          // Totals & Balance - EXACT field names from config.js
+          'Total Expdr as per contengency register': cleanNumber(processedRow['Total Expdr as per contengency register']),
+          '% Age of total Expdr': cleanPercentage(processedRow['% Age of total Expdr']),
+          'Balance fund': cleanNumber(processedRow['Balance fund']),
+          'Expdr plan for balance fund': cleanNumber(processedRow['Expdr plan for balance fund']),
+          
+          // Legacy mappings
+          total_expdr_register: cleanNumber(processedRow['Total Expdr as per contengency register']),
+          percent_total_expdr: cleanPercentage(processedRow['% Age of total Expdr']),
+          balance_fund: cleanNumber(processedRow['Balance fund']),
           expdr_plan_balance: cleanNumber(processedRow['Expdr plan for balance fund']),
           
           // Additional calculated fields
@@ -133,21 +190,31 @@ export const usePatchEngineeringCYB = (filters = {}) => {
           priority: 'NORMAL'
         };
 
-        // Recalculate percentages to ensure no NaN values
-        const allotment = processed.allotment_cfy;
-        const totalExpdr = processed.total_expdr_register;
-        const expdrElekha = processed.expdr_elekha_22_07;
-        const pendingPAD = processed.bill_pending_pad;
-        const pendingHQ = processed.bill_pending_hqrs;
+        // Recalculate percentages if not already calculated
+        const allotment = processed['Allotment CFY'];
+        const totalExpdr = processed['Total Expdr as per contengency register'];
+        const expdrElekha = processed['Expdr_as_per_elekha'];
+        const pendingPAD = processed['Bill pending with PAD'];
+        const pendingHQ = processed['Bill pending with HQrs'];
         
-        // Calculate percentages using safe division
-        processed.percent_expdr_elekha = parseFloat(safeDivide(expdrElekha, allotment, 100).toFixed(2));
-        processed.percent_total_expdr = parseFloat(safeDivide(totalExpdr, allotment, 100).toFixed(2));
+        // Calculate percentages if they're zero (means they weren't in the data)
+        if (processed['% Age of expdr as per e-lekha'] === 0 && allotment > 0) {
+          processed['% Age of expdr as per e-lekha'] = parseFloat(safeDivide(expdrElekha, allotment, 100).toFixed(2));
+          processed.percent_expdr_elekha = processed['% Age of expdr as per e-lekha'];
+        }
         
-        // Calculate balance fund properly with NaN prevention
-        processed.balance_fund = Math.max(0, allotment - totalExpdr - pendingPAD - pendingHQ);
-        if (isNaN(processed.balance_fund) || !isFinite(processed.balance_fund)) {
-          processed.balance_fund = 0;
+        if (processed['% Age of total Expdr'] === 0 && allotment > 0) {
+          processed['% Age of total Expdr'] = parseFloat(safeDivide(totalExpdr, allotment, 100).toFixed(2));
+          processed.percent_total_expdr = processed['% Age of total Expdr'];
+        }
+        
+        // Calculate balance fund if not already calculated
+        if (processed['Balance fund'] === 0 && allotment > 0) {
+          processed['Balance fund'] = Math.max(0, allotment - expdrElekha - pendingPAD - pendingHQ);
+          if (isNaN(processed['Balance fund']) || !isFinite(processed['Balance fund'])) {
+            processed['Balance fund'] = 0;
+          }
+          processed.balance_fund = processed['Balance fund'];
         }
 
         // Calculate derived metrics with NaN prevention
@@ -156,12 +223,12 @@ export const usePatchEngineeringCYB = (filters = {}) => {
           processed.pending_bills_total = 0;
         }
         
-        // Calculate utilization rate with safe division
-        processed.utilization_rate = parseFloat(safeDivide(totalExpdr, allotment, 100).toFixed(2));
+        // Calculate utilization rate based on e-lekha expenditure
+        processed.utilization_rate = parseFloat(safeDivide(expdrElekha, allotment, 100).toFixed(2));
         
         // Calculate efficiency score with NaN prevention
         if (allotment > 0) {
-          const utilizationScore = Math.min(100, safeDivide(totalExpdr, allotment, 100));
+          const utilizationScore = Math.min(100, safeDivide(expdrElekha, allotment, 100));
           const pendingScore = processed.pending_bills_total > 0 
             ? Math.max(0, 100 - safeDivide(processed.pending_bills_total, allotment, 50))
             : 100;
@@ -212,23 +279,35 @@ export const usePatchEngineeringCYB = (filters = {}) => {
         
         // Final validation - ensure all numeric fields are valid numbers
         const numericFields = [
-          'allotment_prev_fy', 'expdr_prev_year', 'liabilities', 'fresh_sanction_cfy',
-          'effective_sanction', 'allotment_cfy', 'allotment_fy_24_25', 'expdr_elekha_22_07',
-          'expdr_elekha_31_03', 'total_expdr_register', 'percent_expdr_elekha',
-          'percent_total_expdr', 'bill_pending_pad', 'bill_pending_hqrs', 'balance_fund',
-          'expdr_plan_balance', 'utilization_rate', 'pending_bills_total', 'efficiency_score'
+          'Allotment Previous Financila year', 'Expdr previous year', 'Liabilities',
+          'Fresh Sanction issued during CFY', 'Effective sanction', 'Allotment CFY',
+          'Allotment (FY 24-25)', 'Expdr_as_per_elekha', '% Age of expdr as per e-lekha',
+          'Bill pending with PAD', 'Bill pending with HQrs', 
+          'Total Expdr as per contengency register', '% Age of total Expdr',
+          'Balance fund', 'Expdr plan for balance fund',
+          'utilization_rate', 'pending_bills_total', 'efficiency_score'
         ];
         
         numericFields.forEach(field => {
-          if (isNaN(processed[field]) || !isFinite(processed[field])) {
+          if (processed[field] !== undefined && (isNaN(processed[field]) || !isFinite(processed[field]))) {
             console.warn(`[PatchCYB] Field ${field} is NaN, setting to 0`);
             processed[field] = 0;
           }
         });
         
+        // Debug log for first few records to verify e-lekha values
+        if (index < 3) {
+          console.log(`[PatchCYB] Record ${index + 1} E-Lekha value:`, {
+            raw: processedRow['Expdr_as_per_elekha'],
+            processed: processed['Expdr_as_per_elekha'],
+            allocation: processed['Allotment CFY'],
+            utilization: processed.utilization_rate
+          });
+        }
+        
         return processed;
       });
-  }, [dbConfig]);
+  }, [dbConfig, normalizeScheme]);
 
   // Load patch data from server API
   useEffect(() => {
@@ -254,17 +333,18 @@ export const usePatchEngineeringCYB = (filters = {}) => {
           setLastUpdate(new Date());
           console.log('[PatchCYB] Loaded', processedData.length, 'CY budget records from server');
           
-          // Debug: Check if balance_fund is properly calculated
-          const sampleWithBalance = processedData.find(d => d.balance_fund > 0);
-          if (sampleWithBalance) {
-            console.log('[PatchCYB] Sample balance_fund calculation:', {
-              allotment: sampleWithBalance.allotment_cfy,
-              expenditure: sampleWithBalance.total_expdr_register,
-              pendingBills: sampleWithBalance.pending_bills_total,
-              balance: sampleWithBalance.balance_fund,
-              utilizationRate: sampleWithBalance.utilization_rate,
-              percentExpdr: sampleWithBalance.percent_total_expdr
+          // Debug: Check if e-lekha values are properly loaded
+          const sampleWithElekha = processedData.find(d => d['Expdr_as_per_elekha'] > 0);
+          if (sampleWithElekha) {
+            console.log('[PatchCYB] Sample E-Lekha calculation:', {
+              elekhaExpdr: sampleWithElekha['Expdr_as_per_elekha'],
+              allotment: sampleWithElekha['Allotment CFY'],
+              percentElekha: sampleWithElekha['% Age of expdr as per e-lekha'],
+              balance: sampleWithElekha['Balance fund'],
+              utilizationRate: sampleWithElekha.utilization_rate
             });
+          } else {
+            console.warn('[PatchCYB] No records found with E-Lekha expenditure > 0');
           }
         }
         
@@ -287,10 +367,8 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     };
   }, [processPatchData]);
 
-  // Create comprehensive filter mapping for patch data
+  // Create comprehensive filter object for patch data with enhanced scheme name mapping
   const patchFilters = useMemo(() => {
-    if (!filters) return {};
-    
     const mappedFilters = {
       searchTerm: filters.searchTerm || '',
       selectedBudgetHeads: [],
@@ -298,82 +376,92 @@ export const usePatchEngineeringCYB = (filters = {}) => {
       selectedSectorHQs: [],
       selectedRiskLevels: [],
       selectedHealthStatuses: [],
-      selectedSchemes: [], // Will map to scheme_name and sub_scheme_name
-      utilizationRange: null
+      selectedSchemes: [],
+      utilizationRange: null,
+      selectedExecutiveAgencies: []
     };
-
+    
     // Map budget heads from filters
-    // Note: The patch data uses 'budget_head' field after processing
     if (filters.selectedBudgetHeads?.length > 0) {
       mappedFilters.selectedBudgetHeads = filters.selectedBudgetHeads;
     } else if (filters.columnFilters?.budget_head?.length > 0) {
       mappedFilters.selectedBudgetHeads = filters.columnFilters.budget_head;
-    } else if (filters.columnFilters?.['Budget head']?.length > 0) {
-      // Handle direct column name from enggcurrentyear
-      mappedFilters.selectedBudgetHeads = filters.columnFilters['Budget head'];
     }
 
-    // Map frontier HQs - patch data uses 'ftr_hq' field
+    // Map frontier HQs - handle both ftr_hq_name and ftr_hq
     if (filters.selectedFrontierHQs?.length > 0) {
       mappedFilters.selectedFrontierHQs = filters.selectedFrontierHQs;
     } else if (filters.columnFilters?.ftr_hq_name?.length > 0) {
       mappedFilters.selectedFrontierHQs = filters.columnFilters.ftr_hq_name;
-    } else if (filters.columnFilters?.['Name of Ftr HQ']?.length > 0) {
-      // Handle direct column name from enggcurrentyear
-      mappedFilters.selectedFrontierHQs = filters.columnFilters['Name of Ftr HQ'];
     } else if (filters.columnFilters?.ftr_hq?.length > 0) {
-      // Handle transformed field name
       mappedFilters.selectedFrontierHQs = filters.columnFilters.ftr_hq;
     }
 
-    // Map sector HQs if available (not in patch data, but keep for consistency)
+    // Map sector HQs if available
     if (filters.selectedSectorHQs?.length > 0) {
       mappedFilters.selectedSectorHQs = filters.selectedSectorHQs;
     } else if (filters.columnFilters?.shq_name?.length > 0) {
       mappedFilters.selectedSectorHQs = filters.columnFilters.shq_name;
     }
 
+    // Map executive agencies
+    if (filters.selectedAgencies?.length > 0) {
+      mappedFilters.selectedExecutiveAgencies = filters.selectedAgencies;
+    } else if (filters.columnFilters?.executive_agency?.length > 0) {
+      mappedFilters.selectedExecutiveAgencies = filters.columnFilters.executive_agency;
+    }
+
     // Map risk levels
     if (filters.selectedRiskLevels?.length > 0) {
       mappedFilters.selectedRiskLevels = filters.selectedRiskLevels;
-    } else if (filters.columnFilters?.risk_level?.length > 0) {
-      mappedFilters.selectedRiskLevels = filters.columnFilters.risk_level;
     }
 
     // Map health statuses
     if (filters.selectedHealthStatuses?.length > 0) {
       mappedFilters.selectedHealthStatuses = filters.selectedHealthStatuses;
-    } else if (filters.columnFilters?.health_status?.length > 0) {
-      mappedFilters.selectedHealthStatuses = filters.columnFilters.health_status;
     }
 
-    // Map utilization range
-    if (filters.rangeFilters?.utilization_rate?.current) {
-      mappedFilters.utilizationRange = filters.rangeFilters.utilization_rate.current;
-    } else if (filters.rangeFilters?.['% Age of total Expdr']?.current) {
-      // Handle direct column name for utilization
-      mappedFilters.utilizationRange = filters.rangeFilters['% Age of total Expdr'].current;
+    // Map utilization range if available from efficiency range
+    if (filters.efficiencyRange && filters.efficiencyRange[0] !== undefined && filters.efficiencyRange[1] !== undefined) {
+      mappedFilters.utilizationRange = filters.efficiencyRange;
     }
-
-    // Improved scheme name mapping - gather from all possible sources
-    const schemeNameSources = [
+    
+    // Enhanced scheme name mapping - gather from all possible sources
+    const schemeNames = [
       ...(filters.selectedSchemes || []),
       ...(filters.columnFilters?.name_of_scheme || []),
       ...(filters.columnFilters?.sub_scheme_name || []),
-      ...(filters.columnFilters?.['Name of scheme'] || []),
-      ...(filters.columnFilters?.['Sub head'] || [])
+      ...(filters.columnFilters?.['sub_scheme-name'] || [])
     ];
-
-    if (schemeNameSources.length > 0) {
-      // Deduplicate scheme names
+    
+    if (schemeNames.length > 0) {
+      // Normalize and deduplicate scheme names
       mappedFilters.selectedSchemes = Array.from(new Set(
-        schemeNameSources.filter(Boolean)
-      ));
+        schemeNames
+          .filter(Boolean)
+          .map(scheme => normalizeScheme(scheme))
+      )).filter(Boolean);
+      
+      console.log('[PatchCYB] Normalized scheme names for patch data:', 
+        mappedFilters.selectedSchemes.slice(0, 3), 
+        `(${mappedFilters.selectedSchemes.length} total)`
+      );
     }
-
-    console.log('[PatchCYB] Mapped filters:', mappedFilters);
+    
     return mappedFilters;
-  }, [filters]);
+  }, [
+    filters.searchTerm,
+    filters.selectedBudgetHeads,
+    filters.selectedFrontierHQs,
+    filters.selectedSectorHQs,
+    filters.selectedRiskLevels,
+    filters.selectedHealthStatuses,
+    filters.selectedSchemes,
+    filters.selectedAgencies,
+    filters.columnFilters,
+    filters.efficiencyRange,
+    normalizeScheme
+  ]);
 
   // Apply filters to patch data with enhanced empty cell handling
   const patchData = useMemo(() => {
@@ -385,75 +473,92 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     if (patchFilters?.searchTerm) {
       const searchLower = patchFilters.searchTerm.toLowerCase();
       filtered = filtered.filter(item =>
-        (item.ftr_hq && item.ftr_hq.toLowerCase().includes(searchLower)) ||
+        (item.ftr_hq_name && item.ftr_hq_name.toLowerCase().includes(searchLower)) ||
         (item.budget_head && item.budget_head.toLowerCase().includes(searchLower)) ||
-        (item.sub_head && item.sub_head.toLowerCase().includes(searchLower)) ||
-        (item.scheme_name && item.scheme_name.toLowerCase().includes(searchLower)) ||
-        (item.name_of_scheme && item.name_of_scheme.toLowerCase().includes(searchLower)) ||
-        (item.sub_scheme_name && item.sub_scheme_name.toLowerCase().includes(searchLower))
+        (item['sub_scheme-name'] && item['sub_scheme-name'].toLowerCase().includes(searchLower)) ||
+        (item.executive_agency && item.executive_agency.toLowerCase().includes(searchLower)) ||
+        (item.shq_name && item.shq_name.toLowerCase().includes(searchLower))
       );
     }
     
     // Apply budget head filter - only include non-empty values
     if (patchFilters?.selectedBudgetHeads?.length > 0) {
-      filtered = filtered.filter(item => 
-        item.budget_head && patchFilters.selectedBudgetHeads.includes(item.budget_head)
-      );
+      filtered = filtered.filter(item => {
+        if (!item.budget_head || item.budget_head === '' || item.budget_head === 'Unknown') {
+          return false;
+        }
+        return patchFilters.selectedBudgetHeads.includes(item.budget_head);
+      });
     }
     
     // Apply frontier HQ filter - only include non-empty values
     if (patchFilters?.selectedFrontierHQs?.length > 0) {
-      filtered = filtered.filter(item => 
-        item.ftr_hq && patchFilters.selectedFrontierHQs.includes(item.ftr_hq)
-      );
+      filtered = filtered.filter(item => {
+        if (!item.ftr_hq_name || item.ftr_hq_name === '' || item.ftr_hq_name === 'Unknown') {
+          return false;
+        }
+        return patchFilters.selectedFrontierHQs.includes(item.ftr_hq_name);
+      });
     }
     
-    // Apply scheme filter with enhanced matching - exclude empty values
+    // Apply executive agency filter - only include non-empty values
+    if (patchFilters?.selectedExecutiveAgencies?.length > 0) {
+      filtered = filtered.filter(item => {
+        if (!item.executive_agency || item.executive_agency === '') {
+          return false;
+        }
+        return patchFilters.selectedExecutiveAgencies.includes(item.executive_agency);
+      });
+    }
+    
+    // Apply scheme filter with enhanced matching logic
     if (patchFilters?.selectedSchemes?.length > 0) {
       filtered = filtered.filter(item => {
-        // Check if any scheme field exists
-        if (!item.scheme_name && !item.name_of_scheme && !item.sub_scheme_name) {
+        const hasSchemeData = item['sub_scheme-name'] && item['sub_scheme-name'] !== '';
+        
+        if (!hasSchemeData) {
           return false;
         }
         
-        // Check direct matches against any scheme field
-        for (const scheme of patchFilters.selectedSchemes) {
-          if (!scheme) continue;
+        for (const selectedScheme of patchFilters.selectedSchemes) {
+          if (!selectedScheme) continue;
           
-          // Direct match check against all scheme field variants
-          if ((item.scheme_name && item.scheme_name === scheme) || 
-              (item.name_of_scheme && item.name_of_scheme === scheme) || 
-              (item.sub_scheme_name && item.sub_scheme_name === scheme)) {
+          if (item.normalized_scheme_name && item.normalized_scheme_name === selectedScheme) {
             return true;
           }
           
-          // Partial match check - either contains the other
-          const schemeLower = scheme.toLowerCase();
-          if ((item.scheme_name && item.scheme_name.toLowerCase().includes(schemeLower)) ||
-              (item.scheme_name && schemeLower.includes(item.scheme_name.toLowerCase())) ||
-              (item.name_of_scheme && item.name_of_scheme.toLowerCase().includes(schemeLower)) ||
-              (item.name_of_scheme && schemeLower.includes(item.name_of_scheme.toLowerCase())) ||
-              (item.sub_scheme_name && item.sub_scheme_name.toLowerCase().includes(schemeLower)) ||
-              (item.sub_scheme_name && schemeLower.includes(item.sub_scheme_name.toLowerCase()))) {
+          const normalizedField = normalizeScheme(item['sub_scheme-name']);
+          if (normalizedField === selectedScheme) {
+            return true;
+          }
+          
+          if (normalizedField.includes(selectedScheme) || selectedScheme.includes(normalizedField)) {
             return true;
           }
         }
+        
         return false;
       });
     }
     
-    // Apply risk level filter - exclude empty values
+    // Apply risk level filter - only include non-empty values
     if (patchFilters?.selectedRiskLevels?.length > 0) {
-      filtered = filtered.filter(item => 
-        item.risk_level && patchFilters.selectedRiskLevels.includes(item.risk_level)
-      );
+      filtered = filtered.filter(item => {
+        if (!item.risk_level || item.risk_level === '') {
+          return false;
+        }
+        return patchFilters.selectedRiskLevels.includes(item.risk_level);
+      });
     }
     
-    // Apply health status filter - exclude empty values
+    // Apply health status filter - only include non-empty values
     if (patchFilters?.selectedHealthStatuses?.length > 0) {
-      filtered = filtered.filter(item => 
-        item.health_status && patchFilters.selectedHealthStatuses.includes(item.health_status)
-      );
+      filtered = filtered.filter(item => {
+        if (!item.health_status || item.health_status === '') {
+          return false;
+        }
+        return patchFilters.selectedHealthStatuses.includes(item.health_status);
+      });
     }
     
     // Apply utilization range filter
@@ -470,7 +575,8 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     return filtered;
   }, [
     rawPatchData, 
-    patchFilters
+    patchFilters,
+    normalizeScheme
   ]);
 
   // Calculate patch metrics with proper balance fund calculation and NaN prevention
@@ -480,8 +586,8 @@ export const usePatchEngineeringCYB = (filters = {}) => {
         totalRecords: 0,
         currentYearAllocation: 0,
         currentYearExpenditure: 0,
-        elekhaExpenditure: 0, // Added E-Lekha expenditure
-        elekhaExpenditureWithPending: 0, // Added E-Lekha + Pending bills
+        elekhaExpenditure: 0,
+        elekhaExpenditureWithPending: 0,
         pendingBillsPAD: 0,
         pendingBillsHQ: 0,
         totalPendingBills: 0,
@@ -520,14 +626,11 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     };
     
     // Sum up financial metrics (convert from lakhs to crores)
-    const currentYearAllocation = patchData.reduce((sum, d) => sum + ensureNumber(d.allotment_cfy), 0) / 100;
-    const currentYearExpenditure = patchData.reduce((sum, d) => sum + ensureNumber(d.total_expdr_register), 0) / 100;
-    
-    // Add E-Lekha expenditure calculation
-    const elekhaExpenditure = patchData.reduce((sum, d) => sum + ensureNumber(d.expdr_elekha_22_07), 0) / 100;
-    
-    const pendingBillsPAD = patchData.reduce((sum, d) => sum + ensureNumber(d.bill_pending_pad), 0) / 100;
-    const pendingBillsHQ = patchData.reduce((sum, d) => sum + ensureNumber(d.bill_pending_hqrs), 0) / 100;
+    const currentYearAllocation = patchData.reduce((sum, d) => sum + ensureNumber(d['Allotment CFY']), 0) / 100;
+    const currentYearExpenditure = patchData.reduce((sum, d) => sum + ensureNumber(d['Total Expdr as per contengency register']), 0) / 100;
+    const elekhaExpenditure = patchData.reduce((sum, d) => sum + ensureNumber(d['Expdr_as_per_elekha']), 0) / 100;
+    const pendingBillsPAD = patchData.reduce((sum, d) => sum + ensureNumber(d['Bill pending with PAD']), 0) / 100;
+    const pendingBillsHQ = patchData.reduce((sum, d) => sum + ensureNumber(d['Bill pending with HQrs']), 0) / 100;
     const totalPendingBills = pendingBillsPAD + pendingBillsHQ;
     
     // Calculate E-Lekha + Pending bills total
@@ -537,11 +640,11 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     const balanceFunds = Math.max(0, currentYearAllocation - elekhaExpenditureWithPending);
     
     // Additional financial metrics
-    const freshSanctions = patchData.reduce((sum, d) => sum + ensureNumber(d.fresh_sanction_cfy), 0) / 100;
-    const previousYearAllocation = patchData.reduce((sum, d) => sum + ensureNumber(d.allotment_prev_fy), 0) / 100;
-    const previousYearExpenditure = patchData.reduce((sum, d) => sum + ensureNumber(d.expdr_prev_year), 0) / 100;
-    const liabilities = patchData.reduce((sum, d) => sum + ensureNumber(d.liabilities), 0) / 100;
-    const effectiveSanction = patchData.reduce((sum, d) => sum + ensureNumber(d.effective_sanction), 0) / 100;
+    const freshSanctions = patchData.reduce((sum, d) => sum + ensureNumber(d['Fresh Sanction issued during CFY']), 0) / 100;
+    const previousYearAllocation = patchData.reduce((sum, d) => sum + ensureNumber(d['Allotment Previous Financila year']), 0) / 100;
+    const previousYearExpenditure = patchData.reduce((sum, d) => sum + ensureNumber(d['Expdr previous year']), 0) / 100;
+    const liabilities = patchData.reduce((sum, d) => sum + ensureNumber(d['Liabilities']), 0) / 100;
+    const effectiveSanction = patchData.reduce((sum, d) => sum + ensureNumber(d['Effective sanction']), 0) / 100;
     
     // Calculate averages with NaN prevention
     const avgUtilizationRate = total > 0 
@@ -590,8 +693,8 @@ export const usePatchEngineeringCYB = (filters = {}) => {
       totalRecords: total,
       currentYearAllocation: isNaN(currentYearAllocation) ? 0 : currentYearAllocation,
       currentYearExpenditure: isNaN(currentYearExpenditure) ? 0 : currentYearExpenditure,
-      elekhaExpenditure: isNaN(elekhaExpenditure) ? 0 : elekhaExpenditure, // Added E-Lekha expenditure
-      elekhaExpenditureWithPending: isNaN(elekhaExpenditureWithPending) ? 0 : elekhaExpenditureWithPending, // Added E-Lekha + Pending
+      elekhaExpenditure: isNaN(elekhaExpenditure) ? 0 : elekhaExpenditure,
+      elekhaExpenditureWithPending: isNaN(elekhaExpenditureWithPending) ? 0 : elekhaExpenditureWithPending,
       pendingBillsPAD: isNaN(pendingBillsPAD) ? 0 : pendingBillsPAD,
       pendingBillsHQ: isNaN(pendingBillsHQ) ? 0 : pendingBillsHQ,
       totalPendingBills: isNaN(totalPendingBills) ? 0 : totalPendingBills,
@@ -623,14 +726,10 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     // Debug log for metrics
     console.log('[PatchCYB] Metrics calculated:', {
       totalRecords: result.totalRecords,
-      balanceFunds: result.balanceFunds.toFixed(2),
-      currentYearAllocation: result.currentYearAllocation.toFixed(2),
-      currentYearExpenditure: result.currentYearExpenditure.toFixed(2),
       elekhaExpenditure: result.elekhaExpenditure.toFixed(2),
-      elekhaExpenditureWithPending: result.elekhaExpenditureWithPending.toFixed(2),
-      totalPendingBills: result.totalPendingBills.toFixed(2),
-      avgUtilizationRate: result.avgUtilizationRate,
-      avgEfficiencyScore: result.avgEfficiencyScore
+      currentYearAllocation: result.currentYearAllocation.toFixed(2),
+      balanceFunds: result.balanceFunds.toFixed(2),
+      avgUtilizationRate: result.avgUtilizationRate
     });
     
     return result;
@@ -734,6 +833,51 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     }
   }, [refreshPatchData]);
 
+  // Handle edit row
+  const handleEditRow = useCallback((row) => {
+    if (!row) return;
+
+    // Find the row index in the raw data
+    const rowIndex = rawPatchData.findIndex(r => r['S/No.'] === row['S/No.']);
+    
+    setSelectedRow(row);
+    setSelectedRowId(row['S/No.']);
+    setSelectedRowIndex(rowIndex !== -1 ? rowIndex : null);
+    setShowEditModal(true);
+  }, [rawPatchData]);
+
+  // Handle add new row
+  const handleAddRow = useCallback(() => {
+    setShowAddRowModal(true);
+  }, []);
+
+  // Handle edit success
+  const handleEditSuccess = useCallback((updatedRow) => {
+    console.log('[PatchCYB] Edit successful:', updatedRow);
+    setShowEditModal(false);
+    setSelectedRow(null);
+    setSelectedRowId(null);
+    setSelectedRowIndex(null);
+    refreshPatchData();
+  }, [refreshPatchData]);
+
+  // Handle add success
+  const handleAddSuccess = useCallback((newRow) => {
+    console.log('[PatchCYB] Add successful:', newRow);
+    setShowAddRowModal(false);
+    refreshPatchData();
+  }, [refreshPatchData]);
+
+  // Handle delete success
+  const handleDeleteSuccess = useCallback((result) => {
+    console.log('[PatchCYB] Delete successful:', result);
+    setShowEditModal(false);
+    setSelectedRow(null);
+    setSelectedRowId(null);
+    setSelectedRowIndex(null);
+    refreshPatchData();
+  }, [refreshPatchData]);
+
   return {
     patchData,
     patchMetrics,
@@ -746,6 +890,21 @@ export const usePatchEngineeringCYB = (filters = {}) => {
     updatePatchRecord,
     addPatchRecord,
     deletePatchRecord,
+    handleEditRow,
+    handleAddRow,
+    selectedRow,
+    setSelectedRow,
+    selectedRowId,
+    setSelectedRowId,
+    selectedRowIndex,
+    setSelectedRowIndex,
+    showEditModal,
+    setShowEditModal,
+    showAddRowModal,
+    setShowAddRowModal,
+    handleEditSuccess,
+    handleAddSuccess,
+    handleDeleteSuccess,
     PatchDataTable: PatchDataTableComponent
   };
 };
@@ -895,116 +1054,125 @@ export const generatePatchBudgetMetrics = (patchMetrics, darkMode = false) => {
   ];
 };
 
-// Enhanced Patch Data Table Component with all columns from config
+// Enhanced Patch Data Table Component with Edit and Add functionality
 const PatchDataTableComponent = ({ 
   data = [], 
   darkMode = false, 
   title = "Current Year Budget Details",
   onClose,
   isModal = false,
-  onRefresh
+  onRefresh,
+  onEditRow,
+  onAddRow
 }) => {
-  const [sortField, setSortField] = useState('serial_no');
+  const [sortField, setSortField] = useState('S/No.');
   const [sortDirection, setSortDirection] = useState('asc');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [viewMode, setViewMode] = useState('standard'); // 'standard', 'compact', 'detailed'
+  const [viewMode, setViewMode] = useState('standard');
   const [selectedColumns, setSelectedColumns] = useState([]);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [selectedRowId, setSelectedRowId] = useState(null);
+  const [selectedRowIndex, setSelectedRowIndex] = useState(null);
   const itemsPerPage = 15;
   
   // Get database configuration
   const dbConfig = useMemo(() => getConfig('enggcurrentyear'), []);
 
-  // Define all available columns with metadata
+  // Define all available columns with metadata using EXACT field names from config
   const availableColumns = useMemo(() => [
     // Basic Information group
-    { id: 'serial_no', field: 'serial_no', header: 'ID', group: 'basic', width: 70, sortable: true, alwaysVisible: true,
+    { id: 'S/No.', field: 'S/No.', header: 'ID', group: 'basic', width: 70, sortable: true, alwaysVisible: true,
       icon: <Fingerprint size={12} className="text-yellow-500" />, format: val => val },
-    { id: 'ftr_hq', field: 'ftr_hq', header: 'Frontier HQ', group: 'basic', width: 120, sortable: true, alwaysVisible: true,
+    { id: 'ftr_hq_name', field: 'ftr_hq_name', header: 'Frontier HQ', group: 'basic', width: 120, sortable: true, alwaysVisible: true,
       icon: <Building2 size={12} className="text-purple-500" />, format: val => val },
     { id: 'budget_head', field: 'budget_head', header: 'Budget Head', group: 'basic', width: 120, sortable: true,
       icon: <FileText size={12} className="text-blue-500" />, format: val => val },
-    { id: 'sub_head', field: 'sub_head', header: 'Sub Head', group: 'basic', width: 130, sortable: true,
+    { id: 'sub_scheme-name', field: 'sub_scheme-name', header: 'Sub Scheme Name', group: 'basic', width: 150, sortable: true,
       icon: <FileText size={12} className="text-blue-500" />, format: val => val },
-    { id: 'scheme_name', field: 'scheme_name', header: 'Scheme Name', group: 'basic', width: 150, sortable: true,
-      icon: <FileText size={12} className="text-blue-500" />, format: val => val },
+    { id: 'shq_name', field: 'shq_name', header: 'SHQ Name', group: 'basic', width: 120, sortable: true,
+      icon: <Building2 size={12} className="text-purple-500" />, format: val => val },
+    { id: 'executive_agency', field: 'executive_agency', header: 'Executive Agency', group: 'basic', width: 120, sortable: true,
+      icon: <Building2 size={12} className="text-purple-500" />, format: val => val },
       
-    // Financial Allocations group
-    { id: 'allotment_prev_fy', field: 'allotment_prev_fy', header: 'Previous FY Allotment', group: 'allocation', width: 130, sortable: true,
-      icon: <DollarSign size={12} className="text-green-500" />, format: val => formatCurrency(val) },
-    { id: 'liabilities', field: 'liabilities', header: 'Liabilities', group: 'allocation', width: 120, sortable: true,
-      icon: <AlertCircle size={12} className="text-red-500" />, format: val => formatCurrency(val) },
-    { id: 'fresh_sanction_cfy', field: 'fresh_sanction_cfy', header: 'Fresh Sanction', group: 'allocation', width: 120, sortable: true,
-      icon: <DollarSign size={12} className="text-green-500" />, format: val => formatCurrency(val) },
-    { id: 'effective_sanction', field: 'effective_sanction', header: 'Effective Sanction', group: 'allocation', width: 130, sortable: true,
-      icon: <DollarSign size={12} className="text-green-500" />, format: val => formatCurrency(val) },
-    { id: 'allotment_cfy', field: 'allotment_cfy', header: 'Current FY Allotment', group: 'allocation', width: 130, sortable: true, alwaysVisible: true,
-      icon: <Wallet size={12} className="text-green-500" />, format: val => formatCurrency(val) },
-    { id: 'allotment_fy_24_25', field: 'allotment_fy_24_25', header: 'FY 24-25 Allotment', group: 'allocation', width: 130, sortable: true,
-      icon: <DollarSign size={12} className="text-green-500" />, format: val => formatCurrency(val) },
+    // Previous Year group
+    { id: 'Allotment Previous Financila year', field: 'Allotment Previous Financila year', header: 'Prev FY Allotment', group: 'previous_year', width: 130, sortable: true,
+      icon: <DollarSign size={12} className="text-green-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L` },
+    { id: 'Expdr previous year', field: 'Expdr previous year', header: 'Prev Year Expdr', group: 'previous_year', width: 130, sortable: true,
+      icon: <Calculator size={12} className="text-orange-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L` },
+    { id: 'Liabilities', field: 'Liabilities', header: 'Liabilities', group: 'previous_year', width: 120, sortable: true,
+      icon: <AlertCircle size={12} className="text-red-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L` },
       
-    // Expenditure group
-    { id: 'expdr_prev_year', field: 'expdr_prev_year', header: 'Previous Year Expdr', group: 'expenditure', width: 130, sortable: true,
-      icon: <Calculator size={12} className="text-orange-500" />, format: val => formatCurrency(val) },
-    { id: 'expdr_elekha_22_07', field: 'expdr_elekha_22_07', header: 'E-lekha Expdr (22/07)', group: 'expenditure', width: 140, sortable: true,
-      icon: <Calculator size={12} className="text-orange-500" />, format: val => formatCurrency(val) },
-    { id: 'expdr_elekha_31_03', field: 'expdr_elekha_31_03', header: 'E-lekha Expdr (31/03)', group: 'expenditure', width: 140, sortable: true,
-      icon: <Calculator size={12} className="text-orange-500" />, format: val => formatCurrency(val) },
-    { id: 'total_expdr_register', field: 'total_expdr_register', header: 'Total Expenditure', group: 'expenditure', width: 130, sortable: true, alwaysVisible: true,
-      icon: <Calculator size={12} className="text-orange-500" />, format: val => formatCurrency(val) },
-    { id: 'percent_expdr_elekha', field: 'percent_expdr_elekha', header: 'E-lekha %', group: 'expenditure', width: 100, sortable: true,
-      icon: <Gauge size={12} className="text-purple-500" />, format: val => `${ensureNumber(val).toFixed(1)}%` },
-    { id: 'percent_total_expdr', field: 'percent_total_expdr', header: 'Total Expdr %', group: 'expenditure', width: 100, sortable: true,
-      icon: <Gauge size={12} className="text-purple-500" />, format: val => `${ensureNumber(val).toFixed(1)}%` },
-    { id: 'utilization_rate', field: 'utilization_rate', header: 'Utilization %', group: 'expenditure', width: 110, sortable: true, alwaysVisible: true,
-      icon: <Gauge size={12} className="text-purple-500" />, format: val => `${ensureNumber(val).toFixed(1)}%`,
+    // Current Sanctions group
+    { id: 'Fresh Sanction issued during CFY', field: 'Fresh Sanction issued during CFY', header: 'Fresh Sanction', group: 'current_sanctions', width: 120, sortable: true,
+      icon: <DollarSign size={12} className="text-green-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L` },
+    { id: 'Effective sanction', field: 'Effective sanction', header: 'Effective Sanction', group: 'current_sanctions', width: 130, sortable: true,
+      icon: <DollarSign size={12} className="text-green-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L` },
+    { id: 'Allotment CFY', field: 'Allotment CFY', header: 'CFY Allotment', group: 'current_sanctions', width: 130, sortable: true, alwaysVisible: true,
+      icon: <Wallet size={12} className="text-green-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L` },
+    { id: 'Allotment (FY 24-25)', field: 'Allotment (FY 24-25)', header: 'FY 24-25 Allotment', group: 'current_sanctions', width: 130, sortable: true,
+      icon: <DollarSign size={12} className="text-green-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L` },
+      
+    // Current Expenditure group
+    { id: 'Expdr_as_per_elekha', field: 'Expdr_as_per_elekha', header: 'E-lekha Expdr', group: 'current_expenditure', width: 130, sortable: true, alwaysVisible: true,
+      icon: <Calculator size={12} className="text-orange-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L` },
+    { id: '% Age of expdr as per e-lekha', field: '% Age of expdr as per e-lekha', header: 'E-lekha %', group: 'current_expenditure', width: 100, sortable: true,
+      icon: <Gauge size={12} className="text-purple-500" />, format: val => `${parseFloat(val || 0).toFixed(1)}%` },
+    { id: 'utilization_rate', field: 'utilization_rate', header: 'Utilization %', group: 'current_expenditure', width: 110, sortable: true, alwaysVisible: true,
+      icon: <Gauge size={12} className="text-purple-500" />, format: val => `${parseFloat(val || 0).toFixed(1)}%`,
       render: (row) => (
         <div className="flex items-center gap-2">
-          <span className="font-medium">{ensureNumber(row.utilization_rate).toFixed(1)}%</span>
+          <span className="font-medium">{parseFloat(row.utilization_rate || 0).toFixed(1)}%</span>
           <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
             <div 
               className={`h-full ${
-                ensureNumber(row.utilization_rate) >= 90 ? 'bg-green-500' :
-                ensureNumber(row.utilization_rate) >= 70 ? 'bg-blue-500' :
-                ensureNumber(row.utilization_rate) >= 50 ? 'bg-yellow-500' :
+                parseFloat(row.utilization_rate || 0) >= 90 ? 'bg-green-500' :
+                parseFloat(row.utilization_rate || 0) >= 70 ? 'bg-blue-500' :
+                parseFloat(row.utilization_rate || 0) >= 50 ? 'bg-yellow-500' :
                 'bg-red-500'
               }`}
-              style={{ width: `${Math.min(100, ensureNumber(row.utilization_rate))}%` }}
+              style={{ width: `${Math.min(100, parseFloat(row.utilization_rate || 0))}%` }}
             />
           </div>
         </div>
       )
     },
       
-    // Pending Bills group
-    { id: 'bill_pending_pad', field: 'bill_pending_pad', header: 'Bills Pending PAD', group: 'pending', width: 130, sortable: true,
-      icon: <Receipt size={12} className="text-red-500" />, format: val => formatCurrency(val) },
-    { id: 'bill_pending_hqrs', field: 'bill_pending_hqrs', header: 'Bills Pending HQ', group: 'pending', width: 130, sortable: true,
-      icon: <Receipt size={12} className="text-red-500" />, format: val => formatCurrency(val) },
-    { id: 'pending_bills_total', field: 'pending_bills_total', header: 'Total Pending Bills', group: 'pending', width: 140, sortable: true,
-      icon: <Clock size={12} className="text-red-500" />, format: val => formatCurrency(val) },
+    // Pending group
+    { id: 'Bill pending with PAD', field: 'Bill pending with PAD', header: 'Pending PAD', group: 'pending', width: 120, sortable: true,
+      icon: <Receipt size={12} className="text-red-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L` },
+    { id: 'Bill pending with HQrs', field: 'Bill pending with HQrs', header: 'Pending HQ', group: 'pending', width: 120, sortable: true,
+      icon: <Receipt size={12} className="text-red-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L` },
+    { id: 'pending_bills_total', field: 'pending_bills_total', header: 'Total Pending', group: 'pending', width: 130, sortable: true,
+      icon: <Clock size={12} className="text-red-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L` },
       
-    // Balance & Planning group
-    { id: 'balance_fund', field: 'balance_fund', header: 'Balance Fund', group: 'balance', width: 120, sortable: true, alwaysVisible: true,
-      icon: <PiggyBank size={12} className="text-green-500" />, format: val => formatCurrency(val),
+    // Totals group
+    { id: 'Total Expdr as per contengency register', field: 'Total Expdr as per contengency register', header: 'Total Expdr', group: 'totals', width: 130, sortable: true,
+      icon: <Calculator size={12} className="text-orange-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L` },
+    { id: '% Age of total Expdr', field: '% Age of total Expdr', header: 'Total Expdr %', group: 'totals', width: 100, sortable: true,
+      icon: <Gauge size={12} className="text-purple-500" />, format: val => `${parseFloat(val || 0).toFixed(1)}%` },
+    { id: 'Balance fund', field: 'Balance fund', header: 'Balance Fund', group: 'totals', width: 120, sortable: true, alwaysVisible: true,
+      icon: <PiggyBank size={12} className="text-green-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L`,
       render: (row) => (
         <div>
           <div className="font-medium text-green-600 dark:text-green-400">
-            {formatCurrency(row.balance_fund)}
+            ₹{parseFloat(row['Balance fund'] || 0).toFixed(2)}L
           </div>
           <div className="text-xs text-gray-500">
-            {ensureNumber(row.allotment_cfy) > 0 
-              ? `${((ensureNumber(row.balance_fund) / ensureNumber(row.allotment_cfy)) * 100).toFixed(1)}% avail`
+            {parseFloat(row['Allotment CFY'] || 0) > 0 
+              ? `${((parseFloat(row['Balance fund'] || 0) / parseFloat(row['Allotment CFY'] || 0)) * 100).toFixed(1)}% avail`
               : '0% avail'}
-          </div>
+            </div>
         </div>
       )
     },
-    { id: 'expdr_plan_balance', field: 'expdr_plan_balance', header: 'Balance Expdr Plan', group: 'balance', width: 140, sortable: true,
-      icon: <TrendingUp size={12} className="text-blue-500" />, format: val => formatCurrency(val) },
+    { id: 'Expdr plan for balance fund', field: 'Expdr plan for balance fund', header: 'Balance Expdr Plan', group: 'totals', width: 140, sortable: true,
+      icon: <TrendingUp size={12} className="text-blue-500" />, format: val => `₹${parseFloat(val || 0).toFixed(2)}L` },
       
-    // Status & Analysis group
+    // Status group
     { id: 'risk_level', field: 'risk_level', header: 'Risk Level', group: 'status', width: 110, sortable: true,
       icon: <AlertTriangle size={12} className="text-yellow-500" />, 
       format: val => val,
@@ -1024,7 +1192,7 @@ const PatchDataTableComponent = ({
       )
     },
     { id: 'efficiency_score', field: 'efficiency_score', header: 'Efficiency Score', group: 'status', width: 130, sortable: true,
-      icon: <Target size={12} className="text-purple-500" />, format: val => `${ensureNumber(val).toFixed(1)}%` },
+      icon: <Target size={12} className="text-purple-500" />, format: val => `${parseFloat(val || 0).toFixed(1)}%` },
     { id: 'priority', field: 'priority', header: 'Priority', group: 'status', width: 100, sortable: true,
       icon: <AlertCircle size={12} className="text-orange-500" />, 
       format: val => val,
@@ -1043,18 +1211,19 @@ const PatchDataTableComponent = ({
   // Define column groups
   const columnGroups = useMemo(() => [
     { id: 'basic', name: 'Basic Information', icon: <FileText size={14} /> },
-    { id: 'allocation', name: 'Financial Allocations', icon: <DollarSign size={14} /> },
-    { id: 'expenditure', name: 'Expenditure Details', icon: <Calculator size={14} /> },
-    { id: 'pending', name: 'Pending Bills', icon: <Clock size={14} /> },
-    { id: 'balance', name: 'Balance & Planning', icon: <PiggyBank size={14} /> },
+    { id: 'previous_year', name: 'Previous Year Data', icon: <Clock size={14} /> },
+    { id: 'current_sanctions', name: 'Current Year Sanctions', icon: <DollarSign size={14} /> },
+    { id: 'current_expenditure', name: 'Current Year Expenditure', icon: <Calculator size={14} /> },
+    { id: 'pending', name: 'Pending Bills', icon: <Receipt size={14} /> },
+    { id: 'totals', name: 'Totals & Balance', icon: <Hash size={14} /> },
     { id: 'status', name: 'Status & Analysis', icon: <Activity size={14} /> },
   ], []);
 
   // Default visible columns by view mode
   const defaultVisibleColumns = useMemo(() => ({
-    compact: ['serial_no', 'ftr_hq', 'budget_head', 'allotment_cfy', 'total_expdr_register', 'utilization_rate', 'balance_fund'],
-    standard: ['serial_no', 'ftr_hq', 'budget_head', 'sub_head', 'scheme_name', 'allotment_cfy', 'total_expdr_register', 
-               'utilization_rate', 'pending_bills_total', 'balance_fund', 'risk_level', 'health_status'],
+    compact: ['S/No.', 'ftr_hq_name', 'budget_head', 'Allotment CFY', 'Expdr_as_per_elekha', 'utilization_rate', 'Balance fund'],
+    standard: ['S/No.', 'ftr_hq_name', 'budget_head', 'sub_scheme-name', 'Allotment CFY', 'Expdr_as_per_elekha', 
+               'utilization_rate', 'pending_bills_total', 'Balance fund', 'risk_level', 'health_status'],
     detailed: availableColumns.map(col => col.id)
   }), [availableColumns]);
 
@@ -1067,12 +1236,6 @@ const PatchDataTableComponent = ({
   const ensureNumber = (val) => {
     const num = parseFloat(val) || 0;
     return isNaN(num) || !isFinite(num) ? 0 : num;
-  };
-
-  // Format currency values (lakhs to crores)
-  const formatCurrency = (value) => {
-    const num = ensureNumber(value);
-    return `₹${num.toFixed(2)}L`; // Displaying in Lakhs
   };
 
   // Get risk level badge color
@@ -1107,15 +1270,14 @@ const PatchDataTableComponent = ({
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(item => {
         return (
-          (item.ftr_hq && item.ftr_hq.toLowerCase().includes(search)) ||
+          (item.ftr_hq_name && item.ftr_hq_name.toLowerCase().includes(search)) ||
           (item.budget_head && item.budget_head.toLowerCase().includes(search)) ||
-          (item.sub_head && item.sub_head.toLowerCase().includes(search)) ||
-          (item.scheme_name && item.scheme_name.toLowerCase().includes(search)) ||
-          (item.name_of_scheme && item.name_of_scheme.toLowerCase().includes(search)) ||
-          (item.sub_scheme_name && item.sub_scheme_name.toLowerCase().includes(search)) ||
-          (item.serial_no && item.serial_no.toString().includes(search)) ||
+          (item['sub_scheme-name'] && item['sub_scheme-name'].toLowerCase().includes(search)) ||
+          (item['S/No.'] && item['S/No.'].toString().includes(search)) ||
           (item.risk_level && item.risk_level.toLowerCase().includes(search)) ||
-          (item.health_status && item.health_status.toLowerCase().includes(search))
+          (item.health_status && item.health_status.toLowerCase().includes(search)) ||
+          (item.executive_agency && item.executive_agency.toLowerCase().includes(search)) ||
+          (item.shq_name && item.shq_name.toLowerCase().includes(search))
         );
       });
     }
@@ -1203,19 +1365,69 @@ const PatchDataTableComponent = ({
     });
   };
 
+  // Handle edit row click
+  const handleEditRowClick = (row) => {
+    // Find the row index in the original data
+    const rowIndex = data.findIndex(r => r['S/No.'] === row['S/No.']);
+    
+    setSelectedRow(row);
+    setSelectedRowId(row['S/No.']);
+    setSelectedRowIndex(rowIndex !== -1 ? rowIndex : null);
+    setShowEditModal(true);
+  };
+
+  // Handle add row click
+  const handleAddRowClick = () => {
+    setShowAddModal(true);
+  };
+
+  // Handle edit success
+  const handleEditSuccess = (updatedRow) => {
+    setShowEditModal(false);
+    setSelectedRow(null);
+    setSelectedRowId(null);
+    setSelectedRowIndex(null);
+    
+    // Call parent's onRefresh if provided
+    if (onRefresh) {
+      onRefresh();
+    }
+  };
+
+  // Handle add success
+  const handleAddSuccess = (newRow) => {
+    setShowAddModal(false);
+    
+    // Call parent's onRefresh if provided
+    if (onRefresh) {
+      onRefresh();
+    }
+  };
+
+  // Handle delete success
+  const handleDeleteSuccess = () => {
+    setShowEditModal(false);
+    setSelectedRow(null);
+    setSelectedRowId(null);
+    setSelectedRowIndex(null);
+    
+    // Call parent's onRefresh if provided
+    if (onRefresh) {
+      onRefresh();
+    }
+  };
+
   // Column selector component
   const ColumnSelector = () => (
-    <div className={`absolute top-full right-0 mt-1 p-4 rounded-lg shadow-lg z-20 w-72 ${
-      darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
-    }`}>
-      <h3 className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+    <div className="absolute top-full right-0 mt-1 p-4 rounded-lg shadow-lg z-20 w-72 bg-white border border-gray-200">
+      <h3 className="text-sm font-semibold mb-2 text-gray-700">
         Select Columns to Display
       </h3>
       
       <div className="max-h-96 overflow-y-auto pr-2">
         {columnGroups.map(group => (
           <div key={group.id} className="mb-4">
-            <div className={`flex items-center gap-2 mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+            <div className="flex items-center gap-2 mb-2 text-gray-600">
               {group.icon}
               <span className="text-xs font-medium uppercase">{group.name}</span>
             </div>
@@ -1227,11 +1439,7 @@ const PatchDataTableComponent = ({
                   <div 
                     key={col.id}
                     className={`flex items-center gap-2 text-sm py-1 px-2 rounded ${
-                      isSelected 
-                        ? darkMode 
-                          ? 'bg-indigo-900/30 text-indigo-300' 
-                          : 'bg-indigo-50 text-indigo-700'
-                        : ''
+                      isSelected ? 'bg-indigo-50 text-indigo-700' : ''
                     }`}
                   >
                     <input
@@ -1265,21 +1473,13 @@ const PatchDataTableComponent = ({
       <div className="mt-4 flex justify-between">
         <button
           onClick={() => setSelectedColumns(defaultVisibleColumns[viewMode])}
-          className={`px-2 py-1 text-xs rounded ${
-            darkMode 
-              ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' 
-              : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-          }`}
+          className="px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300 text-gray-700"
         >
           Reset
         </button>
         <button
           onClick={() => setShowColumnSelector(false)}
-          className={`px-2 py-1 text-xs rounded ${
-            darkMode 
-              ? 'bg-indigo-600 hover:bg-indigo-700 text-white' 
-              : 'bg-indigo-500 hover:bg-indigo-600 text-white'
-          }`}
+          className="px-2 py-1 text-xs rounded bg-indigo-500 hover:bg-indigo-600 text-white"
         >
           Done
         </button>
@@ -1287,66 +1487,94 @@ const PatchDataTableComponent = ({
     </div>
   );
 
-  // Render modal view
+  // Render modal view with new 3-part layout
   if (isModal) {
     return (
-      <div className="fixed inset-0 z-[9999] overflow-hidden flex items-center justify-center">
-        <div 
-          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-          onClick={onClose}
-        />
-        
-        <div className={`relative w-[95vw] max-w-[1600px] h-[85vh] ${
-          darkMode ? 'bg-gray-900' : 'bg-white'
-        } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
+      <>
+        <div className="fixed inset-0 z-[9999] overflow-hidden flex items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={onClose}
+          />
           
-          {/* Header with Config Icon */}
-          <div className={`px-6 py-4 border-b ${
-            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-indigo-500 to-indigo-600'
-          }`}>
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <Calendar size={20} className="text-white" />
-                <div>
-                  <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
-                    {title}
-                  </h2>
-                  <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-indigo-100'}`}>
-                    Database: {dbConfig.displayName} | {processedData.length} entries
-                  </p>
+          <div className="relative w-[95vw] max-w-[1600px] h-[85vh] bg-white flex flex-col overflow-hidden" 
+               style={{ borderRadius: '8px' }}>
+            
+            {/* HEADER - Fixed 60px height, Pure White Background */}
+            <div className="h-[60px] bg-white px-6 flex items-center justify-between border-b border-gray-200">
+              {/* Left - Empty */}
+              <div className="w-24"></div>
+              
+              {/* Center - Table Info */}
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <Database size={16} className="text-indigo-500" />
+                  <span className="font-medium text-gray-700">{dbConfig.displayName}</span>
                 </div>
-                <Key size={16} className="text-yellow-400" title={`ID Field: ${dbConfig.idField}`} />
+                <div className="h-4 w-px bg-gray-300"></div>
+                <div className="flex items-center gap-2">
+                  <FileText size={16} className="text-blue-500" />
+                  <span className="font-medium text-gray-700">{title}</span>
+                </div>
+                <div className="h-4 w-px bg-gray-300"></div>
+                <div className="flex items-center gap-2">
+                  <Hash size={16} className="text-green-500" />
+                  <span className="font-medium text-gray-700">{processedData.length} entries</span>
+                </div>
+                <div className="h-4 w-px bg-gray-300"></div>
+                {/* Search */}
+                <div className="relative">
+                  <Search size={14} className="absolute left-2 top-2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8 pr-3 py-1.5 text-sm rounded-md bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-indigo-400 focus:outline-none w-56"
+                  />
+                </div>
               </div>
               
-              <div className="flex items-center gap-3">
+              {/* Right - Controls */}
+              <div className="flex items-center gap-2">
+                {/* Add button */}
+                <button
+                  onClick={handleAddRowClick}
+                  className="px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white transition-colors shadow-sm"
+                  title="Add New Record"
+                >
+                  <Plus size={14} />
+                  Add
+                </button>
+                
                 {/* View Mode Selector */}
-                <div className="relative flex items-center border rounded-lg overflow-hidden shadow-sm">
+                <div className="flex items-center border rounded-md overflow-hidden shadow-sm">
                   <button
                     onClick={() => setViewMode('compact')}
-                    className={`px-3 py-1.5 text-xs font-medium ${
+                    className={`px-2 py-1.5 text-xs font-medium ${
                       viewMode === 'compact'
-                        ? darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white'
-                        : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
                     Compact
                   </button>
                   <button
                     onClick={() => setViewMode('standard')}
-                    className={`px-3 py-1.5 text-xs font-medium ${
+                    className={`px-2 py-1.5 text-xs font-medium ${
                       viewMode === 'standard'
-                        ? darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white'
-                        : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
                     Standard
                   </button>
                   <button
                     onClick={() => setViewMode('detailed')}
-                    className={`px-3 py-1.5 text-xs font-medium ${
+                    className={`px-2 py-1.5 text-xs font-medium ${
                       viewMode === 'detailed'
-                        ? darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white'
-                        : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
                     Detailed
@@ -1357,9 +1585,8 @@ const PatchDataTableComponent = ({
                 <div className="relative">
                   <button
                     onClick={() => setShowColumnSelector(!showColumnSelector)}
-                    className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 ${
-                      darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-indigo-700 hover:bg-indigo-800 text-white'
-                    } transition-colors`}
+                    className="px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+                    title="Select Columns"
                   >
                     <Layers size={14} />
                     Columns
@@ -1372,184 +1599,201 @@ const PatchDataTableComponent = ({
                 {onRefresh && (
                   <button
                     onClick={onRefresh}
-                    className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 ${
-                      darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-indigo-700 hover:bg-indigo-800 text-white'
-                    } transition-colors`}
+                    className="px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+                    title="Refresh Data"
                   >
                     <RefreshCw size={14} />
-                    Refresh
                   </button>
                 )}
                 
                 {/* Export Button */}
                 <button
                   onClick={exportToCSV}
-                  className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 ${
-                    darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-indigo-700 hover:bg-indigo-800 text-white'
-                  } transition-colors`}
+                  className="px-3 py-1.5 rounded-md text-sm flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+                  title="Export to CSV"
                 >
                   <Download size={14} />
-                  Export
                 </button>
                 
                 {/* Close Button */}
                 <button
                   onClick={onClose}
-                  className={`p-2 rounded-lg ${
-                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-indigo-700'
+                  className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                  title="Close"
+                >
+                  <X size={18} className="text-gray-600" />
+                </button>
+              </div>
+            </div>
+
+            {/* MAIN - Flexible height, Whitesmoke Background */}
+            <div className="flex-1 overflow-auto bg-[#f5f5f5]">
+              <table className="w-full bg-white">
+                <thead className="sticky top-0 bg-gray-50 z-10 border-b-2 border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-black uppercase tracking-wider bg-gray-50">
+                      #
+                    </th>
+                    {selectedColumns.map(column => {
+                      const col = availableColumns.find(c => c.id === column);
+                      return (
+                        <th 
+                          key={column}
+                          className={`px-4 py-3 text-left text-xs font-bold text-black uppercase tracking-wider bg-gray-50 ${
+                            col?.sortable ? 'cursor-pointer hover:bg-gray-100' : ''
+                          }`}
+                          onClick={() => col?.sortable && handleSort(column)}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            {col?.icon}
+                            <span>{col?.header || column.replace(/_/g, ' ')}</span>
+                            {sortField === column && (
+                              <span className="text-indigo-500 font-bold">
+                                {sortDirection === 'asc' ? '↑' : '↓'}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
+                    <th className="px-4 py-3 text-center text-xs font-bold text-black uppercase tracking-wider sticky right-0 bg-gray-50">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                
+                <tbody className="divide-y divide-gray-200">
+                  {paginatedData.map((row, index) => (
+                    <tr 
+                      key={row.id || index}
+                      className={`hover:bg-gray-50 transition-colors ${
+                        row.risk_level === 'CRITICAL' ? 'bg-red-50' :
+                        row.risk_level === 'HIGH' ? 'bg-orange-50' :
+                        'bg-white'
+                      }`}
+                    >
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {(currentPage - 1) * itemsPerPage + index + 1}
+                      </td>
+                      {selectedColumns.map(column => {
+                        const col = availableColumns.find(c => c.id === column);
+                        return (
+                          <td key={column} className="px-4 py-3 text-sm text-gray-700">
+                            {col && col.render ? (
+                              col.render(row)
+                            ) : (
+                              <div className="truncate max-w-xs" title={row[column]}>
+                                {col && typeof col.format === 'function' 
+                                  ? col.format(row[column]) 
+                                  : row[column] || '-'}
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="px-4 py-3 text-center sticky right-0 bg-white">
+                        <button
+                          onClick={() => handleEditRowClick(row)}
+                          className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                          title="Edit Row"
+                        >
+                          <Edit size={14} className="text-blue-500" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* FOOTER - Fixed 60px height, Pure White Background */}
+            <div className="h-[60px] bg-white px-6 flex items-center justify-between border-t border-gray-200">
+              <div className="text-sm text-black font-medium">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, processedData.length)} of {processedData.length} entries
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`px-3 py-1.5 rounded text-sm font-medium ${
+                    currentPage === 1
+                      ? 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400'
+                      : 'bg-black text-white hover:bg-gray-800'
                   } transition-colors`}
                 >
-                  <X size={20} className={darkMode ? 'text-gray-300' : 'text-white'} />
+                  Previous
+                </button>
+                
+                {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                  const pageNum = currentPage <= 3 
+                    ? i + 1 
+                    : currentPage >= totalPages - 2
+                      ? totalPages - 4 + i
+                      : currentPage - 2 + i;
+                  
+                  if (pageNum < 1 || pageNum > totalPages) return null;
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-3 py-1.5 rounded text-sm font-medium ${
+                        currentPage === pageNum
+                          ? 'bg-black text-white'
+                          : 'bg-gray-100 text-black hover:bg-gray-200'
+                      } transition-colors`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`px-3 py-1.5 rounded text-sm font-medium ${
+                    currentPage === totalPages
+                      ? 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400'
+                      : 'bg-black text-white hover:bg-gray-800'
+                  } transition-colors`}
+                >
+                  Next
                 </button>
               </div>
             </div>
           </div>
-
-          {/* Search Bar */}
-          <div className={`px-6 py-3 border-b ${
-            darkMode ? 'border-gray-700 bg-gray-850' : 'border-gray-200 bg-gray-50'
-          }`}>
-            <div className="flex justify-between items-center">
-              <div className="relative max-w-md">
-                <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by Frontier HQ, Budget Head, Sub Head, or Scheme..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className={`w-full pl-9 pr-4 py-2 text-sm rounded-lg ${
-                    darkMode 
-                      ? 'bg-gray-700 text-gray-100 placeholder-gray-400 border-gray-600' 
-                      : 'bg-white placeholder-gray-500 border-gray-200'
-                  } border focus:ring-2 focus:ring-indigo-400 focus:outline-none`}
-                />
-              </div>
-              
-              <div className="text-sm text-gray-500">
-                {processedData.length} records found
-              </div>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div className="flex-1 overflow-auto">
-            <table className={`w-full ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
-              <thead className={`sticky top-0 ${
-                darkMode ? 'bg-gray-800' : 'bg-gray-100'
-              } z-10`}>
-                <tr>
-                  {availableColumns
-                    .filter(col => selectedColumns.includes(col.id))
-                    .map(col => (
-                      <th 
-                        key={col.id}
-                        className={`px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
-                          col.sortable ? 'cursor-pointer' : ''
-                        }`}
-                        style={{ minWidth: col.width }}
-                        onClick={() => col.sortable ? handleSort(col.field) : null}
-                      >
-                        <div className="flex items-center gap-1">
-                          {col.icon}
-                          <span>{col.header}</span>
-                          {col.sortable && sortField === col.field && (
-                            <span className="text-indigo-500">
-                              {sortDirection === 'asc' ? '↓' : '↑'}
-                            </span>
-                          )}
-                        </div>
-                      </th>
-                    ))}
-                </tr>
-              </thead>
-              
-              <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                {paginatedData.map((row, index) => (
-                  <tr 
-                    key={row.id || index}
-                    className={`hover:bg-opacity-50 transition-colors ${
-                      row.risk_level === 'CRITICAL' ? (darkMode ? 'bg-red-900/10' : 'bg-red-50') :
-                      row.risk_level === 'HIGH' ? (darkMode ? 'bg-orange-900/10' : 'bg-orange-50') :
-                      darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    {availableColumns
-                      .filter(col => selectedColumns.includes(col.id))
-                      .map(col => (
-                        <td 
-                          key={col.id}
-                          className="px-3 py-2 text-sm"
-                          style={{ maxWidth: col.width * 2 }}
-                        >
-                          {col.render ? col.render(row) : col.format(row[col.field])}
-                        </td>
-                      ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div className={`px-6 py-3 border-t ${
-            darkMode ? 'border-gray-700 bg-gray-850' : 'border-gray-200 bg-gray-50'
-          } flex items-center justify-between`}>
-            <div className="text-sm text-gray-500">
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, processedData.length)} of {processedData.length} entries
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className={`px-3 py-1 rounded text-sm ${
-                  currentPage === 1
-                    ? 'opacity-50 cursor-not-allowed'
-                    : 'hover:bg-gray-200 dark:hover:bg-gray-700'
-                } transition-colors`}
-              >
-                Previous
-              </button>
-              
-              {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                const pageNum = currentPage <= 3 
-                  ? i + 1 
-                  : currentPage >= totalPages - 2
-                    ? totalPages - 4 + i
-                    : currentPage - 2 + i;
-                
-                if (pageNum < 1 || pageNum > totalPages) return null;
-                
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-3 py-1 rounded text-sm ${
-                      currentPage === pageNum
-                        ? 'bg-indigo-500 text-white'
-                        : 'hover:bg-gray-200 dark:hover:bg-gray-700'
-                    } transition-colors`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className={`px-3 py-1 rounded text-sm ${
-                  currentPage === totalPages
-                    ? 'opacity-50 cursor-not-allowed'
-                    : 'hover:bg-gray-200 dark:hover:bg-gray-700'
-                } transition-colors`}
-              >
-                Next
-              </button>
-            </div>
-          </div>
         </div>
-      </div>
+
+        {/* Edit Row Modal - Uses EXACT field names from config */}
+        {showEditModal && (
+          <EditRow
+            isOpen={showEditModal}
+            onClose={() => setShowEditModal(false)}
+            darkMode={darkMode}
+            databaseName="enggcurrentyear"
+            idField={dbConfig.idField}
+            rowId={selectedRowId}
+            rowIndex={selectedRowIndex}
+            rowData={selectedRow}
+            onSuccess={handleEditSuccess}
+            onDelete={handleDeleteSuccess}
+          />
+        )}
+
+        {/* Add Row Modal - Uses EXACT field names from config */}
+        {showAddModal && (
+          <AddRow
+            isOpen={showAddModal}
+            onClose={() => setShowAddModal(false)}
+            darkMode={darkMode}
+            databaseName="enggcurrentyear"
+            idField={dbConfig.idField}
+            onSuccess={handleAddSuccess}
+            defaultValues={{}}
+          />
+        )}
+      </>
     );
   }
 

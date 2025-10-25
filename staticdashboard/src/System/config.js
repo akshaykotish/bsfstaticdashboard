@@ -71,7 +71,8 @@ const databaseConfigs = {
         const sanctioned = parseFloat(row.sd_amount_lakh) || 0;
         return sanctioned > 0 ? ((total / sanctioned) * 100).toFixed(2) : '0';
       }
-    }
+    },
+    comparisonColumns: ['name_of_scheme', 'ftr_hq_name', 'shq_name', 'location', 'work_description', 'executive_agency', 'firm_name', 'sd_amount_lakh']
   },
   
   operations: {
@@ -116,60 +117,65 @@ const databaseConfigs = {
       timeline: { title: 'Timeline', icon: 'Calendar', order: 4 },
       progress: { title: 'Progress', icon: 'Hash', order: 5 }
     },
-    calculations: {}
+    calculations: {},
+    comparisonColumns: ['NAME_OF_WORK', 'FRONTIER', 'SECTOR_HQ', 'LENGTH_KM', 'SANCTIONED_AMOUNT_CR']
   },
   
   enggcurrentyear: {
-    displayName: 'Engineering Current Year',
+    displayName: 'Engineering Current Year Budget',
     fileName: 'enggcurrentyear.csv',
     idField: 'S/No.',
     idPrefix: 'ECY',
     idFormat: 'ECY-{timestamp}-{sequence}',
-    description: 'Current year engineering financial data',
+    description: 'Current year engineering budget and financial tracking',
     icon: 'Calendar',
     color: 'purple',
     columns: [
       // Basic Information
       { name: 'S/No.', type: 'id', required: true, label: 'Serial Number (ID)', group: 'basic' },
-      { name: 'Name of Ftr HQ', type: 'text', required: true, label: 'Name of Frontier HQ', group: 'basic' },
-      { name: 'Budget head', type: 'text', required: true, label: 'Budget Head', group: 'basic' },
-      { name: 'Name of scheme', type: 'text', required: false, label: 'Name of Scheme', group: 'basic' },
+      { name: 'ftr_hq_name', type: 'text', required: true, label: 'Frontier HQ Name', group: 'basic' },
+      { name: 'shq_name', type: 'text', required: false, label: 'SHQ Name', group: 'basic' },
+      { name: 'budget_head', type: 'text', required: true, label: 'Budget Head', group: 'basic' },
+      { name: 'sub_scheme-name', type: 'text', required: false, label: 'Sub Scheme Name', group: 'basic' },
+      { name: 'executive_agency', type: 'text', required: false, label: 'Executive Agency', group: 'basic' },
       
-      // Financial Allocations
-      { name: 'Allotment Previous Financila year', type: 'number', required: false, label: 'Allotment Previous Financial Year', group: 'financial' },
-      { name: 'Liabilities', type: 'number', required: false, label: 'Liabilities', group: 'financial' },
-      { name: 'Fresh Sanction issued during CFY', type: 'number', required: false, label: 'Fresh Sanction Issued During CFY', group: 'financial' },
-      { name: 'Effective sanction', type: 'number', required: false, label: 'Effective Sanction', group: 'financial' },
-      { name: 'Allotment CFY', type: 'number', required: false, label: 'Allotment Current FY', group: 'financial' },
-      { name: 'Allotment  (FY 24-25)', type: 'number', required: false, label: 'Allotment (FY 24-25)', group: 'financial' },
+      // Previous Year Financial Data
+      { name: 'Allotment Previous Financila year', type: 'number', required: false, label: 'Allotment Previous Financial Year', defaultValue: '0', group: 'previous_year' },
+      { name: 'Expdr previous year', type: 'number', required: false, label: 'Expenditure Previous Year', defaultValue: '0', group: 'previous_year' },
+      { name: 'Liabilities', type: 'number', required: false, label: 'Liabilities', defaultValue: '0', group: 'previous_year' },
       
-      // Expenditure Details
-      { name: 'Expdr previous year', type: 'number', required: false, label: 'Expenditure Previous Year', defaultValue: '0', group: 'expenditure' },
-      { name: 'Expdr booked as per e-lekha as on 22/07/25', type: 'number', required: false, label: 'Expenditure as per E-lekha (22/07/25)', defaultValue: '0', group: 'expenditure' },
-      { name: 'Expdr booked as per e-lekha as on 31/03/25', type: 'number', required: false, label: 'Expenditure as per E-lekha (31/03/25)', defaultValue: '0', group: 'expenditure' },
-      { name: 'Total Expdr as per contengency register', type: 'number', required: false, label: 'Total Expenditure per Contingency Register', group: 'expenditure' },
-      { name: '% Age of expdr as per e-lekha', type: 'number', required: false, label: 'Percentage of Expenditure (E-lekha)', calculated: true, group: 'expenditure' },
-      { name: '% Age of total Expdr', type: 'number', required: false, label: 'Percentage of Total Expenditure', calculated: true, group: 'expenditure' },
+      // Current Year Sanctions & Allotments
+      { name: 'Fresh Sanction issued during CFY', type: 'number', required: false, label: 'Fresh Sanction Issued During CFY', defaultValue: '0', group: 'current_sanctions' },
+      { name: 'Effective sanction', type: 'number', required: false, label: 'Effective Sanction', defaultValue: '0', group: 'current_sanctions' },
+      { name: 'Allotment CFY', type: 'number', required: false, label: 'Allotment Current FY', defaultValue: '0', group: 'current_sanctions' },
+      { name: 'Allotment (FY 24-25)', type: 'number', required: false, label: 'Allotment (FY 24-25)', defaultValue: '0', group: 'current_sanctions' },
+      
+      // Current Year Expenditure
+      { name: 'Expdr_as_per_elekha', type: 'number', required: false, label: 'Expenditure as per E-lekha', defaultValue: '0', group: 'current_expenditure' },
+      { name: '% Age of expdr as per e-lekha', type: 'number', required: false, label: '% of Expenditure (E-lekha)', calculated: true, group: 'current_expenditure' },
       
       // Pending Bills
       { name: 'Bill pending with PAD', type: 'number', required: false, label: 'Bills Pending with PAD', defaultValue: '0', group: 'pending' },
       { name: 'Bill pending with HQrs', type: 'number', required: false, label: 'Bills Pending with HQrs', defaultValue: '0', group: 'pending' },
       
-      // Balance and Planning
-      { name: 'Balance fund', type: 'number', required: false, label: 'Balance Fund', calculated: true, group: 'balance' },
-      { name: 'Expdr plan for balance fund', type: 'number', required: false, label: 'Expenditure Plan for Balance Fund', group: 'balance' }
+      // Total Expenditure & Balance
+      { name: 'Total Expdr as per contengency register', type: 'number', required: false, label: 'Total Expenditure (Contingency Register)', defaultValue: '0', group: 'totals' },
+      { name: '% Age of total Expdr', type: 'number', required: false, label: '% of Total Expenditure', calculated: true, group: 'totals' },
+      { name: 'Balance fund', type: 'number', required: false, label: 'Balance Fund', calculated: true, group: 'totals' },
+      { name: 'Expdr plan for balance fund', type: 'number', required: false, label: 'Expenditure Plan for Balance Fund', defaultValue: '0', group: 'totals' }
     ],
     columnGroups: {
       basic: { title: 'Basic Information', icon: 'FileText', order: 1 },
-      financial: { title: 'Financial Allocations', icon: 'DollarSign', order: 2 },
-      expenditure: { title: 'Expenditure Details', icon: 'Calculator', order: 3 },
-      pending: { title: 'Pending Bills', icon: 'Clock', order: 4 },
-      balance: { title: 'Balance & Planning', icon: 'Hash', order: 5 }
+      previous_year: { title: 'Previous Year Data', icon: 'Clock', order: 2 },
+      current_sanctions: { title: 'Current Year Sanctions', icon: 'DollarSign', order: 3 },
+      current_expenditure: { title: 'Current Year Expenditure', icon: 'Calculator', order: 4 },
+      pending: { title: 'Pending Bills', icon: 'Clock', order: 5 },
+      totals: { title: 'Totals & Balance', icon: 'Hash', order: 6 }
     },
     calculations: {
       '% Age of expdr as per e-lekha': (row) => {
         const allotmentCFY = parseFloat(row['Allotment CFY']) || 0;
-        const currentExpdr = parseFloat(row['Expdr booked as per e-lekha as on 22/07/25']) || 0;
+        const currentExpdr = parseFloat(row['Expdr_as_per_elekha']) || 0;
         return allotmentCFY > 0 ? ((currentExpdr / allotmentCFY) * 100).toFixed(2) : '0';
       },
       '% Age of total Expdr': (row) => {
@@ -184,7 +190,8 @@ const databaseConfigs = {
         const pendingHQrs = parseFloat(row['Bill pending with HQrs']) || 0;
         return (allotmentCFY - totalExpdr - pendingPAD - pendingHQrs).toFixed(2);
       }
-    }
+    },
+    comparisonColumns: ['ftr_hq_name', 'shq_name', 'budget_head', 'sub_scheme-name', 'Allotment CFY']
   },
   
   // Template for custom databases
@@ -203,7 +210,8 @@ const databaseConfigs = {
     columnGroups: {
       basic: { title: 'All Fields', icon: 'FileText', order: 1 }
     },
-    calculations: {}
+    calculations: {},
+    comparisonColumns: []
   }
 };
 

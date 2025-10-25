@@ -33,9 +33,9 @@ const EditRow = ({
   darkMode = false,
   databaseName = '',
   idField = '',
-  rowId = null,         // ID of the row to edit (instead of index)
-  rowIndex = null,      // Kept for backward compatibility
-  rowData = null,
+  rowId = null,         // ID of the row to edit
+  rowIndex = null,      // Index for backward compatibility
+  rowData = null,       // Direct row data if available
   onSuccess = () => {},
   onDelete = () => {}
 }) => {
@@ -52,52 +52,51 @@ const EditRow = ({
   const [changedFields, setChangedFields] = useState(new Set());
   const [currentConfig, setCurrentConfig] = useState(null);
   const [calculatedFields, setCalculatedFields] = useState(new Set());
+  const [actualIdField, setActualIdField] = useState('');
+  const [configColumns, setConfigColumns] = useState([]);
 
-  // Load configuration and data when component opens
+  // Load configuration when component opens
   useEffect(() => {
     if (isOpen && databaseName) {
+      console.log('Loading config for database:', databaseName);
       loadDatabaseConfig();
-      
-      // Load row data either from the provided data or fetch by ID/index
+    }
+  }, [isOpen, databaseName]);
+
+  // Load row data after config is ready
+  useEffect(() => {
+    if (isOpen && currentConfig && (rowData || rowId || rowIndex !== null)) {
+      console.log('Loading row data with config:', currentConfig);
       if (rowData) {
-        setFormData(rowData);
-        setOriginalData(rowData);
-        setError('');
-        setSuccess('');
-        setShowDeleteConfirm(false);
+        processRowData(rowData);
       } else {
         fetchRowData();
       }
     }
-  }, [isOpen, rowId, rowIndex, rowData, databaseName]);
-
-  // Track changes
-  useEffect(() => {
-    const hasChanges = Object.keys(formData).some(key => 
-      formData[key] !== originalData[key]
-    );
-    setIsDirty(hasChanges);
-
-    const changes = new Set();
-    Object.keys(formData).forEach(key => {
-      if (formData[key] !== originalData[key]) {
-        changes.add(key);
-      }
-    });
-    setChangedFields(changes);
-  }, [formData, originalData]);
+  }, [isOpen, currentConfig, rowId, rowIndex]);
 
   const loadDatabaseConfig = () => {
     const config = getConfig(databaseName);
+    console.log('Database config loaded:', config);
     
     if (config && config !== databaseConfigs.custom) {
       setCurrentConfig(config);
       
-      // Extract column names from config
-      const columnNames = config.columns.map(col => 
-        typeof col === 'object' ? col.name : col
-      );
-      setColumns(columnNames);
+      // Set the ID field from config
+      const configIdField = config.idField || idField || 'id';
+      setActualIdField(configIdField);
+      console.log('ID field set to:', configIdField);
+      
+      // Extract all column names from config
+      const allColumns = config.columns.map(col => {
+        if (typeof col === 'object') {
+          return col.name;
+        }
+        return col;
+      });
+      setColumns(allColumns);
+      setConfigColumns(config.columns);
+      console.log('Config columns:', allColumns);
       
       // Initialize expanded sections
       const sections = {};
@@ -109,8 +108,10 @@ const EditRow = ({
       // Track calculated fields
       const calcFields = new Set(Object.keys(config.calculations || {}));
       setCalculatedFields(calcFields);
+      console.log('Calculated fields:', Array.from(calcFields));
     } else {
       // Handle custom database
+      setActualIdField(idField || 'id');
       fetchColumnsFromServer();
     }
   };
@@ -120,15 +121,26 @@ const EditRow = ({
       const response = await fetch(`${API_URL}/api/csv/${databaseName}/rows`);
       if (response.ok) {
         const data = await response.json();
+        console.log('Server columns data:', data);
+        
         if (data.columns && data.columns.length > 0) {
           setColumns(data.columns);
           
-          // Create a single group for all columns
-          setCurrentConfig({
+          // Determine ID field from response
+          const responseIdField = data.idField || idField || 'id';
+          setActualIdField(responseIdField);
+          
+          // Create a basic config for custom databases
+          const customConfig = {
             displayName: databaseName,
-            idField: idField || data.idField || 'id',
+            idField: responseIdField,
             idPrefix: databaseName.toUpperCase().slice(0, 3),
-            columns: data.columns.map(col => ({ name: col, type: 'text', required: false })),
+            columns: data.columns.map(col => ({ 
+              name: col, 
+              type: 'text', 
+              required: false,
+              group: 'all'
+            })),
             columnGroups: {
               all: {
                 title: 'All Fields',
@@ -137,45 +149,126 @@ const EditRow = ({
               }
             },
             calculations: {}
-          });
+          };
           
+          setCurrentConfig(customConfig);
+          setConfigColumns(customConfig.columns);
           setExpandedSections({ all: true });
         }
       }
     } catch (err) {
       console.error('Error fetching columns:', err);
+      setError('Failed to load database columns');
     }
+  };
+
+  const processRowData = (data) => {
+    console.log('Processing row data:', data);
+    
+    if (!currentConfig || !data) {
+      console.log('Missing config or data');
+      return;
+    }
+
+    // Create form data object with all fields from the row
+    const processedData = {};
+    
+    // First, add all data from the row as-is
+    Object.keys(data).forEach(key => {
+      processedData[key] = data[key];
+    });
+    
+    // Then ensure all config columns are present
+    if (currentConfig.columns && Array.isArray(currentConfig.columns)) {
+      currentConfig.columns.forEach(col => {
+        const fieldName = typeof col === 'object' ? col.name : col;
+        
+        // If field doesn't exist in data, try to find it with different casing
+        if (processedData[fieldName] === undefined) {
+          // Try exact match first
+          if (data[fieldName] !== undefined) {
+            processedData[fieldName] = data[fieldName];
+          } else {
+            // Try case-insensitive match
+            const matchingKey = Object.keys(data).find(key => 
+              key.toLowerCase() === fieldName.toLowerCase() ||
+              key.replace(/[-_]/g, '').toLowerCase() === fieldName.replace(/[-_]/g, '').toLowerCase()
+            );
+            
+            if (matchingKey) {
+              processedData[fieldName] = data[matchingKey];
+            } else {
+              // Set default value if specified in config
+              const defaultValue = typeof col === 'object' ? col.defaultValue : undefined;
+              processedData[fieldName] = defaultValue !== undefined ? defaultValue : '';
+            }
+          }
+        }
+      });
+    }
+    
+    console.log('Processed data:', processedData);
+    setFormData(processedData);
+    setOriginalData(processedData);
+    setError('');
+    setSuccess('');
+    setShowDeleteConfirm(false);
   };
 
   const fetchRowData = async () => {
     try {
-      let data;
+      console.log('Fetching row data - rowId:', rowId, 'rowIndex:', rowIndex);
       
+      let endpoint;
       if (rowId) {
-        // Fetch row by ID - new preferred method
-        const response = await fetch(`${API_URL}/api/csv/${databaseName}/row/${rowId}`);
-        if (!response.ok) throw new Error('Failed to fetch row data by ID');
-        const result = await response.json();
-        data = result.row;
+        endpoint = `${API_URL}/api/csv/${databaseName}/row/${encodeURIComponent(rowId)}`;
       } else if (rowIndex !== null) {
-        // Backward compatibility - fetch by index
-        const response = await fetch(`${API_URL}/api/csv/${databaseName}/rows/${rowIndex}`);
-        if (!response.ok) throw new Error('Failed to fetch row data by index');
-        const result = await response.json();
-        data = result.row;
+        endpoint = `${API_URL}/api/csv/${databaseName}/rows/${rowIndex}`;
       } else {
-        throw new Error('No row data, ID or index available');
+        throw new Error('No row identifier provided');
       }
 
-      setFormData(data);
-      setOriginalData(data);
-      setError('');
-      setSuccess('');
-      setShowDeleteConfirm(false);
+      console.log('Fetching from endpoint:', endpoint);
+      const response = await fetch(endpoint);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch row data');
+      }
+      
+      const result = await response.json();
+      const data = result.row || result;
+      console.log('Fetched row data:', data);
+      
+      processRowData(data);
     } catch (err) {
+      console.error('Error loading row data:', err);
       setError('Error loading row data: ' + err.message);
     }
   };
+
+  // Track changes
+  useEffect(() => {
+    const hasChanges = Object.keys(formData).some(key => {
+      // Skip ID field and timestamp fields from change detection
+      if (key === actualIdField || key === 'created_at' || key === 'updated_at') {
+        return false;
+      }
+      return formData[key] !== originalData[key];
+    });
+    
+    setIsDirty(hasChanges);
+
+    const changes = new Set();
+    Object.keys(formData).forEach(key => {
+      if (key !== actualIdField && key !== 'created_at' && key !== 'updated_at') {
+        if (formData[key] !== originalData[key]) {
+          changes.add(key);
+        }
+      }
+    });
+    setChangedFields(changes);
+  }, [formData, originalData, actualIdField]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => {
@@ -183,7 +276,9 @@ const EditRow = ({
       
       // Apply calculations if configuration exists
       if (currentConfig && currentConfig.calculations && Object.keys(currentConfig.calculations).length > 0) {
-        return applyCalculations(databaseName, updated);
+        const calculated = applyCalculations(databaseName, updated);
+        console.log('Applied calculations:', calculated);
+        return calculated;
       }
       
       return updated;
@@ -191,12 +286,11 @@ const EditRow = ({
   };
 
   const validateForm = () => {
-    if (!currentConfig) return true;
+    if (!currentConfig || !currentConfig.columns) return true;
     
-    // Collect all required fields from columns
     const requiredFields = [];
     currentConfig.columns.forEach(col => {
-      if (typeof col === 'object' && col.required && col.name !== currentConfig.idField) {
+      if (typeof col === 'object' && col.required && col.name !== actualIdField) {
         requiredFields.push(col.name);
       }
     });
@@ -221,13 +315,20 @@ const EditRow = ({
     setSuccess('');
 
     try {
-      // Determine which endpoint to use based on available identifiers
+      // Prepare data for saving - include all fields
+      const dataToSave = { ...formData };
+      
+      // Ensure ID field is preserved
+      if (actualIdField && originalData[actualIdField]) {
+        dataToSave[actualIdField] = originalData[actualIdField];
+      }
+
+      console.log('Saving data:', dataToSave);
+
       let endpoint;
       if (rowId) {
-        // Update by ID (preferred)
-        endpoint = `${API_URL}/api/csv/${databaseName}/row/${rowId}`;
+        endpoint = `${API_URL}/api/csv/${databaseName}/row/${encodeURIComponent(rowId)}`;
       } else if (rowIndex !== null) {
-        // Update by index (backward compatibility)
         endpoint = `${API_URL}/api/csv/${databaseName}/rows/${rowIndex}`;
       } else {
         throw new Error('Missing row identifier for update');
@@ -238,7 +339,7 @@ const EditRow = ({
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(dataToSave)
       });
 
       if (!response.ok) {
@@ -247,18 +348,19 @@ const EditRow = ({
       }
 
       const result = await response.json();
-      setSuccess('Row updated successfully! ID preserved.');
+      setSuccess('Row updated successfully!');
       setOriginalData(formData);
       setIsDirty(false);
       
       if (onSuccess) {
-        onSuccess(result);
+        onSuccess({ ...dataToSave, ...result });
       }
       
       setTimeout(() => {
         onClose();
       }, 1500);
     } catch (err) {
+      console.error('Error updating row:', err);
       setError(err.message || 'Failed to update row');
     } finally {
       setLoading(false);
@@ -270,13 +372,10 @@ const EditRow = ({
     setError('');
 
     try {
-      // Determine which endpoint to use based on available identifiers
       let endpoint;
       if (rowId) {
-        // Delete by ID (preferred)
-        endpoint = `${API_URL}/api/csv/${databaseName}/row/${rowId}`;
+        endpoint = `${API_URL}/api/csv/${databaseName}/row/${encodeURIComponent(rowId)}`;
       } else if (rowIndex !== null) {
-        // Delete by index (backward compatibility)
         endpoint = `${API_URL}/api/csv/${databaseName}/rows/${rowIndex}`;
       } else {
         throw new Error('Missing row identifier for delete');
@@ -302,6 +401,7 @@ const EditRow = ({
         onClose();
       }, 1500);
     } catch (err) {
+      console.error('Error deleting row:', err);
       setError(err.message || 'Failed to delete row');
     } finally {
       setDeleting(false);
@@ -311,14 +411,20 @@ const EditRow = ({
 
   const handleDuplicate = () => {
     const duplicatedData = { ...formData };
-    const idField = currentConfig?.idField || 'id';
     
-    delete duplicatedData[idField];
+    // Remove ID and timestamp fields
+    delete duplicatedData[actualIdField];
     delete duplicatedData.created_at;
     delete duplicatedData.updated_at;
     
+    // Generate new ID if config available
+    if (currentConfig) {
+      duplicatedData[actualIdField] = generateId(databaseName, Date.now(), Math.floor(Math.random() * 1000));
+    }
+    
     setFormData(duplicatedData);
-    setSuccess('Row duplicated. ID will be auto-generated when saved.');
+    setOriginalData(duplicatedData);
+    setSuccess('Row duplicated. New ID will be generated when saved.');
   };
 
   const handleReset = () => {
@@ -337,8 +443,8 @@ const EditRow = ({
   };
 
   const getFieldType = (field) => {
-    // First check if the field has a type defined in config
-    const column = currentConfig?.columns.find(col => 
+    // Check config for field type
+    const column = configColumns.find(col => 
       (typeof col === 'object' ? col.name : col) === field
     );
     
@@ -346,7 +452,7 @@ const EditRow = ({
       return column.type;
     }
     
-    // Fallback to field name analysis
+    // Auto-detect based on field name
     const fieldLower = field.toLowerCase();
     
     if (fieldLower.includes('date') || fieldLower.includes('pdc') || fieldLower.includes('sdc')) {
@@ -359,12 +465,11 @@ const EditRow = ({
         fieldLower.includes('allotment') || fieldLower.includes('sanction') || 
         fieldLower.includes('fund') || fieldLower.includes('bill') || 
         fieldLower.includes('liabilities') || fieldLower.includes('length') || 
-        fieldLower.includes('days') || fieldLower === 'completed_percentage' ||
-        fieldLower.includes('age of')) {
+        fieldLower.includes('days') || fieldLower.includes('age')) {
       return 'number';
     }
     
-    if (fieldLower === 'remarks' || fieldLower.includes('description')) {
+    if (fieldLower === 'remarks' || fieldLower.includes('description') || fieldLower.includes('work_description')) {
       return 'textarea';
     }
     
@@ -372,8 +477,8 @@ const EditRow = ({
   };
 
   const getFieldLabel = (field) => {
-    // Check if the field has a label defined in config
-    const column = currentConfig?.columns.find(col => 
+    // Check config for field label
+    const column = configColumns.find(col => 
       (typeof col === 'object' ? col.name : col) === field
     );
     
@@ -381,24 +486,27 @@ const EditRow = ({
       return column.label;
     }
     
-    // Fallback to automatic label generation
-    if (field === 'S_No' || field === 'S/No.') return 'Serial Number';
-    if (field === 's_no') return 'Serial Number';
-    
+    // Auto-generate label
     return field
-      .split('_')
+      .split(/[_-]/)
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ')
+      .replace(/\s+/g, ' ')
       .replace('Fy', 'FY')
       .replace('Pdc', 'PDC')
       .replace('Sdc', 'SDC')
       .replace('Shq', 'SHQ')
       .replace('Ftr Hq', 'Frontier HQ')
       .replace('Aa Es', 'AA/ES')
-      .replace('Sd Amount Lakh', 'Sanctioned Amount (Lakhs)')
       .replace('Expdr', 'Expenditure')
+      .replace('Cfy', 'CFY')
       .replace('Cr', 'Crores')
-      .replace('Hlec', 'HLEC');
+      .replace('Hlec', 'HLEC')
+      .replace('Lakh', 'Lakhs')
+      .replace('Prev ', 'Previous ')
+      .replace('Elekha', 'E-Lekha')
+      .replace('Hqrs', 'HQrs')
+      .replace('Financila', 'Financial');
   };
 
   const formatValue = (value, fieldType) => {
@@ -428,51 +536,39 @@ const EditRow = ({
     }
   };
 
-  // Get icon component from string
   const getIconComponent = (iconName) => {
     return iconMap[iconName] || Database;
   };
 
-  // Get fields for a specific group
   const getGroupFields = (group) => {
-    const groupFields = [];
+    if (!configColumns) return [];
     
-    currentConfig?.columns.forEach(col => {
-      const colName = typeof col === 'object' ? col.name : col;
-      const colObj = typeof col === 'object' ? col : null;
-      
-      // Check if field belongs to this group
-      if (colObj && colObj.group === group) {
-        groupFields.push(colName);
-      }
-    });
-    
-    return groupFields;
+    return configColumns
+      .filter(col => {
+        if (typeof col === 'object') {
+          return col.group === group;
+        }
+        return false;
+      })
+      .map(col => typeof col === 'object' ? col.name : col);
   };
 
-  // Get required fields for a group
   const getGroupRequiredFields = (groupKey) => {
-    const requiredFields = [];
+    if (!configColumns) return [];
     
-    currentConfig?.columns.forEach(col => {
-      if (typeof col === 'object' && col.group === groupKey && col.required) {
-        requiredFields.push(col.name);
-      }
-    });
-    
-    return requiredFields;
-  };
-
-  // Generate example ID for display
-  const getExampleId = () => {
-    if (!currentConfig) return 'CUSTOM-1234567890-1';
-    return generateId(databaseName, Date.now(), 1);
+    return configColumns
+      .filter(col => {
+        if (typeof col === 'object') {
+          return col.group === groupKey && col.required;
+        }
+        return false;
+      })
+      .map(col => col.name);
   };
 
   const renderIdBadge = () => {
     const config = currentConfig || {};
-    const idFieldName = config.idField || idField || 'id';
-    const id = formData[idFieldName];
+    const id = formData[actualIdField];
     
     if (!id) return null;
     
@@ -482,18 +578,95 @@ const EditRow = ({
       <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${
         needsRegeneration
           ? 'bg-yellow-100 dark:bg-yellow-900/20'
-          : `bg-${config.color || 'blue'}-100 dark:bg-${config.color || 'blue'}-900/20`
+          : 'bg-blue-100 dark:bg-blue-900/20'
       }`}>
-        <Key size={16} className={needsRegeneration ? 'text-yellow-600' : `text-${config.color || 'blue'}-600`} />
+        <Key size={16} className={needsRegeneration ? 'text-yellow-600' : 'text-blue-600'} />
         <span className={`text-sm font-medium ${
-          needsRegeneration ? 'text-yellow-700 dark:text-yellow-400' : `text-${config.color || 'blue'}-700 dark:text-${config.color || 'blue'}-400`
+          needsRegeneration ? 'text-yellow-700 dark:text-yellow-400' : 'text-blue-700 dark:text-blue-400'
         }`}>
-          {idFieldName}: {id}
+          {actualIdField}: {id}
         </span>
         {needsRegeneration && (
           <span className="text-xs text-yellow-600 dark:text-yellow-500">
             (Needs regeneration)
           </span>
+        )}
+      </div>
+    );
+  };
+
+  const renderField = (field) => {
+    const fieldType = getFieldType(field);
+    const hasChanged = changedFields.has(field);
+    const column = configColumns.find(col => 
+      (typeof col === 'object' ? col.name : col) === field
+    );
+    const isRequired = column && typeof column === 'object' && column.required;
+    const isIdField = field === actualIdField;
+    const isCalculated = calculatedFields.has(field);
+    const isReadonly = isIdField || isCalculated;
+    
+    return (
+      <div key={field} className={fieldType === 'textarea' ? 'md:col-span-2' : ''}>
+        <label className={`block text-xs font-medium mb-1 flex items-center gap-1 ${
+          darkMode ? 'text-gray-300' : 'text-gray-700'
+        }`}>
+          {getFieldLabel(field)}
+          {isRequired && <span className="text-red-500">*</span>}
+          {isIdField && (
+            <Fingerprint size={12} className="text-yellow-500" />
+          )}
+          {hasChanged && (
+            <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" title="Modified"></span>
+          )}
+          {isCalculated && (
+            <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded inline-flex items-center gap-1">
+              <Calculator size={10} />
+              Auto
+            </span>
+          )}
+        </label>
+        
+        {fieldType === 'textarea' ? (
+          <textarea
+            value={formatValue(formData[field], fieldType) || ''}
+            onChange={(e) => handleInputChange(field, e.target.value)}
+            rows={3}
+            disabled={isReadonly}
+            className={`w-full px-3 py-2 text-sm rounded-lg border ${
+              isReadonly
+                ? darkMode
+                  ? 'bg-gray-900 border-gray-700 text-gray-500 cursor-not-allowed'
+                  : 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
+                : hasChanged
+                  ? darkMode
+                    ? 'bg-yellow-900/20 border-yellow-600 text-gray-100'
+                    : 'bg-yellow-50 border-yellow-400'
+                  : darkMode 
+                    ? 'bg-gray-700 border-gray-600 text-gray-100' 
+                    : 'bg-white border-gray-300'
+            } focus:ring-2 focus:ring-blue-500 focus:outline-none`}
+          />
+        ) : (
+          <input
+            type={fieldType}
+            value={formatValue(formData[field], fieldType) || ''}
+            onChange={(e) => handleInputChange(field, e.target.value)}
+            disabled={isReadonly}
+            className={`w-full px-3 py-2 text-sm rounded-lg border ${
+              isReadonly
+                ? darkMode
+                  ? 'bg-gray-900 border-gray-700 text-gray-500 cursor-not-allowed'
+                  : 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
+                : hasChanged
+                  ? darkMode
+                    ? 'bg-yellow-900/20 border-yellow-600 text-gray-100'
+                    : 'bg-yellow-50 border-yellow-400'
+                  : darkMode 
+                    ? 'bg-gray-700 border-gray-600 text-gray-100' 
+                    : 'bg-white border-gray-300'
+            } focus:ring-2 focus:ring-blue-500 focus:outline-none`}
+          />
         )}
       </div>
     );
@@ -521,7 +694,6 @@ const EditRow = ({
 
   const config = currentConfig || {};
   const ConfigIcon = getIconComponent(config.icon);
-  const idFieldName = config.idField || idField || 'id';
 
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
@@ -551,7 +723,7 @@ const EditRow = ({
                   {renderIdBadge()}
                   {(rowIndex !== null || rowId) && (
                     <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
-                      {rowIndex !== null ? `Row #${rowIndex + 1}` : `Row ID: ${rowId}`}
+                      {rowIndex !== null ? `Index: ${rowIndex}` : ''}
                     </span>
                   )}
                 </div>
@@ -606,144 +778,79 @@ const EditRow = ({
         {/* Form Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <div className="space-y-4">
-            {Object.entries(config.columnGroups || {})
-              .sort((a, b) => (a[1].order || 0) - (b[1].order || 0))
-              .map(([groupKey, group]) => {
-                const GroupIcon = getIconComponent(group.icon);
-                const isExpanded = expandedSections[groupKey];
-                const groupFields = getGroupFields(groupKey);
-                
-                if (groupFields.length === 0) return null;
-                
-                const requiredFields = getGroupRequiredFields(groupKey);
-                
-                return (
-                  <div key={groupKey} className={`rounded-xl border ${
-                    darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
-                  }`}>
-                    <button
-                      onClick={() => toggleSection(groupKey)}
-                      className={`w-full px-4 py-3 flex items-center justify-between ${
-                        darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-                      } transition-colors rounded-t-xl`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <GroupIcon size={18} className={`text-${config.color || 'blue'}-500`} />
-                        <h3 className="font-semibold text-sm">{group.title}</h3>
-                        {groupFields.some(field => changedFields.has(field)) && (
-                          <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
-                        )}
-                        {calculatedFields.size > 0 && groupFields.some(f => calculatedFields.has(f)) && (
-                          <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded">
-                            Has Calculated Fields
-                          </span>
-                        )}
-                      </div>
-                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </button>
-                    
-                    {isExpanded && (
-                      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {groupFields.map(field => {
-                          const fieldType = getFieldType(field);
-                          const hasChanged = changedFields.has(field);
-                          const column = currentConfig?.columns.find(col => 
-                            (typeof col === 'object' ? col.name : col) === field
-                          );
-                          const isRequired = column && typeof column === 'object' && column.required;
-                          const isIdField = field === idFieldName;
-                          const isCalculated = calculatedFields.has(field);
-                          const isReadonly = isIdField || isCalculated;
-                          
-                          return (
-                            <div key={field} className={fieldType === 'textarea' ? 'md:col-span-2' : ''}>
-                              <label className={`block text-xs font-medium mb-1 flex items-center gap-1 ${
-                                darkMode ? 'text-gray-300' : 'text-gray-700'
-                              }`}>
-                                {getFieldLabel(field)}
-                                {isRequired && <span className="text-red-500">*</span>}
-                                {isIdField && (
-                                  <Fingerprint size={12} className="text-yellow-500" />
-                                )}
-                                {hasChanged && (
-                                  <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" title="Modified"></span>
-                                )}
-                                {isReadonly && (
-                                  <span className="text-[10px] px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded inline-flex items-center gap-1">
-                                    {isIdField ? (
-                                      <>
-                                        <Key size={10} />
-                                        ID
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Calculator size={10} />
-                                        Auto
-                                      </>
-                                    )}
-                                  </span>
-                                )}
-                              </label>
-                              
-                              {fieldType === 'textarea' ? (
-                                <textarea
-                                  value={formatValue(formData[field], fieldType) || ''}
-                                  onChange={(e) => handleInputChange(field, e.target.value)}
-                                  rows={3}
-                                  disabled={isReadonly}
-                                  className={`w-full px-3 py-2 text-sm rounded-lg border ${
-                                    isReadonly
-                                      ? darkMode
-                                        ? 'bg-gray-900 border-gray-700 text-gray-500 cursor-not-allowed'
-                                        : 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
-                                      : hasChanged
-                                        ? darkMode
-                                          ? 'bg-yellow-900/20 border-yellow-600 text-gray-100'
-                                          : 'bg-yellow-50 border-yellow-400'
-                                        : darkMode 
-                                          ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                                          : 'bg-white border-gray-300'
-                                  } focus:ring-2 focus:ring-blue-500 focus:outline-none`}
-                                />
-                              ) : (
-                                <input
-                                  type={fieldType}
-                                  value={formatValue(formData[field], fieldType) || ''}
-                                  onChange={(e) => handleInputChange(field, e.target.value)}
-                                  disabled={isReadonly}
-                                  className={`w-full px-3 py-2 text-sm rounded-lg border ${
-                                    isReadonly
-                                      ? darkMode
-                                        ? 'bg-gray-900 border-gray-700 text-gray-500 cursor-not-allowed'
-                                        : 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
-                                      : hasChanged
-                                        ? darkMode
-                                          ? 'bg-yellow-900/20 border-yellow-600 text-gray-100'
-                                          : 'bg-yellow-50 border-yellow-400'
-                                        : darkMode 
-                                          ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                                          : 'bg-white border-gray-300'
-                                  } focus:ring-2 focus:ring-blue-500 focus:outline-none`}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            {/* Render fields based on column groups if they exist */}
+            {currentConfig?.columnGroups ? (
+              Object.entries(currentConfig.columnGroups)
+                .sort((a, b) => (a[1].order || 0) - (b[1].order || 0))
+                .map(([groupKey, group]) => {
+                  const GroupIcon = getIconComponent(group.icon);
+                  const isExpanded = expandedSections[groupKey];
+                  const groupFields = getGroupFields(groupKey);
+                  
+                  if (groupFields.length === 0) return null;
+                  
+                  const requiredFields = getGroupRequiredFields(groupKey);
+                  
+                  return (
+                    <div key={groupKey} className={`rounded-xl border ${
+                      darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+                    }`}>
+                      <button
+                        onClick={() => toggleSection(groupKey)}
+                        className={`w-full px-4 py-3 flex items-center justify-between ${
+                          darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                        } transition-colors rounded-t-xl`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <GroupIcon size={18} className="text-blue-500" />
+                          <h3 className="font-semibold text-sm">{group.title}</h3>
+                          {groupFields.some(field => changedFields.has(field)) && (
+                            <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                          )}
+                          {requiredFields.length > 0 && (
+                            <span className="text-xs px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded">
+                              {requiredFields.length} Required
+                            </span>
+                          )}
+                          {groupFields.some(f => calculatedFields.has(f)) && (
+                            <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded">
+                              Has Calculated Fields
+                            </span>
+                          )}
+                        </div>
+                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+                      
+                      {isExpanded && (
+                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {groupFields.map(field => renderField(field))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+            ) : (
+              // Render all fields in a single group if no groups defined
+              <div className={`rounded-xl border ${
+                darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {columns.map(field => renderField(field))}
+                </div>
+              </div>
+            )}
 
-            {/* Additional Fields (for fields not in any group) */}
-            {columns.length > 0 && (() => {
+            {/* Ungrouped fields (if any) */}
+            {(() => {
+              if (!currentConfig?.columnGroups) return null;
+              
               const groupedFields = new Set();
-              Object.keys(config.columnGroups || {}).forEach(groupKey => {
+              Object.keys(currentConfig.columnGroups).forEach(groupKey => {
                 getGroupFields(groupKey).forEach(field => groupedFields.add(field));
               });
               
               const ungroupedFields = columns.filter(col => 
-                !groupedFields.has(col) && col !== idFieldName
+                !groupedFields.has(col) && col !== actualIdField
               );
               
               if (ungroupedFields.length === 0) return null;
@@ -770,54 +877,7 @@ const EditRow = ({
                   
                   {expandedSections.additional && (
                     <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {ungroupedFields.map(field => {
-                        const fieldType = getFieldType(field);
-                        const hasChanged = changedFields.has(field);
-                        
-                        return (
-                          <div key={field} className={fieldType === 'textarea' ? 'md:col-span-2' : ''}>
-                            <label className={`block text-xs font-medium mb-1 flex items-center gap-1 ${
-                              darkMode ? 'text-gray-300' : 'text-gray-700'
-                            }`}>
-                              {getFieldLabel(field)}
-                              {hasChanged && (
-                                <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" title="Modified"></span>
-                              )}
-                            </label>
-                            {fieldType === 'textarea' ? (
-                              <textarea
-                                value={formData[field] || ''}
-                                onChange={(e) => handleInputChange(field, e.target.value)}
-                                rows={3}
-                                className={`w-full px-3 py-2 text-sm rounded-lg border ${
-                                  hasChanged
-                                    ? darkMode
-                                      ? 'bg-yellow-900/20 border-yellow-600 text-gray-100'
-                                      : 'bg-yellow-50 border-yellow-400'
-                                    : darkMode 
-                                      ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                                      : 'bg-white border-gray-300'
-                                } focus:ring-2 focus:ring-blue-500 focus:outline-none`}
-                              />
-                            ) : (
-                              <input
-                                type={fieldType}
-                                value={formatValue(formData[field], fieldType) || ''}
-                                onChange={(e) => handleInputChange(field, e.target.value)}
-                                className={`w-full px-3 py-2 text-sm rounded-lg border ${
-                                  hasChanged
-                                    ? darkMode
-                                      ? 'bg-yellow-900/20 border-yellow-600 text-gray-100'
-                                      : 'bg-yellow-50 border-yellow-400'
-                                    : darkMode 
-                                      ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                                      : 'bg-white border-gray-300'
-                                } focus:ring-2 focus:ring-blue-500 focus:outline-none`}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
+                      {ungroupedFields.map(field => renderField(field))}
                     </div>
                   )}
                 </div>
@@ -863,9 +923,11 @@ const EditRow = ({
           
           <div className="flex gap-2">
             <div className="text-xs text-gray-500 flex items-center gap-2 mr-4">
-              <ConfigIcon size={16} className={`text-${config.color || 'gray'}-500`} />
+              <ConfigIcon size={16} className="text-blue-500" />
+              Database: {databaseName}
               {calculatedFields.size > 0 && (
                 <>
+                  <span>•</span>
                   <Calculator size={14} />
                   {calculatedFields.size} calculated field(s)
                 </>
