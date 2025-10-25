@@ -46,7 +46,7 @@ const databaseConfigs = {
       { name: 'pdc_agreement', type: 'date', required: false, label: 'PDC Agreement', group: 'timeline' },
       { name: 'pdc_revised', type: 'date', required: false, label: 'PDC Revised', group: 'timeline' },
       { name: 'completion_date_actual', type: 'date', required: false, label: 'Completion Date Actual', group: 'timeline' },
-      { name: 'time_allowed_days', type: 'number', required: false, label: 'Time Allowed (Days)', group: 'timeline' },
+      { name: 'time_allowed_days', type: 'number', required: false, label: 'Time Allowed (Days)', calculated: true, group: 'timeline' },
       
       // Progress & Status
       { name: 'physical_progress_percent', type: 'number', required: false, label: 'Physical Progress Percent', defaultValue: '0', group: 'progress' },
@@ -70,6 +70,34 @@ const databaseConfigs = {
         const total = parseFloat(row.expenditure_total) || 0;
         const sanctioned = parseFloat(row.sd_amount_lakh) || 0;
         return sanctioned > 0 ? ((total / sanctioned) * 100).toFixed(2) : '0';
+      },
+      time_allowed_days: (row) => {
+        // Calculate: (PDC Agreement - Award Date) + 10
+        const awardDate = row.award_date;
+        const pdcAgreement = row.pdc_agreement;
+        
+        if (!awardDate || !pdcAgreement) {
+          return '';
+        }
+        
+        try {
+          const award = new Date(awardDate);
+          const pdc = new Date(pdcAgreement);
+          
+          // Check if dates are valid
+          if (isNaN(award.getTime()) || isNaN(pdc.getTime())) {
+            return '';
+          }
+          
+          // Calculate difference in days
+          const diffTime = pdc.getTime() - award.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          // Add 10 days as per requirement
+          return (diffDays + 10).toString();
+        } catch (e) {
+          return '';
+        }
       }
     },
     comparisonColumns: ['name_of_scheme', 'ftr_hq_name', 'shq_name', 'location', 'work_description', 'executive_agency', 'firm_name', 'sd_amount_lakh']

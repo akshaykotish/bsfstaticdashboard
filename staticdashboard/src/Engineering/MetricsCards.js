@@ -1415,7 +1415,7 @@ const MetricsCards = ({
       color: 'orange',
       gradient: 'from-orange-500 to-orange-600',
       infoText: "Projects with significant risk factors."
-    },
+      },
     {
       id: 'delayed',
       group: 'health',
@@ -1571,7 +1571,7 @@ const MetricsCards = ({
     return colors[color] || 'text-gray-500';
   };
 
-  // MetricCard Component with stable values
+  // MetricCard Component with stable values and glassmorphism theme
   const MetricCard = ({ metric, isMain = true, size = 'normal' }) => {
     const isHovered = hoveredCard === metric.id;
     const showDetailPopup = isHovered && metric.details;
@@ -1600,9 +1600,13 @@ const MetricsCards = ({
     // For divider cards
     if (metric.isDivider) {
       return (
-        <div className={`col-span-full ${darkMode ? 'bg-gray-750/50' : 'bg-gray-50'} rounded-xl p-3 my-2`}>
+        <div className={`col-span-full rounded-xl p-3 my-2 backdrop-blur-xl border ${
+          darkMode 
+            ? 'bg-gray-800/40 border-gray-700/50' 
+            : 'bg-white/40 border-gray-200/50'
+        } shadow-lg`}>
           <div className="flex items-center gap-2">
-            <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.gradient}`}>
+            <div className={`p-2 rounded-lg bg-gradient-to-br ${metric.gradient} shadow-lg backdrop-blur-sm`}>
               <metric.icon size={16} className="text-white" />
             </div>
             <div>
@@ -1629,19 +1633,25 @@ const MetricsCards = ({
             setShowInfo(false);
           }}
           className={`
-            relative rounded-2xl shadow-sm border transition-all duration-300 cursor-pointer
+            relative rounded-2xl shadow-lg border transition-all duration-300 cursor-pointer
+            backdrop-blur-xl
             ${darkMode 
-              ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' 
-              : 'bg-white border-gray-100 hover:bg-gray-50'
+              ? 'bg-gray-800/30 border-gray-700/50 hover:bg-gray-800/50' 
+              : 'bg-white/30 border-gray-200/50 hover:bg-white/50'
             }
             ${cardSizes[size]}
-            hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5
-            ${metric.alert ? 'ring-2 ring-red-400 ring-opacity-50' : ''}
+            hover:shadow-2xl hover:scale-[1.02] hover:-translate-y-0.5
+            ${metric.alert ? 'ring-2 ring-red-400/50 ring-opacity-50' : ''}
             ${metric.pulse ? 'animate-pulse' : ''}
-            ${metric.isPatchData ? 'border-l-4 border-l-indigo-500' : ''}
+            ${metric.isPatchData ? 'border-l-4 border-l-indigo-500/80' : ''}
           `}
+          style={{
+            background: darkMode 
+              ? 'rgba(31, 41, 55, 0.3)'
+              : 'rgba(255, 255, 255, 0.3)'
+          }}
         >
-          <div className={`absolute inset-0 bg-gradient-to-br ${metric.gradient} opacity-[0.03] rounded-2xl pointer-events-none`} />
+          <div className={`absolute inset-0 bg-gradient-to-br ${metric.gradient} opacity-[0.05] rounded-2xl pointer-events-none`} />
           
           {/* Alert indicator */}
           {metric.alert && (
@@ -1656,7 +1666,11 @@ const MetricsCards = ({
           {/* Patch Data Indicator */}
           {metric.isPatchData && (
             <div className="absolute top-2 right-3">
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-medium">
+              <span className={`text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm ${
+                darkMode 
+                  ? 'bg-indigo-900/50 text-indigo-300 border border-indigo-700/50' 
+                  : 'bg-indigo-100/50 text-indigo-600 border border-indigo-300/50'
+              } font-medium shadow-sm`}>
                 CY
               </span>
             </div>
@@ -1668,13 +1682,15 @@ const MetricsCards = ({
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className={`text-xs font-semibold ${
-                    darkMode ? 'text-gray-400' : 'text-gray-600'
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
                   }`}>
                     {metric.title}
                   </span>
                   {metric.group && size !== 'compact' && (
-                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${
-                      darkMode ? 'bg-gray-700/50 text-gray-400' : 'bg-gray-100 text-gray-600'
+                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] backdrop-blur-sm ${
+                      darkMode 
+                        ? 'bg-gray-700/50 text-gray-300 border border-gray-600/30' 
+                        : 'bg-gray-100/50 text-gray-700 border border-gray-300/30'
                     }`}>
                       {metric.group}
                     </span>
@@ -1693,8 +1709,8 @@ const MetricsCards = ({
                   )}
               </div>
               
-              {/* Main icon */}
-              <div className={`rounded-xl bg-gradient-to-br ${metric.gradient} shadow-sm ${
+              {/* Main icon with glassmorphism */}
+              <div className={`rounded-xl bg-gradient-to-br ${metric.gradient} shadow-lg backdrop-blur-sm ${
                 size === 'compact' ? 'p-2' : 'p-2.5'
               }`}>
                 <metric.icon size={size === 'compact' ? 14 : isMain ? 18 : 16} className="text-white" />
@@ -1711,16 +1727,18 @@ const MetricsCards = ({
             </div>
             
             {metric.subtitle && size !== 'compact' && (
-              <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                 {metric.subtitle}
               </div>
             )}
             
-            {/* Progress bar */}
+            {/* Progress bar with glassmorphism */}
             {metric.percentage !== undefined && size !== 'compact' && (
-              <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+              <div className={`mt-2 w-full rounded-full h-1.5 backdrop-blur-sm ${
+                darkMode ? 'bg-gray-700/50' : 'bg-gray-200/50'
+              }`}>
                 <div 
-                  className={`h-1.5 rounded-full bg-gradient-to-r ${metric.gradient} transition-all duration-500`}
+                  className={`h-1.5 rounded-full bg-gradient-to-r ${metric.gradient} transition-all duration-500 shadow-sm`}
                   style={{ width: `${Math.min(100, Math.max(0, metric.percentage))}%` }}
                 />
               </div>
@@ -1749,7 +1767,7 @@ const MetricsCards = ({
             )}
           </div>
 
-          {/* Help Icon */}
+          {/* Help Icon with glassmorphism */}
           {showInfoTooltips && metric.infoText && size !== 'compact' && (
             <button
               onClick={(e) => {
@@ -1761,28 +1779,32 @@ const MetricsCards = ({
                 setShowInfo(true);
               }}
               onMouseLeave={() => setShowInfo(false)}
-              className={`absolute bottom-2 right-2 p-1 rounded-full ${
-                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+              className={`absolute bottom-2 right-2 p-1 rounded-full backdrop-blur-sm ${
+                darkMode 
+                  ? 'hover:bg-gray-700/50 border border-gray-600/30' 
+                  : 'hover:bg-gray-100/50 border border-gray-300/30'
               } transition-colors z-20`}
             >
               <HelpCircle size={14} className="text-gray-400" />
             </button>
           )}
           
-          {/* Info Tooltip */}
+          {/* Info Tooltip with glassmorphism */}
           {showInfo && metric.infoText && (
             <>
               <div className="fixed inset-0 z-[9998] pointer-events-none" />
               <div 
-                className={`absolute bottom-10 right-0 w-64 p-3 rounded-xl shadow-2xl ${
-                  darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
-                } border z-[9999]`}
+                className={`absolute bottom-10 right-0 w-64 p-3 rounded-xl shadow-2xl backdrop-blur-xl border ${
+                  darkMode 
+                    ? 'bg-gray-900/90 border-gray-700/50' 
+                    : 'bg-white/90 border-gray-200/50'
+                } z-[9999]`}
                 style={{ maxWidth: '250px' }}
               >
                 <div 
                   className="absolute -bottom-2 right-4 w-0 h-0 border-l-[8px] border-r-[8px] border-t-[8px] border-transparent"
                   style={{ 
-                    borderTopColor: darkMode ? '#111827' : '#ffffff',
+                    borderTopColor: darkMode ? 'rgba(17, 24, 39, 0.9)' : 'rgba(255, 255, 255, 0.9)',
                     filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.1))'
                   }}
                 />
@@ -1793,14 +1815,16 @@ const MetricsCards = ({
             </>
           )}
 
-          {/* More options button */}
+          {/* More options button with glassmorphism */}
           {size !== 'compact' && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
               }}
-              className={`absolute top-3 right-3 p-1 rounded-lg opacity-0 hover:opacity-100 transition-opacity ${
-                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+              className={`absolute top-3 right-3 p-1 rounded-lg opacity-0 hover:opacity-100 transition-opacity backdrop-blur-sm ${
+                darkMode 
+                  ? 'hover:bg-gray-700/50 border border-gray-600/30' 
+                  : 'hover:bg-gray-100/50 border border-gray-300/30'
               }`}
             >
               <MoreVertical size={14} className="text-gray-400" />
@@ -1808,12 +1832,14 @@ const MetricsCards = ({
           )}
         </div>
 
-        {/* Detail popup using fixed positioning */}
+        {/* Detail popup using fixed positioning with glassmorphism */}
         {showDetailPopup && (
           <div 
-            className={`fixed p-3 rounded-xl shadow-xl ${
-              darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
-            } border z-[99999]`}
+            className={`fixed p-3 rounded-xl shadow-2xl backdrop-blur-xl border z-[99999] ${
+              darkMode 
+                ? 'bg-gray-900/90 border-gray-700/50' 
+                : 'bg-white/90 border-gray-200/50'
+            }`}
             style={{ 
               top: `${popupPosition.top}px`,
               left: `${popupPosition.left}px`,
@@ -1833,9 +1859,11 @@ const MetricsCards = ({
               ))}
             </div>
             
-            <button className={`mt-3 w-full py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1 ${
-              darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'
-            } transition-colors`}>
+            <button className={`mt-3 w-full py-1.5 rounded-lg text-xs font-medium flex items-center justify-center gap-1 backdrop-blur-sm ${
+              darkMode 
+                ? 'bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700/30' 
+                : 'bg-gray-100/50 hover:bg-gray-200/50 border border-gray-300/30'
+            } transition-colors shadow-sm`}>
               <Eye size={12} />
               View Details
             </button>
@@ -1883,16 +1911,18 @@ const MetricsCards = ({
     // Render regular project data table with ONLY the filtered drillDownData
     return (
       <div className="fixed inset-0 z-[9999] overflow-hidden flex items-center justify-center">
-        {/* Backdrop */}
+        {/* Backdrop with glassmorphism */}
         <div 
           className="absolute inset-0 bg-black/50 backdrop-blur-sm"
           onClick={handleClose}
         />
         
-        {/* Modal Container */}
-        <div className={`relative w-[98vw] max-w-[1600px] h-[88vh] ${
-          darkMode ? 'bg-gray-900' : 'bg-white'
-        } rounded-2xl shadow-2xl flex flex-col overflow-hidden`}>
+        {/* Modal Container with glassmorphism */}
+        <div className={`relative w-[98vw] max-w-[1600px] h-[88vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl border ${
+          darkMode 
+            ? 'bg-gray-900/95 border-gray-700/50' 
+            : 'bg-white/95 border-gray-200/50'
+        }`}>
 
           {/* Data Table - ONLY showing drillDownData rows */}
           <div className="flex-1 overflow-hidden">
@@ -1918,10 +1948,12 @@ const MetricsCards = ({
 
   return (
     <div className="space-y-4" style={{ position: 'relative' }}>
-      {/* Controls Bar */}
-      <div className={`flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl ${
-        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'
-      } shadow-sm border`}>
+      {/* Controls Bar with glassmorphism */}
+      <div className={`flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl shadow-lg border backdrop-blur-xl ${
+        darkMode 
+          ? 'bg-gray-800/40 border-gray-700/50' 
+          : 'bg-white/40 border-gray-100/50'
+      }`}>
         {/* Group Filter */}
         <div className="flex items-center gap-2">
           <span className={`text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -1932,10 +1964,12 @@ const MetricsCards = ({
               <button
                 key={group}
                 onClick={() => setSelectedMetricGroup(group)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all backdrop-blur-sm shadow-sm ${
                   selectedMetricGroup === group
-                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm'
-                    : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+                    : darkMode 
+                      ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 border border-gray-600/30' 
+                      : 'bg-gray-100/50 text-gray-700 hover:bg-gray-200/50 border border-gray-300/30'
                 }`}
               >
                 {group}
@@ -1950,10 +1984,12 @@ const MetricsCards = ({
           {(selectedMetricGroup === 'budget' || selectedMetricGroup === 'all') && (
             <button
               onClick={() => setShowPatchData(!showPatchData)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all backdrop-blur-sm shadow-sm ${
                 showPatchData
-                  ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-sm'
-                  : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white'
+                  : darkMode 
+                    ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 border border-gray-600/30' 
+                    : 'bg-gray-100/50 text-gray-700 hover:bg-gray-200/50 border border-gray-300/30'
               }`}
               title="Toggle Current Year Budget patch data"
             >
@@ -1970,9 +2006,11 @@ const MetricsCards = ({
             <select
               value={cardSize}
               onChange={(e) => setCardSize(e.target.value)}
-              className={`px-2 py-1 rounded-lg text-xs ${
-                darkMode ? 'bg-gray-700 text-gray-300 border-gray-600' : 'bg-gray-100 text-gray-700 border-gray-200'
-              } border focus:outline-none focus:ring-2 focus:ring-blue-400`}
+              className={`px-2 py-1 rounded-lg text-xs backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                darkMode 
+                  ? 'bg-gray-700/50 text-gray-300 border-gray-600/50' 
+                  : 'bg-gray-100/50 text-gray-700 border-gray-200/50'
+              }`}
             >
               <option value="compact">Compact</option>
               <option value="normal">Normal</option>
@@ -1983,10 +2021,12 @@ const MetricsCards = ({
           {/* Info Tooltips Toggle */}
           <button
             onClick={() => setShowInfoTooltips(!showInfoTooltips)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all backdrop-blur-sm shadow-sm ${
               showInfoTooltips
-                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm'
-                : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+                : darkMode 
+                  ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 border border-gray-600/30' 
+                  : 'bg-gray-100/50 text-gray-700 hover:bg-gray-200/50 border border-gray-300/30'
             }`}
             title="Toggle information tooltips"
           >
@@ -1997,10 +2037,12 @@ const MetricsCards = ({
           {/* Trends Toggle */}
           <button
             onClick={() => setShowTrends(!showTrends)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all backdrop-blur-sm shadow-sm ${
               showTrends
-                ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-sm'
-                : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-gradient-to-r from-green-500 to-green-600 text-white'
+                : darkMode 
+                  ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 border border-gray-600/30' 
+                  : 'bg-gray-100/50 text-gray-700 hover:bg-gray-200/50 border border-gray-300/30'
             }`}
           >
             <Activity size={12} />
@@ -2010,8 +2052,10 @@ const MetricsCards = ({
           {/* Expand Toggle */}
           <button
             onClick={() => setExpandedView(!expandedView)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${
-              darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all backdrop-blur-sm shadow-sm border ${
+              darkMode 
+                ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50 border-gray-600/30' 
+                : 'bg-gray-100/50 text-gray-700 hover:bg-gray-200/50 border-gray-300/30'
             }`}
           >
             {expandedView ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -2025,17 +2069,25 @@ const MetricsCards = ({
         // Show all sections with headers
         <div className="space-y-6">
           {/* Projects Section */}
-          <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
-            darkMode ? 'border-gray-700' : 'border-gray-100'
-          } overflow-hidden`}>
-            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-blue-50 border-blue-100'} border-b flex items-center justify-between`}>
+          <div className={`rounded-2xl shadow-lg border backdrop-blur-xl overflow-hidden ${
+            darkMode 
+              ? 'bg-gray-800/30 border-gray-700/50' 
+              : 'bg-white/30 border-gray-100/50'
+          }`}>
+            <div className={`px-4 py-3 border-b backdrop-blur-sm flex items-center justify-between ${
+              darkMode 
+                ? 'bg-gray-900/50 border-gray-700/50' 
+                : 'bg-blue-50/50 border-blue-100/50'
+            }`}>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
                   <Briefcase size={16} className="text-white" />
                 </div>
                 <h3 className="font-semibold">{dbConfig.displayName ? 'Projects' : 'Projects'}</h3>
-                <span className={`px-2 py-0.5 rounded-full text-xs ${
-                  darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
+                <span className={`px-2 py-0.5 rounded-full text-xs backdrop-blur-sm ${
+                  darkMode 
+                    ? 'bg-gray-700/50 text-gray-400 border border-gray-600/30' 
+                    : 'bg-gray-100/50 text-gray-600 border border-gray-300/30'
                 }`}>
                   {projectsMetrics.length} metrics
                 </span>
@@ -2061,17 +2113,25 @@ const MetricsCards = ({
           </div>
 
           {/* Budget Section */}
-          <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
-            darkMode ? 'border-gray-700' : 'border-gray-100'
-          } overflow-hidden`}>
-            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-green-50 border-green-100'} border-b flex items-center justify-between`}>
+          <div className={`rounded-2xl shadow-lg border backdrop-blur-xl overflow-hidden ${
+            darkMode 
+              ? 'bg-gray-800/30 border-gray-700/50' 
+              : 'bg-white/30 border-gray-100/50'
+          }`}>
+            <div className={`px-4 py-3 border-b backdrop-blur-sm flex items-center justify-between ${
+              darkMode 
+                ? 'bg-gray-900/50 border-gray-700/50' 
+                : 'bg-green-50/50 border-green-100/50'
+            }`}>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg">
                   <IndianRupee size={16} className="text-white" />
                 </div>
                 <h3 className="font-semibold">Financial</h3>
-                <span className={`px-2 py-0.5 rounded-full text-xs ${
-                  darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
+                <span className={`px-2 py-0.5 rounded-full text-xs backdrop-blur-sm ${
+                  darkMode 
+                    ? 'bg-gray-700/50 text-gray-400 border border-gray-600/30' 
+                    : 'bg-gray-100/50 text-gray-600 border border-gray-300/30'
                 }`}>
                   {budgetMetrics.filter(m => !m.isDivider).length} metrics
                 </span>
@@ -2091,17 +2151,25 @@ const MetricsCards = ({
           </div>
 
           {/* Progress Section */}
-          <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
-            darkMode ? 'border-gray-700' : 'border-gray-100'
-          } overflow-hidden`}>
-            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-purple-50 border-purple-100'} border-b`}>
+          <div className={`rounded-2xl shadow-lg border backdrop-blur-xl overflow-hidden ${
+            darkMode 
+              ? 'bg-gray-800/30 border-gray-700/50' 
+              : 'bg-white/30 border-gray-100/50'
+          }`}>
+            <div className={`px-4 py-3 border-b backdrop-blur-sm ${
+              darkMode 
+                ? 'bg-gray-900/50 border-gray-700/50' 
+                : 'bg-purple-50/50 border-purple-100/50'
+            }`}>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg">
                   <Activity size={16} className="text-white" />
                 </div>
                 <h3 className="font-semibold">Progress</h3>
-                <span className={`px-2 py-0.5 rounded-full text-xs ${
-                  darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
+                <span className={`px-2 py-0.5 rounded-full text-xs backdrop-blur-sm ${
+                  darkMode 
+                    ? 'bg-gray-700/50 text-gray-400 border border-gray-600/30' 
+                    : 'bg-gray-100/50 text-gray-600 border border-gray-300/30'
                 }`}>
                   {progressMetrics.length} metrics
                 </span>
@@ -2121,17 +2189,25 @@ const MetricsCards = ({
           </div>
 
           {/* Health Section */}
-          <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
-            darkMode ? 'border-gray-700' : 'border-gray-100'
-          } overflow-hidden`}>
-            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-red-50 border-red-100'} border-b`}>
+          <div className={`rounded-2xl shadow-lg border backdrop-blur-xl overflow-hidden ${
+            darkMode 
+              ? 'bg-gray-800/30 border-gray-700/50' 
+              : 'bg-white/30 border-gray-100/50'
+          }`}>
+            <div className={`px-4 py-3 border-b backdrop-blur-sm ${
+              darkMode 
+                ? 'bg-gray-900/50 border-gray-700/50' 
+                : 'bg-red-50/50 border-red-100/50'
+            }`}>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg">
                   <Heart size={16} className="text-white" />
                 </div>
                 <h3 className="font-semibold">Health</h3>
-                <span className={`px-2 py-0.5 rounded-full text-xs ${
-                  darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
+                <span className={`px-2 py-0.5 rounded-full text-xs backdrop-blur-sm ${
+                  darkMode 
+                    ? 'bg-gray-700/50 text-gray-400 border border-gray-600/30' 
+                    : 'bg-gray-100/50 text-gray-600 border border-gray-300/30'
                 }`}>
                   {healthMetrics.length} metrics
                 </span>
@@ -2151,17 +2227,25 @@ const MetricsCards = ({
           </div>
 
           {/* Timeline Section */}
-          <div className={`${darkMode ? 'bg-gray-800/50' : 'bg-white'} rounded-2xl shadow-sm border ${
-            darkMode ? 'border-gray-700' : 'border-gray-100'
-          } overflow-hidden`}>
-            <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-indigo-50 border-indigo-100'} border-b`}>
+          <div className={`rounded-2xl shadow-lg border backdrop-blur-xl overflow-hidden ${
+            darkMode 
+              ? 'bg-gray-800/30 border-gray-700/50' 
+              : 'bg-white/30 border-gray-100/50'
+          }`}>
+            <div className={`px-4 py-3 border-b backdrop-blur-sm ${
+              darkMode 
+                ? 'bg-gray-900/50 border-gray-700/50' 
+                : 'bg-indigo-50/50 border-indigo-100/50'
+            }`}>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg">
                   <CalendarDays size={16} className="text-white" />
                 </div>
                 <h3 className="font-semibold">Timeline</h3>
-                <span className={`px-2 py-0.5 rounded-full text-xs ${
-                  darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
+                <span className={`px-2 py-0.5 rounded-full text-xs backdrop-blur-sm ${
+                  darkMode 
+                    ? 'bg-gray-700/50 text-gray-400 border border-gray-600/30' 
+                    : 'bg-gray-100/50 text-gray-600 border border-gray-300/30'
                 }`}>
                   {timelineMetrics.length} metrics
                 </span>
@@ -2206,11 +2290,13 @@ const MetricsCards = ({
         </div>
       )}
 
-      {/* Info Banner when tooltips are enabled */}
+      {/* Info Banner when tooltips are enabled with glassmorphism */}
       {showInfoTooltips && (
-        <div className={`p-3 rounded-xl flex items-start gap-3 ${
-          darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'
-        } border`}>
+        <div className={`p-3 rounded-xl flex items-start gap-3 backdrop-blur-xl shadow-lg border ${
+          darkMode 
+            ? 'bg-blue-900/30 border-blue-800/50' 
+            : 'bg-blue-50/50 border-blue-200/50'
+        }`}>
           <Info size={14} className="text-blue-500 mt-0.5 flex-shrink-0" />
           <div className="text-xs">
             <p className="font-semibold text-blue-700 dark:text-blue-400 mb-1">
@@ -2225,10 +2311,12 @@ const MetricsCards = ({
         </div>
       )}
 
-      {/* Summary Stats Bar */}
-      <div className={`flex flex-wrap items-center justify-center gap-4 p-3 rounded-xl ${
-        darkMode ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50 border-gray-100'
-      } text-xs border`}>
+      {/* Summary Stats Bar with glassmorphism */}
+      <div className={`flex flex-wrap items-center justify-center gap-4 p-3 rounded-xl text-xs border backdrop-blur-xl shadow-lg ${
+        darkMode 
+          ? 'bg-gray-800/30 border-gray-700/50' 
+          : 'bg-gray-50/50 border-gray-100/50'
+      }`}>
         <div className="flex items-center gap-2">
           <Info size={14} className="text-blue-500" />
           <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>

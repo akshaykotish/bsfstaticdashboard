@@ -575,19 +575,19 @@ const EditRow = ({
     const needsRegeneration = /^\d+$/.test(String(id));
     
     return (
-      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+      <div className={`inline-flex items-center gap-2 px-2 py-1 rounded-lg ${
         needsRegeneration
           ? 'bg-yellow-100 dark:bg-yellow-900/20'
           : 'bg-blue-100 dark:bg-blue-900/20'
       }`}>
-        <Key size={16} className={needsRegeneration ? 'text-yellow-600' : 'text-blue-600'} />
-        <span className={`text-sm font-medium ${
+        <Key size={14} className={needsRegeneration ? 'text-yellow-600' : 'text-blue-600'} />
+        <span className={`text-xs font-medium ${
           needsRegeneration ? 'text-yellow-700 dark:text-yellow-400' : 'text-blue-700 dark:text-blue-400'
         }`}>
           {actualIdField}: {id}
         </span>
         {needsRegeneration && (
-          <span className="text-xs text-yellow-600 dark:text-yellow-500">
+          <span className="text-[10px] text-yellow-600 dark:text-yellow-500">
             (Needs regeneration)
           </span>
         )}
@@ -607,21 +607,21 @@ const EditRow = ({
     const isReadonly = isIdField || isCalculated;
     
     return (
-      <div key={field} className={fieldType === 'textarea' ? 'md:col-span-2' : ''}>
-        <label className={`block text-xs font-medium mb-1 flex items-center gap-1 ${
+      <div key={field} className={fieldType === 'textarea' ? 'lg:col-span-4' : ''}>
+        <label className={`block text-[11px] font-medium mb-1 flex items-center gap-1 ${
           darkMode ? 'text-gray-300' : 'text-gray-700'
         }`}>
           {getFieldLabel(field)}
           {isRequired && <span className="text-red-500">*</span>}
           {isIdField && (
-            <Fingerprint size={12} className="text-yellow-500" />
+            <Fingerprint size={10} className="text-yellow-500" />
           )}
           {hasChanged && (
             <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" title="Modified"></span>
           )}
           {isCalculated && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded inline-flex items-center gap-1">
-              <Calculator size={10} />
+            <span className="text-[9px] px-1 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded inline-flex items-center gap-0.5">
+              <Calculator size={8} />
               Auto
             </span>
           )}
@@ -631,9 +631,9 @@ const EditRow = ({
           <textarea
             value={formatValue(formData[field], fieldType) || ''}
             onChange={(e) => handleInputChange(field, e.target.value)}
-            rows={3}
+            rows={2}
             disabled={isReadonly}
-            className={`w-full px-3 py-2 text-sm rounded-lg border ${
+            className={`w-full px-2.5 py-1.5 text-xs rounded-lg border ${
               isReadonly
                 ? darkMode
                   ? 'bg-gray-900 border-gray-700 text-gray-500 cursor-not-allowed'
@@ -653,7 +653,7 @@ const EditRow = ({
             value={formatValue(formData[field], fieldType) || ''}
             onChange={(e) => handleInputChange(field, e.target.value)}
             disabled={isReadonly}
-            className={`w-full px-3 py-2 text-sm rounded-lg border ${
+            className={`w-full px-2.5 py-1.5 text-xs rounded-lg border ${
               isReadonly
                 ? darkMode
                   ? 'bg-gray-900 border-gray-700 text-gray-500 cursor-not-allowed'
@@ -702,27 +702,27 @@ const EditRow = ({
         onClick={handleClose}
       />
       
-      <div className={`relative w-full max-w-5xl max-h-[90vh] ${
+      <div className={`relative w-[98vw] max-w-[98vw] h-[84vh] ${
         darkMode ? 'bg-gray-900' : 'bg-white'
       } rounded-2xl shadow-2xl overflow-hidden flex flex-col`}>
         
-        {/* Header */}
-        <div className={`px-6 py-4 border-b ${
+        {/* Header - Compact for landscape */}
+        <div className={`px-6 py-3 border-b ${
           darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-blue-500 to-blue-600'
         }`}>
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
-                <Edit2 size={24} className="text-white" />
+              <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center">
+                <Edit2 size={20} className="text-white" />
               </div>
               <div>
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                <h2 className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
                   Edit Row - {config.displayName || databaseName}
                 </h2>
-                <div className="flex items-center gap-3 mt-1">
+                <div className="flex items-center gap-2 mt-0.5">
                   {renderIdBadge()}
                   {(rowIndex !== null || rowId) && (
-                    <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
+                    <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-blue-100'}`}>
                       {rowIndex !== null ? `Index: ${rowIndex}` : ''}
                     </span>
                   )}
@@ -732,16 +732,16 @@ const EditRow = ({
             
             <div className="flex items-center gap-2">
               {isDirty && (
-                <span className="px-2 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs font-medium">
-                  {changedFields.size} unsaved changes
+                <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 rounded text-[10px] font-medium">
+                  {changedFields.size} unsaved
                 </span>
               )}
               
               <button
                 onClick={handleDuplicate}
-                className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                className="px-2.5 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
               >
-                <Copy size={14} />
+                <Copy size={12} />
                 Duplicate
               </button>
               
@@ -751,33 +751,33 @@ const EditRow = ({
                   darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'
                 } transition-colors`}
               >
-                <X size={20} className="text-white" />
+                <X size={18} className="text-white" />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Alerts */}
+        {/* Alerts - Compact */}
         {(error || success) && (
-          <div className="px-6 py-3">
+          <div className="px-6 py-2">
             {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg">
-                <AlertCircle size={16} />
-                <span className="text-sm">{error}</span>
+              <div className="flex items-center gap-2 p-2 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg">
+                <AlertCircle size={14} />
+                <span className="text-xs">{error}</span>
               </div>
             )}
             {success && (
-              <div className="flex items-center gap-2 p-3 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg">
-                <Check size={16} />
-                <span className="text-sm">{success}</span>
+              <div className="flex items-center gap-2 p-2 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg">
+                <Check size={14} />
+                <span className="text-xs">{success}</span>
               </div>
             )}
           </div>
         )}
 
-        {/* Form Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="space-y-4">
+        {/* Form Body - 4 columns layout for landscape */}
+        <div className="flex-1 overflow-y-auto px-6 py-3">
+          <div className="space-y-3">
             {/* Render fields based on column groups if they exist */}
             {currentConfig?.columnGroups ? (
               Object.entries(currentConfig.columnGroups)
@@ -797,32 +797,32 @@ const EditRow = ({
                     }`}>
                       <button
                         onClick={() => toggleSection(groupKey)}
-                        className={`w-full px-4 py-3 flex items-center justify-between ${
+                        className={`w-full px-4 py-2 flex items-center justify-between ${
                           darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
                         } transition-colors rounded-t-xl`}
                       >
                         <div className="flex items-center gap-2">
-                          <GroupIcon size={18} className="text-blue-500" />
-                          <h3 className="font-semibold text-sm">{group.title}</h3>
+                          <GroupIcon size={16} className="text-blue-500" />
+                          <h3 className="font-semibold text-xs">{group.title}</h3>
                           {groupFields.some(field => changedFields.has(field)) && (
-                            <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                            <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
                           )}
                           {requiredFields.length > 0 && (
-                            <span className="text-xs px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded">
+                            <span className="text-[10px] px-1.5 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded">
                               {requiredFields.length} Required
                             </span>
                           )}
                           {groupFields.some(f => calculatedFields.has(f)) && (
-                            <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded">
+                            <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded">
                               Has Calculated Fields
                             </span>
                           )}
                         </div>
-                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                       </button>
                       
                       {isExpanded && (
-                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                           {groupFields.map(field => renderField(field))}
                         </div>
                       )}
@@ -834,7 +834,7 @@ const EditRow = ({
               <div className={`rounded-xl border ${
                 darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
               }`}>
-                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                   {columns.map(field => renderField(field))}
                 </div>
               </div>
@@ -861,22 +861,22 @@ const EditRow = ({
                 }`}>
                   <button
                     onClick={() => toggleSection('additional')}
-                    className={`w-full px-4 py-3 flex items-center justify-between ${
+                    className={`w-full px-4 py-2 flex items-center justify-between ${
                       darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
                     } transition-colors rounded-t-xl`}
                   >
                     <div className="flex items-center gap-2">
-                      <Database size={18} className="text-purple-500" />
-                      <h3 className="font-semibold text-sm">Additional Fields</h3>
+                      <Database size={16} className="text-purple-500" />
+                      <h3 className="font-semibold text-xs">Additional Fields</h3>
                       {ungroupedFields.some(field => changedFields.has(field)) && (
-                        <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                        <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
                       )}
                     </div>
-                    {expandedSections.additional ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    {expandedSections.additional ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
                   
                   {expandedSections.additional && (
-                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                       {ungroupedFields.map(field => renderField(field))}
                     </div>
                   )}
@@ -886,8 +886,8 @@ const EditRow = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className={`px-6 py-4 border-t ${
+        {/* Footer - Compact */}
+        <div className={`px-6 py-2.5 border-t ${
           darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
         } flex justify-between items-center`}>
           <div className="flex gap-2">
@@ -895,25 +895,25 @@ const EditRow = ({
               <button
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={loading || deleting}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
-                <Trash2 size={16} />
+                <Trash2 size={14} />
                 Delete
               </button>
             ) : (
-              <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 px-3 py-1 rounded-lg">
-                <AlertTriangle size={16} className="text-red-500" />
-                <span className="text-sm text-red-700 dark:text-red-400">Confirm deletion?</span>
+              <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded-lg">
+                <AlertTriangle size={14} className="text-red-500" />
+                <span className="text-xs text-red-700 dark:text-red-400">Confirm?</span>
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="px-3 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700"
+                  className="px-2 py-0.5 bg-red-600 text-white rounded text-[10px] font-medium hover:bg-red-700"
                 >
                   {deleting ? 'Deleting...' : 'Yes'}
                 </button>
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="px-3 py-1 bg-gray-500 text-white rounded text-xs font-medium hover:bg-gray-600"
+                  className="px-2 py-0.5 bg-gray-500 text-white rounded text-[10px] font-medium hover:bg-gray-600"
                 >
                   No
                 </button>
@@ -922,14 +922,14 @@ const EditRow = ({
           </div>
           
           <div className="flex gap-2">
-            <div className="text-xs text-gray-500 flex items-center gap-2 mr-4">
-              <ConfigIcon size={16} className="text-blue-500" />
+            <div className="text-[10px] text-gray-500 flex items-center gap-2 mr-3">
+              <ConfigIcon size={14} className="text-blue-500" />
               Database: {databaseName}
               {calculatedFields.size > 0 && (
                 <>
                   <span>•</span>
-                  <Calculator size={14} />
-                  {calculatedFields.size} calculated field(s)
+                  <Calculator size={12} />
+                  {calculatedFields.size} calculated
                 </>
               )}
             </div>
@@ -938,13 +938,13 @@ const EditRow = ({
               <button
                 onClick={handleReset}
                 disabled={loading}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   darkMode 
                     ? 'bg-gray-700 text-gray-100 hover:bg-gray-600' 
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                } disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                } disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5`}
               >
-                <RefreshCw size={16} />
+                <RefreshCw size={14} />
                 Reset
               </button>
             )}
@@ -952,7 +952,7 @@ const EditRow = ({
             <button
               onClick={handleClose}
               disabled={loading}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 darkMode 
                   ? 'bg-gray-700 text-gray-100 hover:bg-gray-600' 
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -964,16 +964,16 @@ const EditRow = ({
             <button
               onClick={handleSave}
               disabled={loading || !isDirty}
-              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:opacity-90 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+              className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:opacity-90 transition-all text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-sm"
             >
               {loading ? (
                 <>
-                  <Loader size={16} className="animate-spin" />
+                  <Loader size={14} className="animate-spin" />
                   Saving...
                 </>
               ) : (
                 <>
-                  <Save size={16} />
+                  <Save size={14} />
                   Save Changes
                 </>
               )}

@@ -425,25 +425,25 @@ const AddRow = ({
         onClick={handleClose}
       />
       
-      <div className={`relative w-full max-w-5xl max-h-[90vh] ${
+      <div className={`relative w-[98vw] max-w-[98vw] h-[84vh] ${
         darkMode ? 'bg-gray-900' : 'bg-white'
       } rounded-2xl shadow-2xl overflow-hidden flex flex-col`}>
         
-        {/* Header */}
-        <div className={`px-6 py-4 border-b ${
+        {/* Header - Compact for landscape */}
+        <div className={`px-6 py-3 border-b ${
           darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gradient-to-r from-green-500 to-green-600'
         }`}>
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
-                <Plus size={24} className="text-white" />
+              <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center">
+                <Plus size={20} className="text-white" />
               </div>
               <div>
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
+                <h2 className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-white'}`}>
                   Add New Row - {config.displayName || databaseName}
                 </h2>
-                <p className={`text-sm mt-0.5 ${darkMode ? 'text-gray-400' : 'text-green-100'} flex items-center gap-2`}>
-                  <Key size={14} />
+                <p className={`text-xs mt-0.5 ${darkMode ? 'text-gray-400' : 'text-green-100'} flex items-center gap-2`}>
+                  <Key size={12} />
                   ID will be auto-generated: {getExampleId()}
                 </p>
               </div>
@@ -455,62 +455,61 @@ const AddRow = ({
                 darkMode ? 'hover:bg-gray-700' : 'hover:bg-green-700'
               } transition-colors`}
             >
-              <X size={20} className="text-white" />
+              <X size={18} className="text-white" />
             </button>
           </div>
         </div>
 
-        {/* ID Information Banner */}
+        {/* ID Information Banner - Compact */}
         {showIdInfo && (
-          <div className="px-6 py-3 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
-            <div className="flex items-start gap-3">
-              <Fingerprint size={20} className="text-blue-600 dark:text-blue-400 mt-0.5" />
+          <div className="px-6 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
+            <div className="flex items-center gap-3">
+              <Fingerprint size={16} className="text-blue-600 dark:text-blue-400" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-300">
-                  Automatic ID Generation
+                <p className="text-xs font-medium text-blue-900 dark:text-blue-300 inline">
+                  Automatic ID Generation - 
                 </p>
-                <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
-                  A unique ID will be generated automatically when you save this record. 
-                  The ID field ({config.idField}) will be: {getExampleId()}
+                <p className="text-xs text-blue-700 dark:text-blue-400 inline ml-1">
+                  A unique ID ({getExampleId()}) will be generated automatically.
+                  {config.calculations && Object.keys(config.calculations).length > 0 && (
+                    <span className="ml-2">
+                      <Calculator size={10} className="inline mr-1" />
+                      {Object.keys(config.calculations).length} field(s) will be auto-calculated
+                    </span>
+                  )}
                 </p>
-                {config.calculations && Object.keys(config.calculations).length > 0 && (
-                  <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
-                    <Calculator size={12} className="inline mr-1" />
-                    {Object.keys(config.calculations).length} field(s) will be automatically calculated
-                  </p>
-                )}
               </div>
               <button
                 onClick={() => setShowIdInfo(false)}
                 className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
               >
-                <X size={16} />
+                <X size={14} />
               </button>
             </div>
           </div>
         )}
 
-        {/* Alerts */}
+        {/* Alerts - Compact */}
         {(error || success) && (
-          <div className="px-6 py-3">
+          <div className="px-6 py-2">
             {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg">
-                <AlertCircle size={16} />
-                <span className="text-sm">{error}</span>
+              <div className="flex items-center gap-2 p-2 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg">
+                <AlertCircle size={14} />
+                <span className="text-xs">{error}</span>
               </div>
             )}
             {success && (
-              <div className="flex items-center gap-2 p-3 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg">
-                <Check size={16} />
-                <span className="text-sm font-medium">{success}</span>
+              <div className="flex items-center gap-2 p-2 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg">
+                <Check size={14} />
+                <span className="text-xs font-medium">{success}</span>
               </div>
             )}
           </div>
         )}
 
-        {/* Form Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="space-y-4">
+        {/* Form Body - 4 columns layout for landscape */}
+        <div className="flex-1 overflow-y-auto px-6 py-3">
+          <div className="space-y-3">
             {Object.entries(config.columnGroups || {})
               .sort((a, b) => (a[1].order || 0) - (b[1].order || 0))
               .map(([groupKey, group]) => {
@@ -528,29 +527,29 @@ const AddRow = ({
                   }`}>
                     <button
                       onClick={() => toggleSection(groupKey)}
-                      className={`w-full px-4 py-3 flex items-center justify-between ${
+                      className={`w-full px-4 py-2 flex items-center justify-between ${
                         darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
                       } transition-colors rounded-t-xl`}
                     >
                       <div className="flex items-center gap-2">
-                        <GroupIcon size={18} className={`text-${config.color || 'blue'}-500`} />
-                        <h3 className="font-semibold text-sm">{group.title}</h3>
+                        <GroupIcon size={16} className={`text-${config.color || 'blue'}-500`} />
+                        <h3 className="font-semibold text-xs">{group.title}</h3>
                         {requiredFields.length > 0 && (
-                          <span className="text-xs px-2 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded">
+                          <span className="text-[10px] px-1.5 py-0.5 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded">
                             {requiredFields.length} Required
                           </span>
                         )}
                         {groupFields.some(f => calculatedFields.has(f)) && (
-                          <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded">
+                          <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded">
                             Has Calculated Fields
                           </span>
                         )}
                       </div>
-                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </button>
                     
                     {isExpanded && (
-                      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                         {groupFields.map(field => {
                           const fieldType = getFieldType(field);
                           const column = currentConfig?.columns.find(col => 
@@ -560,16 +559,16 @@ const AddRow = ({
                           const isCalculated = calculatedFields.has(field);
                           
                           return (
-                            <div key={field} className={fieldType === 'textarea' ? 'md:col-span-2' : ''}>
-                              <label className={`block text-xs font-medium mb-1 ${
+                            <div key={field} className={fieldType === 'textarea' ? 'lg:col-span-4' : ''}>
+                              <label className={`block text-[11px] font-medium mb-1 ${
                                 darkMode ? 'text-gray-300' : 'text-gray-700'
                               }`}>
                                 {getFieldLabel(field)}
                                 {isRequired && <span className="text-red-500 ml-1">*</span>}
                                 {isCalculated && (
-                                  <span className="text-[10px] px-1.5 py-0.5 ml-2 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded inline-flex items-center gap-1">
-                                    <Calculator size={10} />
-                                    Auto-calculated
+                                  <span className="text-[9px] px-1 py-0.5 ml-1 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded inline-flex items-center gap-0.5">
+                                    <Calculator size={8} />
+                                    Auto
                                   </span>
                                 )}
                               </label>
@@ -578,10 +577,10 @@ const AddRow = ({
                                 <textarea
                                   value={formData[field] || ''}
                                   onChange={(e) => handleInputChange(field, e.target.value)}
-                                  rows={3}
+                                  rows={2}
                                   disabled={isCalculated}
                                   placeholder={isRequired ? 'Required' : 'Optional'}
-                                  className={`w-full px-3 py-2 text-sm rounded-lg border ${
+                                  className={`w-full px-2.5 py-1.5 text-xs rounded-lg border ${
                                     isCalculated
                                       ? darkMode
                                         ? 'bg-gray-900 border-gray-700 text-gray-500 cursor-not-allowed'
@@ -598,7 +597,7 @@ const AddRow = ({
                                   onChange={(e) => handleInputChange(field, e.target.value)}
                                   disabled={isCalculated}
                                   placeholder={isRequired ? 'Required' : 'Optional'}
-                                  className={`w-full px-3 py-2 text-sm rounded-lg border ${
+                                  className={`w-full px-2.5 py-1.5 text-xs rounded-lg border ${
                                     isCalculated
                                       ? darkMode
                                         ? 'bg-gray-900 border-gray-700 text-gray-500 cursor-not-allowed'
@@ -620,17 +619,17 @@ const AddRow = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className={`px-6 py-4 border-t ${
+        {/* Footer - Compact */}
+        <div className={`px-6 py-2.5 border-t ${
           darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
         } flex justify-between items-center`}>
-          <div className="text-xs text-gray-500 flex items-center gap-2">
-            <ConfigIcon size={16} className={`text-${config.color || 'gray'}-500`} />
+          <div className="text-[10px] text-gray-500 flex items-center gap-2">
+            <ConfigIcon size={14} className={`text-${config.color || 'gray'}-500`} />
             Fields marked with <span className="text-red-500">*</span> are required
             {calculatedFields.size > 0 && (
               <>
                 <span className="mx-1">•</span>
-                <Calculator size={14} />
+                <Calculator size={12} />
                 {calculatedFields.size} calculated field(s)
               </>
             )}
@@ -640,20 +639,20 @@ const AddRow = ({
             <button
               onClick={handleReset}
               disabled={loading}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 darkMode 
                   ? 'bg-gray-700 text-gray-100 hover:bg-gray-600' 
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              } disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+              } disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5`}
             >
-              <RefreshCw size={16} />
+              <RefreshCw size={14} />
               Reset
             </button>
             
             <button
               onClick={handleClose}
               disabled={loading}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 darkMode 
                   ? 'bg-gray-700 text-gray-100 hover:bg-gray-600' 
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -665,16 +664,16 @@ const AddRow = ({
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:opacity-90 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+              className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:opacity-90 transition-all text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-sm"
             >
               {loading ? (
                 <>
-                  <Loader size={16} className="animate-spin" />
+                  <Loader size={14} className="animate-spin" />
                   Adding...
                 </>
               ) : (
                 <>
-                  <Save size={16} />
+                  <Save size={14} />
                   Add Row
                 </>
               )}
