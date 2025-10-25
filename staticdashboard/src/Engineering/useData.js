@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-const API_URL = 'http://localhost:3456';
+const API_URL = 'http://172.21.188.201:3456';
 
 // Import database configurations - handle both default and named exports
 let databaseConfigs;

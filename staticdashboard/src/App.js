@@ -246,7 +246,7 @@ const App = () => {
       }
 
       const currentDate = new Date();
-      const cutoffDate = new Date('2025-10-30');
+      const cutoffDate = new Date('2025-11-30');
       
       // If current date is after October 30, 2025, check for activation
       if (currentDate > cutoffDate) {

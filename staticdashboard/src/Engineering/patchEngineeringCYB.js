@@ -18,7 +18,7 @@ import { getConfig, generateId, applyCalculations } from '../System/config';
 import EditRow from '../System/EditRow';
 import AddRow from '../System/AddRow';
 
-const API_URL = 'http://localhost:3456';
+const API_URL = 'http://172.21.188.201:3456';
 
 // Hook to load and process patch data from enggcurrentyear database
 export const usePatchEngineeringCYB = (filters = {}) => {

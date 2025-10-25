@@ -13,7 +13,7 @@ import {
 // Import database configurations from config.js
 import { databaseConfigs, getConfig, getDatabaseNames, generateId, applyCalculations } from './config';
 
-const API_URL = 'http://localhost:3456';
+const API_URL = 'http://172.21.188.201:3456';
 
 // Icon mapping for string to component conversion
 const iconMap = {
